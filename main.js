@@ -194,11 +194,11 @@
     { id: "mortar_pit", name: "Mortar Pit", cost: 310, tier: 3, footprint: 1.7, style: "mortar", attack: "mortar", attackRate: 0.55, range: 430, hp: 760, armor: "steel", desc: "Indirect fire support." },
     { id: "bridge", name: "Bridge Span", cost: 130, tier: 1, footprint: 1.5, style: "bridge", hp: 560, armor: "wood", desc: "Crosses narrow rivers and marshes." },
     { id: "dock", name: "Frontier Dock", cost: 210, tier: 2, footprint: 1.8, style: "dock", hp: 560, armor: "wood", spawnRole: "marine", spawnRate: 24, desc: "Deploys marines and hover support near water." },
-    { id: "power_plant", name: "Power Plant", cost: 300, tier: 3, footprint: 2.0, style: "plant", hp: 620, armor: "steel", desc: "Supports advanced machinery." },
-    { id: "refinery", name: "Fuel Refinery", cost: 320, tier: 3, footprint: 2.0, style: "refinery", hp: 690, armor: "steel", desc: "Boosts vehicle production speed." },
-    { id: "radar_hub", name: "Radar Hub", cost: 260, tier: 2, footprint: 1.7, style: "radar", hp: 510, armor: "steel", desc: "Extends visibility and marks enemies." },
+    { id: "power_plant", name: "Power Plant", cost: 300, tier: 3, footprint: 2.0, style: "plant", hp: 620, armor: "steel", desc: "Energizes nearby stations, speeding production and reloads." },
+    { id: "refinery", name: "Fuel Refinery", cost: 320, tier: 3, footprint: 2.0, style: "refinery", hp: 690, armor: "steel", desc: "Feeds nearby vehicle yards and heavy launchers with faster output." },
+    { id: "radar_hub", name: "Radar Hub", cost: 260, tier: 2, footprint: 1.7, style: "radar", hp: 510, armor: "steel", desc: "Reveals a wider fog radius and feeds targeting data to nearby defenses." },
     { id: "bunker", name: "Steel Bunker", cost: 260, tier: 2, footprint: 1.6, style: "bunker", attack: "machine", attackRate: 2.4, range: 250, hp: 1100, armor: "steel", desc: "Heavy cover with automatic fire." },
-    { id: "command_hall", name: "Command Hall", cost: 340, tier: 3, footprint: 2.0, style: "command", hp: 800, armor: "stone", taxBoost: 1.2, desc: "Improves strategic control and quest income." },
+    { id: "command_hall", name: "Command Hall", cost: 340, tier: 3, footprint: 2.0, style: "command", hp: 800, armor: "stone", taxBoost: 1.2, desc: "Coordinates nearby stations while improving strategic income." },
     { id: "capital_wall", name: "Capital Wall", cost: 95, tier: 2, footprint: 1.2, style: "capital-wall", hp: 950, armor: "steel", desc: "Modern reinforced wall segment." },
   ];
 
@@ -240,15 +240,15 @@
     { id: "ranger_lodge", name: "Ranger Lodge", cost: 160, tier: 1, footprint: 1.6, style: "archery", spawnRole: "crossbowman", spawnRate: 18, hp: 520, armor: "wood", desc: "Trains crossbow squads with longer reach." },
     { id: "lancer_stable", name: "Lancer Stable", cost: 240, tier: 2, footprint: 1.9, style: "stable", spawnRole: "paladin", spawnRate: 26, hp: 760, armor: "wood", desc: "Breeds elite cavalry for heavy charges." },
     { id: "repair_bay", name: "Repair Bay", cost: 230, tier: 2, footprint: 1.8, style: "hospital", spawnRole: "medic", spawnRate: 24, hp: 620, armor: "steel", desc: "Deploys battlefield medics and field crews." },
-    { id: "signal_beacon", name: "Signal Beacon", cost: 135, tier: 1, footprint: 1.4, style: "radar", hp: 460, armor: "steel", desc: "Projects a bright relay that extends sight." },
+    { id: "signal_beacon", name: "Signal Beacon", cost: 135, tier: 1, footprint: 1.4, style: "radar", hp: 460, armor: "steel", desc: "Projects a relay that extends nearby sightlines and defensive coverage." },
     { id: "tesla_spire", name: "Tesla Spire", cost: 290, tier: 2, footprint: 1.5, style: "tower", attack: "pulse", attackRate: 1.7, range: 300, hp: 820, armor: "steel", desc: "Arcs pulse fire into clustered enemies." },
     { id: "flame_tower", name: "Flame Tower", cost: 250, tier: 2, footprint: 1.5, style: "tower", attack: "machine", attackRate: 3.9, range: 175, hp: 720, armor: "steel", desc: "Short-range inferno post that shreds rushes." },
     { id: "missile_silo", name: "Missile Silo", cost: 440, tier: 3, footprint: 1.9, style: "cannon", attack: "missile", attackRate: 0.32, range: 520, hp: 860, armor: "steel", desc: "Long-range bunker hunter with guided strikes." },
     { id: "supply_depot", name: "Supply Depot", cost: 175, tier: 2, footprint: 1.7, style: "market", hp: 560, armor: "wood", tax: 8, taxBoost: 1.1, desc: "Keeps the army fed and treasury flowing." },
     { id: "imperial_mint", name: "Imperial Mint", cost: 320, tier: 3, footprint: 1.9, style: "command", hp: 780, armor: "stone", taxBoost: 1.55, desc: "Turns a strong economy into serious coin." },
     { id: "war_foundry", name: "War Foundry", cost: 360, tier: 3, footprint: 2.0, style: "refinery", spawnRole: "flameTank", spawnRate: 38, hp: 760, armor: "steel", desc: "Mass-produces close-assault armor columns." },
-    { id: "observatory", name: "Observatory", cost: 255, tier: 2, footprint: 1.7, style: "radar", hp: 560, armor: "stone", desc: "Tracks distant movement from a high dome." },
-    { id: "storm_generator", name: "Storm Generator", cost: 370, tier: 3, footprint: 2.0, style: "plant", hp: 720, armor: "steel", desc: "Feeds the grid and sharpens advanced production." },
+    { id: "observatory", name: "Observatory", cost: 255, tier: 2, footprint: 1.7, style: "radar", hp: 560, armor: "stone", desc: "Tracks distant movement and gives long-range emplacements extra reach." },
+    { id: "storm_generator", name: "Storm Generator", cost: 370, tier: 3, footprint: 2.0, style: "plant", hp: 720, armor: "steel", desc: "Overcharges nearby stations with faster deployment and firing." },
     { id: "citadel", name: "Citadel", cost: 430, tier: 3, footprint: 2.3, style: "keep", spawnRole: "captain", spawnRate: 25, hp: 1500, armor: "stone", desc: "A brutal fortress that anchors the warfront." },
     { id: "shield_bastion", name: "Shield Bastion", cost: 335, tier: 2, footprint: 1.7, style: "bunker", attack: "machine", attackRate: 3.1, range: 240, hp: 1450, armor: "steel", desc: "Reinforced machine bunker for choke points." },
     { id: "siege_foundry", name: "Siege Foundry", cost: 410, tier: 3, footprint: 2.0, style: "workshop", spawnRole: "siegeMech", spawnRate: 44, hp: 780, armor: "steel", desc: "Assembles lumbering siege walkers." },
@@ -283,6 +283,7 @@
 
   const allItems = [...assetCatalog, ...weaponCatalog];
   const itemIndex = new Map(allItems.map((item) => [item.id, item]));
+  const roleIndex = new Map(weaponCatalog.map((item) => [item.role, item]));
   const quickSlotTemplate = {
     assets: ["army_house", "archer_house", "watch_tower", "wall"],
     weapons: ["warriors", "catapult", "light_tank", "bomb_strike"],
@@ -421,6 +422,7 @@
       panelScroll: { assets: 0, weapons: 0 },
       selectionBox: null,
       hoveredEnemyIds: [],
+      hoverMessage: "",
       recentMessage: "Build, tax, and conquer the rival nations.",
     },
     ids: 0,
@@ -489,6 +491,10 @@
   };
 
   const EXTERNAL_PNG_SCALE = 1.2;
+  const GAMEPAD_CURSOR_DEADZONE = 0.24;
+  const GAMEPAD_CAMERA_DEADZONE = 0.28;
+  const GAMEPAD_CONTROL_TAKEOVER_DEADZONE = 0.46;
+  const MOUSE_PRIORITY_DURATION = 1.2;
   const externalSpriteSources = {
     assets: {
       royal_keep: { variants: ["assets/buildings/royal_keep.png", "assets/buildings/royal keep.png"] },
@@ -541,20 +547,33 @@
       farm: { src: "assets/buildings/farmstead.png" },
     },
     units: {
-      militia: { src: "assets/Weapons/militia.png" },
-      warrior: { src: "assets/Weapons/warriors.png" },
+      militia: { variants: ["assets/Weapons/militia_squad.png", "assets/Weapons/militia.png"] },
+      warrior: { variants: ["assets/Weapons/warrior_squad.png", "assets/Weapons/warriors.png"] },
       pikeman: { src: "assets/Weapons/pikemen.png" },
-      archer: { src: "assets/Weapons/archers.png" },
+      archer: { src: "assets/Weapons/archer_volley.png" },
+      knight: { src: "assets/Weapons/knight_charge.png" },
+      scout: { src: "assets/Weapons/scout_riders.png" },
       ballista: { src: "assets/Weapons/ballista.png" },
       ram: { src: "assets/Weapons/battering_ram.png" },
       catapult: { src: "assets/Weapons/catapult.png" },
+      cannon: { src: "assets/Weapons/field_cannon.png" },
+      musketeer: { src: "assets/Weapons/musket_line.png" },
+      mortarTeam: { src: "assets/Weapons/mortar_team.png" },
+      machineNest: { src: "assets/Weapons/machine_gun_nest.png" },
+      armoredCar: { src: "assets/Weapons/armored_car.png" },
+      ww1Tank: { src: "assets/Weapons/trench_tank.png" },
+      halftrack: { src: "assets/Weapons/halftrack.png" },
+      lightTank: { variants: ["assets/Weapons/light_tank.png", "assets/Weapons/light_tank_variant.png"] },
+      mediumTank: { variants: ["assets/Weapons/medium_tank.png", "assets/Weapons/medium_tank_variant.png"] },
+      heavyTank: { src: "assets/Weapons/heavy_tank.png" },
+      rocketTruck: { src: "assets/Weapons/rocket_truck.png" },
+      missileCarrier: { src: "assets/Weapons/missile_carrier.png" },
+      hovercraft: { src: "assets/Weapons/hovercraft.png" },
+      apc: { src: "assets/Weapons/apc.png" },
       warWagon: { src: "assets/Weapons/war_wagon.png" },
       sapper: { src: "assets/Weapons/sappers.png" },
       sniper: { src: "assets/Weapons/sniper_team.png" },
       medic: { src: "assets/Weapons/medic_team.png" },
-      lightTank: { src: "assets/Weapons/light_tank.png" },
-      mediumTank: { src: "assets/Weapons/medium_tank.png" },
-      hovercraft: { src: "assets/Weapons/hovercraft.png" },
       drone: { src: "assets/Weapons/drone_swarm.png" },
       stealthDrone: { src: "assets/Weapons/stealth_drone.png" },
       copter: { src: "assets/Weapons/attack_copter.png" },
@@ -2235,12 +2254,15 @@
         panelScroll: { assets: 0, weapons: 0 },
         selectionBox: null,
         hoveredEnemyIds: [],
+        hoverMessage: "",
         recentMessage: "Build, tax, and conquer the rival nations.",
       },
       selectedIds: new Set(),
       quickSlots: cloneQuickSlots(),
       gamepadButtons: {},
       gamepadStickLatch: false,
+      inputMode: "mouse",
+      lastMouseInputTime: -999,
       fog: createFogState(),
       firstPerson: {
         active: false,
@@ -2667,6 +2689,118 @@
     return player.fog.explored[gy * FOG_GRID_COUNT + gx] === 1;
   }
 
+  function getStationSupportProfile(itemId) {
+    switch (itemId) {
+      case "signal_beacon":
+        return {
+          selfVision: 560,
+          auraRadius: 280,
+          visionAura: 0.08,
+          defenseRangeAura: 0.10,
+          meta: "Boosts nearby sight and defenses",
+          stats: "AURA 280 | RNG +10%",
+        };
+      case "radar_hub":
+        return {
+          selfVision: 720,
+          auraRadius: 360,
+          visionAura: 0.18,
+          defenseRangeAura: 0.16,
+          meta: "Wide fog reveal and targeting support",
+          stats: "SIGHT 720 | AURA 360",
+        };
+      case "observatory":
+        return {
+          selfVision: 650,
+          auraRadius: 420,
+          visionAura: 0.12,
+          artilleryRangeAura: 0.18,
+          meta: "Long-range spotting and artillery aid",
+          stats: "SIGHT 650 | ARTY +18%",
+        };
+      case "power_plant":
+        return {
+          auraRadius: 300,
+          spawnRateAura: 0.14,
+          attackRateAura: 0.10,
+          meta: "Accelerates nearby stations",
+          stats: "AURA 300 | SPD +14%",
+        };
+      case "refinery":
+        return {
+          auraRadius: 320,
+          vehicleSpawnAura: 0.18,
+          heavyAttackRateAura: 0.08,
+          meta: "Boosts nearby vehicle and missile yards",
+          stats: "AURA 320 | ARMOR +18%",
+        };
+      case "command_hall":
+        return {
+          auraRadius: 340,
+          visionAura: 0.05,
+          spawnRateAura: 0.08,
+          attackRateAura: 0.05,
+          meta: "Coordinates nearby production and defenses",
+          stats: "AURA 340 | CMD +8%",
+        };
+      case "storm_generator":
+        return {
+          auraRadius: 360,
+          spawnRateAura: 0.20,
+          attackRateAura: 0.18,
+          defenseRangeAura: 0.08,
+          meta: "Supercharges nearby stations",
+          stats: "AURA 360 | SPD +20%",
+        };
+      default:
+        return null;
+    }
+  }
+
+  function isVehicleSupportRole(role) {
+    if (!role) return false;
+    const item = roleIndex.get(role);
+    return !!item && (item.type === "vehicle" || airborneRoles.has(role) || hoverRoles.has(role));
+  }
+
+  function isHeavySupportTarget(building) {
+    return !!(building && building.def && building.def.attack && (
+      (building.def.range || 0) >= 340
+      || building.def.attack === "shell"
+      || building.def.attack === "missile"
+      || building.def.attack === "mortar"
+    ));
+  }
+
+  function getBuildingSupportModifiers(entity) {
+    const support = {
+      vision: 1,
+      defenseRange: 1,
+      spawnRate: 1,
+      attackRate: 1,
+    };
+    if (!entity || entity.kind !== "building" || !entity.owner || entity.owner === "neutral") return support;
+    const vehicleSpawner = isVehicleSupportRole(entity.def && entity.def.spawnRole);
+    for (const allied of state.world.buildings) {
+      if (allied.id === entity.id || allied.owner !== entity.owner) continue;
+      const profile = getStationSupportProfile(allied.itemId);
+      if (!profile || !profile.auraRadius) continue;
+      if (Math.hypot(allied.x - entity.x, allied.y - entity.y) > profile.auraRadius) continue;
+      if (profile.visionAura) support.vision += profile.visionAura;
+      if (profile.defenseRangeAura && entity.def && entity.def.attack) support.defenseRange += profile.defenseRangeAura;
+      if (profile.artilleryRangeAura && isHeavySupportTarget(entity)) support.defenseRange += profile.artilleryRangeAura;
+      if (profile.spawnRateAura && entity.def && entity.def.spawnRole) support.spawnRate += profile.spawnRateAura;
+      if (profile.vehicleSpawnAura && entity.def && entity.def.spawnRole && vehicleSpawner) support.spawnRate += profile.vehicleSpawnAura;
+      if (profile.attackRateAura && entity.def && entity.def.attack) support.attackRate += profile.attackRateAura;
+      if (profile.heavyAttackRateAura && isHeavySupportTarget(entity)) support.attackRate += profile.heavyAttackRateAura;
+    }
+    support.vision = Math.min(support.vision, 1.45);
+    support.defenseRange = Math.min(support.defenseRange, 1.42);
+    support.spawnRate = Math.min(support.spawnRate, 1.6);
+    support.attackRate = Math.min(support.attackRate, 1.55);
+    return support;
+  }
+
   function getPlayerFogCoverage(player) {
     if (!player || !player.fog) return 100;
     return (player.fog.exploredCount / (FOG_GRID_COUNT * FOG_GRID_COUNT)) * 100;
@@ -2685,16 +2819,16 @@
   function getVisionRadius(entity) {
     if (!entity) return 0;
     if (entity.kind === "building") {
-      if (entity.itemId === "observatory") return 580;
-      if (entity.itemId === "signal_beacon") return 520;
-      if (entity.itemId === "radar_hub") return 620;
-      if (entity.itemId === "missile_silo") return 440;
-      if (entity.itemId === "outpost") return 460;
-      if (entity.itemId === "royal_keep") return 420;
-      if (entity.itemId === "citadel") return 470;
-      if (entity.def && (entity.def.style === "tower" || entity.def.style === "radar")) return 360;
-      if (entity.itemId === "market" || entity.itemId === "command_hall") return 320;
-      return 250;
+      const stationProfile = getStationSupportProfile(entity.itemId);
+      let radius = 250;
+      if (stationProfile && stationProfile.selfVision) radius = stationProfile.selfVision;
+      else if (entity.itemId === "missile_silo") radius = 440;
+      else if (entity.itemId === "outpost") radius = 460;
+      else if (entity.itemId === "royal_keep") radius = 420;
+      else if (entity.itemId === "citadel") radius = 470;
+      else if (entity.def && (entity.def.style === "tower" || entity.def.style === "radar")) radius = 360;
+      else if (entity.itemId === "market" || entity.itemId === "command_hall") radius = 320;
+      return radius * getBuildingSupportModifiers(entity).vision;
     }
     if (entity.kind === "unit") {
       if (entity.airborne) return 420;
@@ -5369,6 +5503,7 @@
     building.lastCombatTimer = Math.max(0, (building.lastCombatTimer || 0) - dt);
     building.lastTaxedTimer = Math.max(0, (building.lastTaxedTimer || 0) - dt);
     const terrainMultiplier = getTerrainStructureMultiplier(building);
+    const supportMultiplier = getBuildingSupportModifiers(building);
     const terrainDamage = getTerrainAttrition(building, dt);
     if (terrainDamage > 0 && building.hp > 1) {
       building.hp = Math.max(1, building.hp - terrainDamage);
@@ -5387,7 +5522,7 @@
           : building.owner === "player";
     if (building.def.spawnRole && canProduce) {
       const hostilityRate = !isHumanOwner(building.owner) && isHardModeActive() ? 1.22 : 1;
-      building.spawnCooldown -= dt * getProductionMultiplier(building.owner) * terrainMultiplier * hostilityRate;
+      building.spawnCooldown -= dt * getProductionMultiplier(building.owner) * terrainMultiplier * hostilityRate * supportMultiplier.spawnRate;
       if (building.spawnCooldown <= 0) {
         building.spawnCooldown = building.def.spawnRate || 22;
         const spawnAngle = randomRange(building.x + building.y + state.time, 0, TAU);
@@ -5429,9 +5564,9 @@
     }
 
     if (building.def.attack) {
-      building.attackCooldown -= dt;
+      building.attackCooldown -= dt * supportMultiplier.attackRate;
       if (building.attackCooldown <= 0) {
-        const rangeBoost = getTerrainAttackRangeBonus(building);
+        const rangeBoost = getTerrainAttackRangeBonus(building) * supportMultiplier.defenseRange;
         const target = findNearest(
           [...state.world.units, ...state.world.buildings],
           building.x,
@@ -5973,8 +6108,45 @@
     return `rgba(${Math.round(r * amount)}, ${Math.round(g * amount)}, ${Math.round(b * amount)}, ${alpha})`;
   }
 
-  function getFirstPersonHorizon(viewport, fp) {
-    return viewport.y + viewport.h * clamp(0.46 + fp.pitch * 0.7, 0.18, 0.78);
+  function getFirstPersonMotionProfile(unit, fp) {
+    const baseSpeed = Math.max(1, unit.speed || 80);
+    const speed = Math.hypot(unit.vx || 0, unit.vy || 0);
+    const speedNorm = clamp(speed / (baseSpeed * 1.08), 0, 1.5);
+    const forwardX = Math.cos(fp.yaw);
+    const forwardY = Math.sin(fp.yaw);
+    const rightX = -forwardY;
+    const rightY = forwardX;
+    const forwardSpeed = ((unit.vx || 0) * forwardX + (unit.vy || 0) * forwardY) / baseSpeed;
+    const strafeSpeed = ((unit.vx || 0) * rightX + (unit.vy || 0) * rightY) / baseSpeed;
+    const bobPhase = state.time * (2.1 + speedNorm * 9.6);
+    const aimFactor = fp.aiming ? 0.46 : 1;
+    const breath = Math.sin(state.time * (fp.aiming ? 2.4 : 1.5) + (unit.id || 0) * 0.013) * (fp.aiming ? 0.5 : 1.05);
+    const bobX = Math.sin(bobPhase) * (1.2 + speedNorm * 4.8) * aimFactor + strafeSpeed * 4.2;
+    const bobY = Math.abs(Math.cos(bobPhase * 1.82)) * (0.5 + speedNorm * 4.4) * aimFactor + Math.max(0, forwardSpeed) * 0.7;
+    const cameraOffsetX = bobX * 0.34 + strafeSpeed * 1.5;
+    const cameraOffsetY = bobY * 0.28 + breath - fp.kick * 2.4 - (fp.aiming ? 0.8 : 0);
+    const sprint = state.keys.sprint && !fp.aiming ? clamp(speedNorm, 0, 1) : 0;
+    const lean = clamp(-strafeSpeed * 10 + ((state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0)) * 2.8, -8, 8) * (fp.aiming ? 0.5 : 1);
+    return {
+      speedNorm,
+      forwardSpeed,
+      strafeSpeed,
+      breath,
+      bobX,
+      bobY,
+      cameraOffsetX,
+      cameraOffsetY,
+      weaponOffsetX: bobX * (fp.aiming ? 0.58 : 1.38) + fp.kick * 8.2,
+      weaponOffsetY: bobY * (fp.aiming ? 0.52 : 1.14) + breath * 0.7 + fp.kick * 12.5,
+      lean,
+      sprint,
+      reticleSpread: clamp((fp.aiming ? 2.2 : 5.4) + speedNorm * 8.4 + fp.kick * 18, fp.aiming ? 1.8 : 4.6, fp.aiming ? 8 : 18),
+    };
+  }
+
+  function getFirstPersonHorizon(viewport, fp, motion = null) {
+    const motionOffset = motion ? motion.cameraOffsetY / Math.max(1, viewport.h) : 0;
+    return viewport.y + viewport.h * clamp(0.46 + fp.pitch * 0.7 + motionOffset * 0.22, 0.18, 0.78);
   }
 
   function getBiomeFloorColor(biome, worldX, worldY, distance = 0) {
@@ -5995,7 +6167,45 @@
     return shadeRgb(92, 120, 74, shade);
   }
 
-  function projectFirstPersonPoint(viewport, unit, fp, x, y, z = 0) {
+  function drawFirstPersonSkylineLayers(viewport, unit, fp, horizon, biome, motion = null) {
+    const palettes = biome === "desert" || biome === "canyon"
+      ? [
+        { color: "#443124", height: viewport.h * 0.19, variance: viewport.h * 0.028, alpha: 0.34, parallax: 0.14 },
+        { color: "#664634", height: viewport.h * 0.13, variance: viewport.h * 0.022, alpha: 0.26, parallax: 0.24 },
+        { color: "#8e6144", height: viewport.h * 0.08, variance: viewport.h * 0.014, alpha: 0.2, parallax: 0.38 },
+      ]
+      : biome === "ocean" || biome === "river"
+        ? [
+          { color: "#193848", height: viewport.h * 0.14, variance: viewport.h * 0.02, alpha: 0.3, parallax: 0.12 },
+          { color: "#245165", height: viewport.h * 0.09, variance: viewport.h * 0.014, alpha: 0.2, parallax: 0.22 },
+        ]
+        : [
+          { color: "#24362c", height: viewport.h * 0.16, variance: viewport.h * 0.024, alpha: 0.3, parallax: 0.12 },
+          { color: "#35523d", height: viewport.h * 0.11, variance: viewport.h * 0.018, alpha: 0.22, parallax: 0.24 },
+          { color: "#4f6b56", height: viewport.h * 0.07, variance: viewport.h * 0.012, alpha: 0.16, parallax: 0.36 },
+        ];
+    for (let layerIndex = 0; layerIndex < palettes.length; layerIndex += 1) {
+      const layer = palettes[layerIndex];
+      const segments = 18;
+      const baseOffset = (motion ? motion.cameraOffsetX : 0) * layer.parallax * 0.35;
+      ctx.fillStyle = withAlpha(layer.color, layer.alpha);
+      ctx.beginPath();
+      ctx.moveTo(viewport.x - 4, viewport.y + viewport.h + 4);
+      for (let i = 0; i <= segments; i += 1) {
+        const t = i / segments;
+        const worldPhase = unit.x * 0.00026 * layer.parallax + unit.y * 0.00018 * layer.parallax + fp.yaw * (0.8 + layerIndex * 0.2) + layerIndex * 1.7;
+        const ridge = Math.sin(worldPhase + t * 5.8) * 0.52 + Math.sin(worldPhase * 1.8 + t * 13.2 + layerIndex * 0.8) * 0.26 + Math.cos(worldPhase * 2.4 + t * 8.1) * 0.18;
+        const xPos = viewport.x + t * viewport.w + baseOffset;
+        const yPos = horizon - layer.height + ridge * layer.variance;
+        ctx.lineTo(xPos, yPos);
+      }
+      ctx.lineTo(viewport.x + viewport.w + 4, viewport.y + viewport.h + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function projectFirstPersonPoint(viewport, unit, fp, x, y, z = 0, motion = null) {
     const dx = x - unit.x;
     const dy = y - unit.y;
     const forwardX = Math.cos(fp.yaw);
@@ -6006,8 +6216,8 @@
     if (depth <= 8) return null;
     const side = dx * rightX + dy * rightY;
     const focal = viewport.w * (fp.aiming ? 0.96 : 0.74);
-    const centerX = viewport.x + viewport.w * 0.5 + (side / depth) * focal;
-    const horizon = getFirstPersonHorizon(viewport, fp);
+    const centerX = viewport.x + viewport.w * 0.5 + (motion ? motion.cameraOffsetX : 0) + (side / depth) * focal;
+    const horizon = getFirstPersonHorizon(viewport, fp, motion);
     const eyeHeight = getFirstPersonEyeHeight(unit);
     const screenY = horizon + ((eyeHeight - z) / depth) * focal;
     return {
@@ -6021,36 +6231,48 @@
     };
   }
 
-  function drawFirstPersonBackdrop(viewport, unit, fp) {
+  function drawFirstPersonBackdrop(viewport, unit, fp, motion = null) {
     const ray = getFirstPersonRay(unit, getPlayerState(unit.owner), 180);
     const lookTile = getTileAtWorld(ray ? ray.point.x : unit.x, ray ? ray.point.y : unit.y) || getTileAtWorld(unit.x, unit.y);
     const mood = getEnvironmentMood((lookTile && lookTile.biome) || "meadow");
-    const horizon = getFirstPersonHorizon(viewport, fp);
+    const biome = (lookTile && lookTile.biome) || "meadow";
+    const horizon = getFirstPersonHorizon(viewport, fp, motion);
     const sky = ctx.createLinearGradient(viewport.x, viewport.y, viewport.x, horizon);
     sky.addColorStop(0, mood.skyTop);
     sky.addColorStop(0.58, mood.skyMid);
     sky.addColorStop(1, mood.skyBottom);
     ctx.fillStyle = sky;
-    ctx.fillRect(viewport.x, viewport.y, viewport.w, horizon - viewport.y + 1);
-    const sunX = viewport.x + viewport.w * 0.22 + Math.sin(state.time * 0.035 + fp.yaw) * viewport.w * 0.04;
-    const sunY = viewport.y + viewport.h * 0.17 + Math.cos(state.time * 0.02 + unit.x * 0.001) * viewport.h * 0.03;
+    ctx.fillRect(viewport.x - 8, viewport.y - 8, viewport.w + 16, horizon - viewport.y + 18);
+    const sunX = viewport.x + viewport.w * 0.22 + (motion ? motion.cameraOffsetX * 0.3 : 0) + Math.sin(state.time * 0.035 + fp.yaw) * viewport.w * 0.04;
+    const sunY = viewport.y + viewport.h * 0.17 + (motion ? motion.cameraOffsetY * 0.25 : 0) + Math.cos(state.time * 0.02 + unit.x * 0.001) * viewport.h * 0.03;
     const sun = ctx.createRadialGradient(sunX, sunY, 6, sunX, sunY, viewport.w * 0.24);
     sun.addColorStop(0, mood.sunCore);
     sun.addColorStop(0.35, mood.sunGlow);
     sun.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sun;
-    ctx.fillRect(viewport.x, viewport.y, viewport.w, horizon - viewport.y + 1);
+    ctx.fillRect(viewport.x - 8, viewport.y - 8, viewport.w + 16, horizon - viewport.y + 18);
+    for (let i = 0; i < 4; i += 1) {
+      const cloudY = viewport.y + viewport.h * (0.11 + i * 0.11) + Math.sin(state.time * 0.018 + i * 1.8 + unit.x * 0.0004) * viewport.h * 0.018;
+      const cloudX = viewport.x + ((state.time * (10 + i * 4) + unit.y * 0.08 + i * 120) % (viewport.w + 260)) - 130;
+      const cloud = ctx.createRadialGradient(cloudX, cloudY, 8, cloudX, cloudY, viewport.w * 0.12);
+      cloud.addColorStop(0, withAlpha("#f4f0e6", 0.04 + i * 0.008));
+      cloud.addColorStop(0.6, withAlpha("#d2d8de", 0.02 + i * 0.006));
+      cloud.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = cloud;
+      ctx.fillRect(cloudX - viewport.w * 0.16, cloudY - viewport.h * 0.08, viewport.w * 0.32, viewport.h * 0.16);
+    }
+    drawFirstPersonSkylineLayers(viewport, unit, fp, horizon, biome, motion);
     const haze = ctx.createLinearGradient(viewport.x, horizon - viewport.h * 0.12, viewport.x, horizon + viewport.h * 0.18);
     haze.addColorStop(0, mood.horizon);
     haze.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = haze;
-    ctx.fillRect(viewport.x, horizon - viewport.h * 0.14, viewport.w, viewport.h * 0.3);
+    ctx.fillRect(viewport.x - 8, horizon - viewport.h * 0.14, viewport.w + 16, viewport.h * 0.34);
   }
 
-  function drawFirstPersonGround(viewport, unit, fp) {
-    const centerX = viewport.x + viewport.w * 0.5;
+  function drawFirstPersonGround(viewport, unit, fp, motion = null) {
+    const centerX = viewport.x + viewport.w * 0.5 + (motion ? motion.cameraOffsetX : 0);
     const focal = viewport.w * (fp.aiming ? 0.96 : 0.74);
-    const horizon = getFirstPersonHorizon(viewport, fp);
+    const horizon = getFirstPersonHorizon(viewport, fp, motion);
     const eyeHeight = getFirstPersonEyeHeight(unit) + 8;
     const forwardX = Math.cos(fp.yaw);
     const forwardY = Math.sin(fp.yaw);
@@ -6067,11 +6289,43 @@
         const tile = getTileAtWorld(worldX, worldY);
         ctx.fillStyle = getBiomeFloorColor(tile ? tile.biome : "meadow", worldX, worldY, rowDistance);
         ctx.fillRect(x, y, stepX + 1, stepY + 1);
+        if (tile && (tile.biome === "river" || tile.biome === "ocean" || tile.biome === "marsh")) {
+          const shimmer = 0.5 + 0.5 * Math.sin(state.time * 2.4 + worldX * 0.02 + worldY * 0.017);
+          if (shimmer > 0.74) {
+            ctx.fillStyle = tile.biome === "marsh" ? `rgba(182,206,166,${(shimmer - 0.74) * 0.12})` : `rgba(228,244,255,${(shimmer - 0.74) * 0.2})`;
+            ctx.fillRect(x, y, stepX + 1, Math.max(1, stepY * 0.45));
+          }
+        } else if (tile && tile.biome === "road") {
+          const lane = Math.abs(Math.sin(worldX * 0.035 + worldY * 0.02));
+          if (lane > 0.86) {
+            ctx.fillStyle = "rgba(70,54,38,0.1)";
+            ctx.fillRect(x, y, stepX + 1, stepY + 1);
+          }
+        }
+      }
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 10; i += 1) {
+      const t = i / 10;
+      const lineY = horizon + Math.pow(t, 2.15) * (viewport.h - (horizon - viewport.y));
+      ctx.beginPath();
+      ctx.moveTo(viewport.x, lineY);
+      ctx.lineTo(viewport.x + viewport.w, lineY);
+      ctx.stroke();
+    }
+    if (!fp.aiming) {
+      ctx.strokeStyle = "rgba(255,255,255,0.035)";
+      for (const lane of [-0.34, -0.12, 0.12, 0.34]) {
+        ctx.beginPath();
+        ctx.moveTo(centerX + lane * viewport.w * 0.44, viewport.y + viewport.h);
+        ctx.lineTo(centerX + lane * viewport.w * 0.07, horizon + viewport.h * 0.02);
+        ctx.stroke();
       }
     }
     const vignette = ctx.createLinearGradient(viewport.x, horizon, viewport.x, viewport.y + viewport.h);
     vignette.addColorStop(0, "rgba(255,255,255,0)");
-    vignette.addColorStop(1, "rgba(0,0,0,0.22)");
+    vignette.addColorStop(1, "rgba(0,0,0,0.26)");
     ctx.fillStyle = vignette;
     ctx.fillRect(viewport.x, horizon, viewport.w, viewport.h - (horizon - viewport.y));
   }
@@ -6092,6 +6346,27 @@
     ctx.fillRect(x - width * 0.5, y, width, 4);
     ctx.fillStyle = fill;
     ctx.fillRect(x - width * 0.5, y, width * clamp(ratio, 0, 1), 4);
+  }
+
+  function getFirstPersonDepthFade(depth, maxDistance = 1080) {
+    const fog = clamp((depth - 120) / Math.max(1, maxDistance - 120), 0, 1);
+    return {
+      fog,
+      alpha: lerp(1, 0.34, fog),
+    };
+  }
+
+  function getFirstPersonWeaponLabel(unit) {
+    if (unit.pickupWeapon) return String(unit.pickupWeapon).replace(/\b\w/g, (char) => char.toUpperCase());
+    const entry = weaponCatalog.find((item) => item.role === unit.role);
+    if (entry) return entry.name;
+    return getSelectionEntityName(unit);
+  }
+
+  function getFirstPersonHeadingLabel(yaw) {
+    const angle = (yaw % TAU + TAU) % TAU;
+    const labels = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
+    return labels[Math.round(angle / (TAU / labels.length)) % labels.length];
   }
 
   function drawFirstPersonTreeModel(tree, proj) {
@@ -6328,7 +6603,7 @@
     if (actor.lastHitTimer > 0 || fp.targetId === actor.id) drawFirstPersonHealthBar(x, y - height - 6, Math.max(18, width * 0.6), actor.hp / actor.maxHp, "#ff9b89");
   }
 
-  function drawFirstPersonWorldObjects(viewport, unit, fp) {
+  function drawFirstPersonWorldObjects(viewport, unit, fp, motion = null) {
     const drawables = [];
     const maxDistance = 1080;
     const pushDrawable = (kind, source, projection) => {
@@ -6336,39 +6611,35 @@
       if (Math.abs(projection.side) > projection.depth * 1.7 + 120) return;
       drawables.push({ kind, source, projection });
     };
-    for (const tree of state.world.trees) pushDrawable("tree", tree, projectFirstPersonPoint(viewport, unit, fp, tree.x, tree.y, 0));
-    for (const rock of state.world.rocks) pushDrawable("rock", rock, projectFirstPersonPoint(viewport, unit, fp, rock.x, rock.y, 0));
-    for (const building of state.world.buildings) pushDrawable("building", building, projectFirstPersonPoint(viewport, unit, fp, building.x, building.y, 0));
+    for (const tree of state.world.trees) pushDrawable("tree", tree, projectFirstPersonPoint(viewport, unit, fp, tree.x, tree.y, 0, motion));
+    for (const rock of state.world.rocks) pushDrawable("rock", rock, projectFirstPersonPoint(viewport, unit, fp, rock.x, rock.y, 0, motion));
+    for (const building of state.world.buildings) pushDrawable("building", building, projectFirstPersonPoint(viewport, unit, fp, building.x, building.y, 0, motion));
     for (const other of state.world.units) {
       if (other.id === unit.id) continue;
-      pushDrawable("unit", other, projectFirstPersonPoint(viewport, unit, fp, other.x, other.y, other.z || 0));
+      pushDrawable("unit", other, projectFirstPersonPoint(viewport, unit, fp, other.x, other.y, other.z || 0, motion));
     }
-    for (const animal of state.world.animals) pushDrawable("animal", animal, projectFirstPersonPoint(viewport, unit, fp, animal.x, animal.y, 0));
-    for (const civilian of state.world.civilians) pushDrawable("civilian", civilian, projectFirstPersonPoint(viewport, unit, fp, civilian.x, civilian.y, 0));
-    for (const projectile of state.world.projectiles) pushDrawable("projectile", projectile, projectFirstPersonPoint(viewport, unit, fp, projectile.x, projectile.y, projectile.z || 0));
-    for (const effect of state.world.effects) pushDrawable("effect", effect, projectFirstPersonPoint(viewport, unit, fp, effect.x, effect.y, 0));
+    for (const animal of state.world.animals) pushDrawable("animal", animal, projectFirstPersonPoint(viewport, unit, fp, animal.x, animal.y, 0, motion));
+    for (const civilian of state.world.civilians) pushDrawable("civilian", civilian, projectFirstPersonPoint(viewport, unit, fp, civilian.x, civilian.y, 0, motion));
+    for (const projectile of state.world.projectiles) pushDrawable("projectile", projectile, projectFirstPersonPoint(viewport, unit, fp, projectile.x, projectile.y, projectile.z || 0, motion));
+    for (const effect of state.world.effects) pushDrawable("effect", effect, projectFirstPersonPoint(viewport, unit, fp, effect.x, effect.y, 0, motion));
     drawables.sort((a, b) => b.projection.depth - a.projection.depth);
 
     for (const entry of drawables) {
       const proj = entry.projection;
-      const baseY = proj.y;
+      const depthFade = getFirstPersonDepthFade(proj.depth, maxDistance);
+      ctx.save();
+      if (entry.kind === "projectile") ctx.globalAlpha *= lerp(1, 0.46, depthFade.fog);
+      else if (entry.kind === "effect") ctx.globalAlpha *= lerp(1, 0.56, depthFade.fog);
+      else ctx.globalAlpha *= depthFade.alpha;
       if (entry.kind === "tree") {
         drawFirstPersonTreeModel(entry.source, proj);
-        continue;
-      }
-      if (entry.kind === "rock") {
+      } else if (entry.kind === "rock") {
         drawFirstPersonRockModel(entry.source, proj);
-        continue;
-      }
-      if (entry.kind === "building") {
+      } else if (entry.kind === "building") {
         drawFirstPersonBuildingModel(entry.source, proj, fp);
-        continue;
-      }
-      if (entry.kind === "unit" || entry.kind === "animal" || entry.kind === "civilian") {
+      } else if (entry.kind === "unit" || entry.kind === "animal" || entry.kind === "civilian") {
         drawFirstPersonUnitModel(entry.source, proj, fp);
-        continue;
-      }
-      if (entry.kind === "projectile") {
+      } else if (entry.kind === "projectile") {
         const projectile = entry.source;
         const radius = Math.max(2, (projectile.projectileType === "bullet" ? 4 : 7) * proj.scale);
         ctx.strokeStyle = projectile.projectileType === "pulse" ? "#7ef7ff" : projectile.projectileType === "rocket" || projectile.projectileType === "missile" ? "#ffb469" : "#e9e0c9";
@@ -6381,39 +6652,45 @@
         ctx.beginPath();
         ctx.arc(proj.x, proj.y, radius, 0, TAU);
         ctx.fill();
-        continue;
-      }
-      if (entry.kind === "effect") {
+      } else if (entry.kind === "effect") {
         const effect = entry.source;
-        if (effect.ttl <= 0) continue;
-        const alpha = clamp(effect.ttl / effect.maxTtl, 0, 1) * 0.7;
-        if (effect.type === "damageText") {
-          ctx.fillStyle = withAlpha(effect.tint || "#ffe29a", alpha);
-          ctx.font = `700 ${Math.max(14, Math.round(proj.scale * 86))}px Cambria`;
-          ctx.textAlign = "center";
-          ctx.fillText(effect.text || "0", proj.x, proj.y);
-          ctx.textAlign = "left";
-          continue;
+        if (effect.ttl > 0) {
+          const alpha = clamp(effect.ttl / effect.maxTtl, 0, 1) * 0.7;
+          if (effect.type === "damageText") {
+            ctx.fillStyle = withAlpha(effect.tint || "#ffe29a", alpha);
+            ctx.font = `700 ${Math.max(14, Math.round(proj.scale * 86))}px Cambria`;
+            ctx.textAlign = "center";
+            ctx.fillText(effect.text || "0", proj.x, proj.y);
+            ctx.textAlign = "left";
+          } else {
+            const radius = Math.max(6, effect.radius * 0.22 * proj.scale);
+            if (effect.type === "smoke") {
+              ctx.fillStyle = `rgba(68,72,80,${alpha * 0.4})`;
+            } else {
+              ctx.fillStyle = withAlpha(effect.tint || "#ffc48a", alpha * 0.8);
+            }
+            ctx.beginPath();
+            ctx.arc(proj.x, proj.y - radius * 0.35, radius, 0, TAU);
+            ctx.fill();
+          }
         }
-        const radius = Math.max(6, effect.radius * 0.22 * proj.scale);
-        if (effect.type === "smoke") {
-          ctx.fillStyle = `rgba(68,72,80,${alpha * 0.4})`;
-        } else {
-          ctx.fillStyle = withAlpha(effect.tint || "#ffc48a", alpha * 0.8);
-        }
+      }
+      if (depthFade.fog > 0.06 && entry.kind !== "projectile" && entry.kind !== "effect") {
+        ctx.fillStyle = `rgba(194,214,224,${depthFade.fog * 0.08})`;
         ctx.beginPath();
-        ctx.arc(proj.x, proj.y - radius * 0.35, radius, 0, TAU);
+        ctx.ellipse(proj.x, proj.y - 18 * proj.scale, Math.max(18, 68 * proj.scale), Math.max(12, 40 * proj.scale), 0, 0, TAU);
         ctx.fill();
       }
+      ctx.restore();
     }
   }
 
-  function drawFirstPersonWeaponOverlay(viewport, unit, fp) {
+  function drawFirstPersonWeaponOverlay(viewport, unit, fp, motion = null) {
     const moveFactor = (state.keys.forward || state.keys.back || state.keys.left || state.keys.right) ? 1 : 0;
-    const sway = Math.sin(state.time * (moveFactor ? 8.2 : 3.6)) * (moveFactor ? 7 : 3) + fp.kick * 12;
+    const sway = Math.sin(state.time * (moveFactor ? 8.2 : 3.6)) * (moveFactor ? 7 : 3) + (motion ? motion.weaponOffsetY * 0.35 : 0) + fp.kick * 12;
     const aimPull = fp.aiming ? 0.54 : 1;
-    const baseX = viewport.x + viewport.w * (fp.aiming ? 0.6 : 0.74);
-    const baseY = viewport.y + viewport.h * 0.83 + sway * 0.16;
+    const baseX = viewport.x + viewport.w * (fp.aiming ? 0.6 : 0.74) + (motion ? motion.weaponOffsetX : 0);
+    const baseY = viewport.y + viewport.h * 0.83 + sway * 0.16 + (motion ? motion.weaponOffsetY : 0);
     const pickupName = String(unit.pickupWeapon || "").toLowerCase();
     const projectileType = unit.projectile || (pickupName.includes("gun") || pickupName.includes("rifle") ? "bullet" : "");
     const isBow = !pickupName && projectileType === "arrow";
@@ -6422,9 +6699,14 @@
     const isFirearm = !isBow && !isCrossbow && (projectileType || getAttackRange(unit) >= 120);
     ctx.save();
     ctx.translate(baseX, baseY);
-    ctx.rotate(-0.16 + fp.kick * 0.06);
+    ctx.rotate((-0.16 + fp.kick * 0.06) + (motion ? motion.lean * 0.012 : 0));
     const handColor = "#d8c0a4";
     const sleeveColor = withAlpha(ownerColors[unit.owner] || "#50626c", 0.92);
+    const castShadow = ctx.createRadialGradient(-viewport.w * 0.02, viewport.h * 0.02, 10, 0, viewport.h * 0.05, viewport.w * 0.18);
+    castShadow.addColorStop(0, "rgba(0,0,0,0.3)");
+    castShadow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = castShadow;
+    ctx.fillRect(-viewport.w * 0.24, -viewport.h * 0.06, viewport.w * 0.42, viewport.h * 0.26);
     if (isBow) {
       const bowW = viewport.w * 0.12 * aimPull;
       const bowH = viewport.h * 0.16;
@@ -6554,22 +6836,58 @@
     ctx.restore();
   }
 
-  function drawFirstPersonHud(viewport, unit, fp) {
+  function drawFirstPersonPostEffects(viewport, unit, fp, motion = null) {
+    const centerX = viewport.x + viewport.w * 0.5 + (motion ? motion.cameraOffsetX * 0.35 : 0);
+    const centerY = viewport.y + viewport.h * 0.5 + (motion ? motion.cameraOffsetY * 0.2 : 0);
+    const grade = ctx.createLinearGradient(viewport.x, viewport.y, viewport.x, viewport.y + viewport.h);
+    grade.addColorStop(0, "rgba(255,226,188,0.035)");
+    grade.addColorStop(0.55, "rgba(0,0,0,0)");
+    grade.addColorStop(1, "rgba(16,24,32,0.14)");
+    ctx.fillStyle = grade;
+    ctx.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
+    const vignette = ctx.createRadialGradient(centerX, centerY, viewport.w * 0.16, centerX, centerY, viewport.w * 0.76);
+    vignette.addColorStop(0, "rgba(0,0,0,0)");
+    vignette.addColorStop(0.68, "rgba(0,0,0,0.06)");
+    vignette.addColorStop(1, fp.aiming ? "rgba(0,0,0,0.44)" : "rgba(0,0,0,0.32)");
+    ctx.fillStyle = vignette;
+    ctx.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
+    if (motion && motion.sprint > 0.04) {
+      const edgeAlpha = motion.sprint * 0.12;
+      const left = ctx.createLinearGradient(viewport.x, centerY, viewport.x + viewport.w * 0.14, centerY);
+      left.addColorStop(0, `rgba(255,255,255,${edgeAlpha})`);
+      left.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = left;
+      ctx.fillRect(viewport.x, viewport.y, viewport.w * 0.18, viewport.h);
+      const right = ctx.createLinearGradient(viewport.x + viewport.w, centerY, viewport.x + viewport.w * 0.86, centerY);
+      right.addColorStop(0, `rgba(255,255,255,${edgeAlpha})`);
+      right.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = right;
+      ctx.fillRect(viewport.x + viewport.w * 0.82, viewport.y, viewport.w * 0.18, viewport.h);
+    }
+  }
+
+  function drawFirstPersonHud(viewport, unit, fp, motion = null) {
     const aim = getFirstPersonAimData(unit, getPlayerState(unit.owner));
     const centerX = viewport.x + viewport.w * 0.5;
     const centerY = viewport.y + viewport.h * 0.5;
-    ctx.strokeStyle = fp.aiming ? "rgba(220,244,255,0.92)" : "rgba(255,226,154,0.9)";
-    ctx.lineWidth = fp.aiming ? 1.4 : 2.2;
+    const reticleGap = motion ? motion.reticleSpread : (fp.aiming ? 2.2 : 5.4);
+    const reticleColor = fp.aiming ? "rgba(220,244,255,0.94)" : "rgba(255,226,154,0.92)";
+    ctx.strokeStyle = reticleColor;
+    ctx.lineWidth = fp.aiming ? 1.35 : 2;
     ctx.beginPath();
-    ctx.moveTo(centerX - 14, centerY);
-    ctx.lineTo(centerX - 4, centerY);
-    ctx.moveTo(centerX + 4, centerY);
-    ctx.lineTo(centerX + 14, centerY);
-    ctx.moveTo(centerX, centerY - 14);
-    ctx.lineTo(centerX, centerY - 4);
-    ctx.moveTo(centerX, centerY + 4);
-    ctx.lineTo(centerX, centerY + 14);
+    ctx.moveTo(centerX - reticleGap - 10, centerY);
+    ctx.lineTo(centerX - reticleGap, centerY);
+    ctx.moveTo(centerX + reticleGap, centerY);
+    ctx.lineTo(centerX + reticleGap + 10, centerY);
+    ctx.moveTo(centerX, centerY - reticleGap - 10);
+    ctx.lineTo(centerX, centerY - reticleGap);
+    ctx.moveTo(centerX, centerY + reticleGap);
+    ctx.lineTo(centerX, centerY + reticleGap + 10);
     ctx.stroke();
+    ctx.fillStyle = fp.aiming ? "rgba(231,246,255,0.9)" : "rgba(255,240,186,0.84)";
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, fp.aiming ? 1.7 : 2.2, 0, TAU);
+    ctx.fill();
     if (fp.hitTimer > 0) {
       const hitAlpha = clamp(fp.hitTimer / 0.24, 0, 1);
       ctx.strokeStyle = withAlpha(fp.hitColor || "#ffe29a", 0.9 * hitAlpha);
@@ -6591,17 +6909,27 @@
       ctx.textAlign = "left";
     }
 
-    roundRect(ctx, viewport.x + 18, viewport.y + 18, 238, 62, 18, "rgba(7,14,20,0.72)", "rgba(255,255,255,0.08)");
+    const heading = getFirstPersonHeadingLabel(fp.yaw);
+    const headingDegrees = Math.round(((fp.yaw % TAU + TAU) % TAU) * (180 / Math.PI));
+    const weaponLabel = getFirstPersonWeaponLabel(unit);
+    roundRect(ctx, viewport.x + 18, viewport.y + 18, 286, 82, 20, "rgba(7,14,20,0.74)", "rgba(255,255,255,0.08)");
     ctx.fillStyle = ownerColors[unit.owner] || "#ffffff";
     ctx.font = "700 16px Cambria";
     ctx.fillText(getSelectionEntityName(unit), viewport.x + 34, viewport.y + 40);
     ctx.fillStyle = "#9db2be";
     ctx.font = "12px Cambria";
-    ctx.fillText(unitSupportsAim(unit) ? "First-person control active" : "First-person melee control active", viewport.x + 34, viewport.y + 58);
+    ctx.fillText(weaponLabel, viewport.x + 34, viewport.y + 58);
+    ctx.fillText(`${heading}  ${headingDegrees} deg  |  ${fp.aiming ? "aiming" : motion && motion.sprint > 0.05 ? "sprinting" : "combat ready"}`, viewport.x + 34, viewport.y + 75);
     ctx.fillStyle = "rgba(0,0,0,0.4)";
-    ctx.fillRect(viewport.x + 34, viewport.y + 65, 172, 6);
+    ctx.fillRect(viewport.x + 34, viewport.y + 86, 236, 6);
     ctx.fillStyle = unit.hp / unit.maxHp > 0.45 ? "#7df2ab" : "#ff9b89";
-    ctx.fillRect(viewport.x + 34, viewport.y + 65, 172 * clamp(unit.hp / unit.maxHp, 0, 1), 6);
+    ctx.fillRect(viewport.x + 34, viewport.y + 86, 236 * clamp(unit.hp / unit.maxHp, 0, 1), 6);
+    roundRect(ctx, centerX - 72, viewport.y + 16, 144, 24, 12, "rgba(7,14,20,0.64)", "rgba(255,255,255,0.06)");
+    ctx.fillStyle = "#d9e8ef";
+    ctx.font = "12px Cambria";
+    ctx.textAlign = "center";
+    ctx.fillText(`Heading ${heading}`, centerX, viewport.y + 32);
+    ctx.textAlign = "left";
     if (unit.lastHitTimer > 0) {
       const hurt = clamp(unit.lastHitTimer / 0.2, 0, 1);
       const hurtGrad = ctx.createRadialGradient(centerX, centerY, viewport.w * 0.18, centerX, centerY, viewport.w * 0.68);
@@ -6611,7 +6939,7 @@
       ctx.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
     }
 
-    roundRect(ctx, centerX - 186, viewport.y + viewport.h - 58, 372, 36, 18, "rgba(7,14,20,0.68)", "rgba(255,255,255,0.08)");
+    roundRect(ctx, centerX - 214, viewport.y + viewport.h - 60, 428, 38, 18, "rgba(7,14,20,0.68)", "rgba(255,255,255,0.08)");
     ctx.fillStyle = "#d5e2ea";
     ctx.font = "12px Cambria";
     ctx.textAlign = "center";
@@ -6619,26 +6947,28 @@
     ctx.textAlign = "left";
 
     if (aim && aim.target) {
-      const targetWidth = 176;
-      roundRect(ctx, centerX - targetWidth * 0.5, centerY - 88, targetWidth, 34, 14, "rgba(7,14,20,0.74)", "rgba(255,255,255,0.08)");
+      const targetWidth = 202;
+      roundRect(ctx, centerX - targetWidth * 0.5, centerY - 94, targetWidth, 46, 14, "rgba(7,14,20,0.76)", "rgba(255,255,255,0.08)");
       ctx.fillStyle = aim.target.owner ? ownerColors[aim.target.owner] || "#f3ece0" : "#f3ece0";
       ctx.font = "700 13px Cambria";
       ctx.textAlign = "center";
-      ctx.fillText(getSelectionEntityName(aim.target), centerX, centerY - 67);
+      ctx.fillText(getSelectionEntityName(aim.target), centerX, centerY - 74);
+      ctx.fillStyle = "#9db2be";
+      ctx.font = "12px Cambria";
+      ctx.fillText(`${Math.round(aim.distance || 0)} range`, centerX, centerY - 58);
       ctx.fillStyle = "rgba(0,0,0,0.4)";
-      ctx.fillRect(centerX - 62, centerY - 60, 124, 4);
+      ctx.fillRect(centerX - 70, centerY - 50, 140, 4);
       ctx.fillStyle = "#ff9b89";
-      ctx.fillRect(centerX - 62, centerY - 60, 124 * clamp((aim.target.hp || 0) / Math.max(1, aim.target.maxHp || aim.target.hp || 1), 0, 1), 4);
+      ctx.fillRect(centerX - 70, centerY - 50, 140 * clamp((aim.target.hp || 0) / Math.max(1, aim.target.maxHp || aim.target.hp || 1), 0, 1), 4);
       ctx.textAlign = "left";
     }
 
     if (document.pointerLockElement !== canvas) {
-      ctx.fillStyle = "rgba(7,14,20,0.74)";
-      ctx.fillRect(centerX - 122, viewport.y + 94, 244, 26);
+      roundRect(ctx, centerX - 132, viewport.y + 110, 264, 30, 14, "rgba(7,14,20,0.74)", "rgba(255,223,153,0.1)");
       ctx.fillStyle = "#ffdf99";
       ctx.font = "12px Cambria";
       ctx.textAlign = "center";
-      ctx.fillText("Click inside the view to lock the mouse", centerX, viewport.y + 111);
+      ctx.fillText("Click inside the view to lock the mouse", centerX, viewport.y + 129);
       ctx.textAlign = "left";
     }
   }
@@ -6655,14 +6985,16 @@
     }
     const fp = getFirstPersonState(player);
     syncFirstPersonCamera(player, unit);
+    const motion = getFirstPersonMotionProfile(unit, fp);
     ctx.save();
     ctx.beginPath();
     ctx.rect(viewport.x, viewport.y, viewport.w, viewport.h);
     ctx.clip();
-    drawFirstPersonBackdrop(viewport, unit, fp);
-    drawFirstPersonGround(viewport, unit, fp);
-    drawFirstPersonWorldObjects(viewport, unit, fp);
-    drawFirstPersonWeaponOverlay(viewport, unit, fp);
+    drawFirstPersonBackdrop(viewport, unit, fp, motion);
+    drawFirstPersonGround(viewport, unit, fp, motion);
+    drawFirstPersonWorldObjects(viewport, unit, fp, motion);
+    drawFirstPersonWeaponOverlay(viewport, unit, fp, motion);
+    drawFirstPersonPostEffects(viewport, unit, fp, motion);
     if (fp.muzzle > 0) {
       const flash = ctx.createRadialGradient(viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, 18, viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, viewport.w * 0.28);
       flash.addColorStop(0, `rgba(255,255,228,${0.18 * fp.muzzle / 0.08})`);
@@ -6670,7 +7002,7 @@
       ctx.fillStyle = flash;
       ctx.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
     }
-    drawFirstPersonHud(viewport, unit, fp);
+    drawFirstPersonHud(viewport, unit, fp, motion);
     ctx.restore();
   }
 
@@ -7789,21 +8121,28 @@
     });
   }
 
-  function wrapText(text, x, y, maxWidth, lineHeight) {
-    const words = text.split(" ");
+  function getWrappedTextLines(text, maxWidth) {
+    const words = String(text || "").split(" ");
     let line = "";
-    let lineY = y;
+    const lines = [];
     for (const word of words) {
       const test = line ? `${line} ${word}` : word;
       if (ctx.measureText(test).width > maxWidth && line) {
-        ctx.fillText(line, x, lineY);
+        lines.push(line);
         line = word;
-        lineY += lineHeight;
       } else {
         line = test;
       }
     }
-    if (line) ctx.fillText(line, x, lineY);
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function wrapText(text, x, y, maxWidth, lineHeight) {
+    const lines = getWrappedTextLines(text, maxWidth);
+    lines.forEach((line, index) => {
+      ctx.fillText(line, x, y + index * lineHeight);
+    });
   }
 
   function getItemVisualTheme(item) {
@@ -8007,6 +8346,8 @@
   function getItemMetaText(item) {
     if (!item) return "";
     if (item.tier != null) {
+      const stationProfile = getStationSupportProfile(item.id);
+      if (stationProfile && stationProfile.meta) return stationProfile.meta;
       if (item.spawnRole) return `Produces ${formatSelectionLabel(item.spawnRole)}`;
       if (item.attack) return `${formatSelectionLabel(item.attack)} defense platform`;
       if (item.gather) return `Harvests ${formatSelectionLabel(item.gather)}`;
@@ -8023,6 +8364,8 @@
   function getItemStatText(item) {
     if (!item) return "";
     if (item.tier != null) {
+      const stationProfile = getStationSupportProfile(item.id);
+      if (stationProfile && stationProfile.stats) return stationProfile.stats;
       if (item.attack) return `RNG ${Math.round(item.range || 0)} | HP ${Math.round(item.hp || 0)}`;
       if (item.spawnRate) return `TRAIN ${Math.round(item.spawnRate)}s | HP ${Math.round(item.hp || 0)}`;
       if (item.taxBoost) return `TAX x${item.taxBoost.toFixed(2)} | HP ${Math.round(item.hp || 0)}`;
@@ -8322,15 +8665,26 @@
   }
 
   function drawRecentMessage(w, h) {
+    const text = state.ui.hoverMessage || state.ui.recentMessage;
+    if (!text) return;
     const viewport = state.activeViewport || getViewportForPlayer();
     const scale = getUiScale();
     const centerX = viewport.x + w / 2;
-    roundRect(ctx, centerX - 240 * scale, viewport.y + h - 170 * scale, 480 * scale, 34 * scale, 18, "rgba(7,14,20,0.74)", "rgba(255,255,255,0.08)");
+    ctx.save();
+    ctx.font = `600 ${Math.round(14 * scale)}px Cambria`;
+    const lines = getWrappedTextLines(text, 448 * scale);
+    const panelW = 480 * scale;
+    const panelH = Math.max(34 * scale, 20 * scale + lines.length * 16 * scale);
+    const panelY = viewport.y + h - 136 * scale - panelH;
+    roundRect(ctx, centerX - panelW * 0.5, panelY, panelW, panelH, 18, "rgba(7,14,20,0.78)", state.ui.hoverMessage ? "rgba(255,226,154,0.18)" : "rgba(255,255,255,0.08)");
     ctx.fillStyle = "#dbe3e8";
-    ctx.font = "600 14px Cambria";
+    ctx.font = `600 ${Math.round(14 * scale)}px Cambria`;
     ctx.textAlign = "center";
-    ctx.fillText(state.ui.recentMessage, centerX, viewport.y + h - 149 * scale);
+    lines.forEach((line, index) => {
+      ctx.fillText(line, centerX, panelY + 20 * scale + index * 16 * scale);
+    });
     ctx.textAlign = "left";
+    ctx.restore();
   }
 
   function formatSelectionLabel(value) {
@@ -8352,17 +8706,90 @@
   function getSelectionEntityName(entity) {
     if (!entity) return "Selection";
     if (entity.kind === "building") return entity.def && entity.def.name ? entity.def.name : formatSelectionLabel(entity.itemId);
-    const item = weaponCatalog.find((entry) => entry.role === entity.role);
+    const item = roleIndex.get(entity.role);
     return entity.displayName || (item && item.name) || formatSelectionLabel(entity.role);
   }
 
   function getEntityVisualItem(entity) {
     if (!entity) return null;
     if (entity.kind === "building") return entity.def || itemIndex.get(entity.itemId) || null;
-    return weaponCatalog.find((entry) => entry.role === entity.role) || {
+    return roleIndex.get(entity.role) || {
       type: entity.type === "vehicle" ? "vehicle" : "unit",
       era: entity.type === "vehicle" || entity.airborne ? "Modern" : "Old",
     };
+  }
+
+  function getItemHoverMessage(item) {
+    if (!item) return "";
+    return `${item.name}: ${item.desc || getItemMetaText(item)}`;
+  }
+
+  function getEntityHoverMessage(entity) {
+    if (!entity) return "";
+    const item = getEntityVisualItem(entity);
+    const label = getSelectionEntityName(entity);
+    if (item && item.desc) return `${label}: ${item.desc}`;
+    if (item) return `${label}: ${getItemMetaText(item)}`;
+    return label;
+  }
+
+  function isPointerOverUiOverlay(x, y) {
+    if (state.ui.openPanel && isInsideRect(x, y, getPanelLayout(state.ui.openPanel))) return true;
+    const bottom = getBottomBarLayout();
+    const bottomFrame = {
+      x: bottom.x - 22,
+      y: bottom.y - 24,
+      w: bottom.slotSize * 8 + bottom.gap * 7 + 44,
+      h: bottom.slotSize + 48,
+    };
+    if (isInsideRect(x, y, bottomFrame)) return true;
+    const selectionLayout = getSelectionHudLayout();
+    if (selectionLayout && isInsideRect(x, y, selectionLayout)) return true;
+    const minimap = getMinimapLayout();
+    if (isInsideRect(x, y, { x: minimap.panelX, y: minimap.panelY, w: minimap.panelW, h: minimap.panelH })) return true;
+    const viewport = state.activeViewport || getViewportForPlayer();
+    const scale = getUiScale();
+    if (isInsideRect(x, y, { x: viewport.x + 22 * scale, y: viewport.y + 18 * scale, w: 452 * scale, h: 104 * scale })) return true;
+    if (isInsideRect(x, y, { x: viewport.x + viewport.w - 360 * scale - 24 * scale, y: viewport.y + 20 * scale, w: 360 * scale, h: 188 * scale })) return true;
+    return false;
+  }
+
+  function getHoveredWorldEntity(player, worldX, worldY) {
+    if (!player || !isPointExploredForPlayer(player, worldX, worldY)) return null;
+    return findNearest(
+      [...state.world.buildings, ...state.world.units],
+      worldX,
+      worldY,
+      (entity) => isPointExploredForPlayer(player, entity.x, entity.y) && Math.hypot(entity.x - worldX, entity.y - worldY) <= (entity.radius || 12) + (entity.kind === "building" ? 22 : 16),
+    );
+  }
+
+  function updateHoverMessage(player, x, y, worldPos) {
+    setActivePlayerContext(player, getViewportForPlayer(player));
+    let message = "";
+    const card = getItemCardAt(x, y);
+    if (card) {
+      message = getItemHoverMessage(card.item);
+    } else {
+      const selectionHit = getSelectionHudHitAt(x, y);
+      if (selectionHit) {
+        const actionText = selectionHit.action === "eye"
+          ? " Click the eye to enter first-person control."
+          : " Click to remove it from the current selection.";
+        message = `${getEntityHoverMessage(selectionHit.slot.entity)}${actionText}`;
+      } else {
+        const slot = getQuickSlotAt(x, y);
+        if (slot) {
+          const itemId = getQuickSlots()[slot.side][slot.index];
+          const item = itemIndex.get(itemId);
+          message = item ? getItemHoverMessage(item) : "";
+        } else if (!isPointerOverUiOverlay(x, y)) {
+          const hoveredEntity = getHoveredWorldEntity(player, worldPos.x, worldPos.y);
+          if (hoveredEntity) message = getEntityHoverMessage(hoveredEntity);
+        }
+      }
+    }
+    state.ui.hoverMessage = message;
   }
 
   function getSelectionHudLayout(entities = getSelectedEntities()) {
@@ -8827,6 +9254,7 @@
     }
     state.ui.hoveredSlot = getQuickSlotAt(x, y);
     state.ui.hoveredEnemyIds = getHoveredEnemyTargets(world.x, world.y, 4);
+    updateHoverMessage(player, x, y, world);
   }
 
   function onPointerMove(event) {
@@ -8837,6 +9265,7 @@
     }
     const pointer = clientToCanvasPoint(event.clientX, event.clientY);
     const player = getPlayerForScreenPoint(pointer.x, pointer.y);
+    markMouseInput(player);
     updatePlayerPointer(player, pointer.x, pointer.y);
   }
 
@@ -8845,6 +9274,7 @@
     if (getFirstPersonActivePlayer()) return;
     const pointer = clientToCanvasPoint(event.clientX, event.clientY);
     const player = getPlayerForScreenPoint(pointer.x, pointer.y);
+    markMouseInput(player);
     setActivePlayerContext(player, getViewportForPlayer(player));
     if (state.ui.openPanel) {
       const layout = getPanelLayout(state.ui.openPanel);
@@ -8881,6 +9311,24 @@
     return Boolean(gamepad && gamepad.buttons[index] && gamepad.buttons[index].pressed);
   }
 
+  function applyRadialDeadzone(x = 0, y = 0, deadzone = 0.24) {
+    const magnitude = Math.hypot(x, y);
+    if (!magnitude || magnitude <= deadzone) return { x: 0, y: 0, magnitude: 0 };
+    const scaled = clamp((magnitude - deadzone) / Math.max(0.001, 1 - deadzone), 0, 1);
+    const factor = scaled / magnitude;
+    return {
+      x: x * factor,
+      y: y * factor,
+      magnitude: scaled,
+    };
+  }
+
+  function markMouseInput(player) {
+    if (!player) return;
+    player.inputMode = "mouse";
+    player.lastMouseInputTime = state.time;
+  }
+
   function clampCursorToViewport(player) {
     const viewport = getViewportForPlayer(player);
     player.input.cursorX = clamp(player.input.cursorX || viewport.x + viewport.w / 2, viewport.x + 18, viewport.x + viewport.w - 18);
@@ -8897,22 +9345,6 @@
         player.gamepadButtons = {};
         continue;
       }
-      const leftX = Math.abs(gamepad.axes[0] || 0) > 0.16 ? gamepad.axes[0] : 0;
-      const leftY = Math.abs(gamepad.axes[1] || 0) > 0.16 ? gamepad.axes[1] : 0;
-      const rightX = Math.abs(gamepad.axes[2] || 0) > 0.16 ? gamepad.axes[2] : 0;
-      const rightY = Math.abs(gamepad.axes[3] || 0) > 0.16 ? gamepad.axes[3] : 0;
-      player.input.cursorX += leftX * 420 * dt;
-      player.input.cursorY += leftY * 420 * dt;
-      clampCursorToViewport(player);
-      setActivePlayerContext(player, getViewportForPlayer(player));
-      const cos = Math.cos(-player.camera.rotation);
-      const sin = Math.sin(-player.camera.rotation);
-      player.camera.x += (rightX * cos - rightY * sin) * 320 * dt;
-      player.camera.y += (rightX * sin + rightY * cos) * 320 * dt;
-      player.camera.x = clamp(player.camera.x, -CAMERA_LIMIT, CAMERA_LIMIT);
-      player.camera.y = clamp(player.camera.y, -CAMERA_LIMIT, CAMERA_LIMIT);
-      updatePlayerPointer(player, player.input.cursorX, player.input.cursorY);
-
       const aPressed = getGamepadButton(gamepad, 0);
       const bPressed = getGamepadButton(gamepad, 1);
       const xPressed = getGamepadButton(gamepad, 2);
@@ -8920,6 +9352,28 @@
       const lbPressed = getGamepadButton(gamepad, 4);
       const rbPressed = getGamepadButton(gamepad, 5);
       const r3Pressed = getGamepadButton(gamepad, 11);
+      const buttonsActive = aPressed || bPressed || xPressed || yPressed || lbPressed || rbPressed || r3Pressed;
+      const cursorStick = applyRadialDeadzone(gamepad.axes[0] || 0, gamepad.axes[1] || 0, GAMEPAD_CURSOR_DEADZONE);
+      const cameraStick = applyRadialDeadzone(gamepad.axes[2] || 0, gamepad.axes[3] || 0, GAMEPAD_CAMERA_DEADZONE);
+      const takeoverCursorStick = applyRadialDeadzone(gamepad.axes[0] || 0, gamepad.axes[1] || 0, GAMEPAD_CONTROL_TAKEOVER_DEADZONE);
+      const takeoverCameraStick = applyRadialDeadzone(gamepad.axes[2] || 0, gamepad.axes[3] || 0, GAMEPAD_CONTROL_TAKEOVER_DEADZONE);
+      const strongControllerIntent = buttonsActive || takeoverCursorStick.magnitude > 0 || takeoverCameraStick.magnitude > 0;
+      if (strongControllerIntent) player.inputMode = "controller";
+      const recentMouseInput = state.time - (player.lastMouseInputTime ?? -999) < MOUSE_PRIORITY_DURATION;
+      const allowControllerMotion = player.inputMode === "controller" && (!recentMouseInput || strongControllerIntent);
+      if (allowControllerMotion) {
+        player.input.cursorX += cursorStick.x * 420 * dt;
+        player.input.cursorY += cursorStick.y * 420 * dt;
+        clampCursorToViewport(player);
+        setActivePlayerContext(player, getViewportForPlayer(player));
+        const cos = Math.cos(-player.camera.rotation);
+        const sin = Math.sin(-player.camera.rotation);
+        player.camera.x += (cameraStick.x * cos - cameraStick.y * sin) * 320 * dt;
+        player.camera.y += (cameraStick.x * sin + cameraStick.y * cos) * 320 * dt;
+        player.camera.x = clamp(player.camera.x, -CAMERA_LIMIT, CAMERA_LIMIT);
+        player.camera.y = clamp(player.camera.y, -CAMERA_LIMIT, CAMERA_LIMIT);
+        updatePlayerPointer(player, player.input.cursorX, player.input.cursorY);
+      }
       player.camera.zoom = clamp(player.camera.zoom + (rbPressed ? 0.82 * dt : 0) - (lbPressed ? 0.82 * dt : 0), 0.36, 1.9);
 
       if (aPressed && !player.gamepadButtons.a) handleLeftDown(player, player.input.cursorX, player.input.cursorY, "controller");
@@ -9279,6 +9733,7 @@
     if (event.target !== canvas) return;
     const pointer = clientToCanvasPoint(event.clientX, event.clientY);
     const player = getPlayerForScreenPoint(pointer.x, pointer.y);
+    markMouseInput(player);
     setActivePlayerContext(player, getViewportForPlayer(player));
     if (event.button === 0) handleLeftDown(player, pointer.x, pointer.y, "mouse");
     else if (event.button === 2) {
