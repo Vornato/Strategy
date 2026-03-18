@@ -435,8 +435,8 @@
   const EXTERNAL_PNG_SCALE = 1.2;
   const externalSpriteSources = {
     assets: {
-      royal_keep: { src: "assets/buildings/royal_keep.png" },
-      village_house: { src: "assets/buildings/village_house.png" },
+      royal_keep: { variants: ["assets/buildings/royal_keep.png", "assets/buildings/royal keep.png"] },
+      village_house: { variants: ["assets/buildings/village_house.png", "assets/buildings/village house.png"] },
       army_house: { src: "assets/buildings/army_house.png" },
       archer_house: { src: "assets/buildings/archer_house.png" },
       stable: { src: "assets/buildings/knight stable.png" },
@@ -454,7 +454,33 @@
       siege_workshop: { src: "assets/buildings/siege workshop.png" },
       cannon_nest: { src: "assets/buildings/cannon nest.png" },
       mortar_pit: { src: "assets/buildings/mortar pit.png" },
+      bridge: { src: "assets/buildings/bridge span.png" },
       dock: { src: "assets/buildings/frontier dock.png" },
+      power_plant: { src: "assets/buildings/power plant.png" },
+      refinery: { src: "assets/buildings/fuel refinery.png" },
+      radar_hub: { src: "assets/buildings/radar hub.png" },
+      bunker: { src: "assets/buildings/steel bunker.png" },
+      command_hall: { src: "assets/buildings/command hall.png" },
+      capital_wall: { src: "assets/buildings/capital wall.png" },
+      guard_barracks: { src: "assets/buildings/guard barracks.png" },
+      ranger_lodge: { src: "assets/buildings/ranger lodge.png" },
+      lancer_stable: { src: "assets/buildings/lancer stable.png" },
+      repair_bay: { src: "assets/buildings/repair bay.png" },
+      signal_beacon: { src: "assets/buildings/signal beacon.png" },
+      tesla_spire: { src: "assets/buildings/tesla spire.png" },
+      flame_tower: { src: "assets/buildings/flame tower.png" },
+      missile_silo: { src: "assets/buildings/missile silo.png" },
+      supply_depot: { src: "assets/buildings/supply depot.png" },
+      imperial_mint: { src: "assets/buildings/imperial mint.png" },
+      war_foundry: { src: "assets/buildings/war foundry.png" },
+      observatory: { src: "assets/buildings/observatory.png" },
+      storm_generator: { src: "assets/buildings/storm generator.png" },
+      citadel: { src: "assets/buildings/citadel.png" },
+      shield_bastion: { src: "assets/buildings/shield bastion.png" },
+      siege_foundry: { src: "assets/buildings/siege foundry.png" },
+      drone_lab: { src: "assets/buildings/drone lab.png" },
+      hover_port: { src: "assets/buildings/hover port.png" },
+      rail_fort: { src: "assets/buildings/rail fort.png" },
       watch_tower: { src: "assets/buildings/watch_tower.png" },
       farm: { src: "assets/buildings/farmstead.png" },
     },
@@ -546,8 +572,9 @@
     const map = new Map();
     if (!entries) return map;
     for (const [key, spec] of Object.entries(entries)) {
+      const variants = Array.isArray(spec.variants) && spec.variants.length ? spec.variants : [spec.src];
       map.set(key, {
-        image: loadImage(spec.src),
+        images: variants.filter(Boolean).map((src) => loadImage(src)),
         scale: spec.scale || EXTERNAL_PNG_SCALE,
       });
     }
@@ -558,9 +585,15 @@
     return Boolean(image && image.complete && image.naturalWidth > 0);
   }
 
-  function getSpriteEntry(group, key) {
+  function getSpriteEntry(group, key, variantSeed = 0) {
     const externalEntry = externalSpriteLibrary[group] && externalSpriteLibrary[group].get(key);
-    if (externalEntry && isImageReady(externalEntry.image)) return externalEntry;
+    if (externalEntry) {
+      const readyImages = (externalEntry.images || []).filter((image) => isImageReady(image));
+      if (readyImages.length) {
+        const index = Math.abs(Math.floor(variantSeed || 0)) % readyImages.length;
+        return { image: readyImages[index], scale: externalEntry.scale || 1 };
+      }
+    }
     const sprite = spriteLibrary[group] && spriteLibrary[group].get(key);
     if (isImageReady(sprite)) return { image: sprite, scale: 1 };
     return null;
@@ -2300,8 +2333,8 @@
     return { group: "units", key: item.role };
   }
 
-  function drawSpriteFromGroup(group, key, x, y, width, height, rotation = 0, alpha = 1) {
-    const entry = getSpriteEntry(group, key);
+  function drawSpriteFromGroup(group, key, x, y, width, height, rotation = 0, alpha = 1, variantSeed = 0) {
+    const entry = getSpriteEntry(group, key, variantSeed);
     if (!entry || !isImageReady(entry.image)) return false;
     const scale = entry.scale || 1;
     ctx.save();
@@ -2883,6 +2916,7 @@
       angle,
       manualPlacement: Boolean(options.manualPlacement),
       placementIndex: state.ids,
+      spriteVariantSeed: Number.isFinite(options.spriteVariantSeed) ? options.spriteVariantSeed : state.ids,
       hp: def.hp,
       maxHp: def.hp,
       armor: def.armor || "wood",
@@ -6283,7 +6317,7 @@
     const size = building.radius * 1.9;
     const tint = hit ? "#ffd2b6" : null;
     const spriteSize = getAssetSpriteSize(building, size);
-    if (drawSpriteFromGroup("assets", building.itemId, 0, 0, spriteSize.w, spriteSize.h, 0, hit ? 0.88 : 1)) {
+    if (drawSpriteFromGroup("assets", building.itemId, 0, 0, spriteSize.w, spriteSize.h, 0, hit ? 0.88 : 1, building.spriteVariantSeed || building.placementIndex || 0)) {
       drawBanner(ownerColor, size * 0.26, -size * 0.44, size * 0.3);
       return;
     }
@@ -7573,7 +7607,7 @@
     let drewSprite = false;
     if (entity.kind === "building") {
       const spriteSize = getAssetSpriteSize(entity, w * 0.58);
-      drewSprite = drawSpriteFromGroup("assets", entity.itemId, centerX, centerY, spriteSize.w, spriteSize.h, 0, 1);
+      drewSprite = drawSpriteFromGroup("assets", entity.itemId, centerX, centerY, spriteSize.w, spriteSize.h, 0, 1, entity.spriteVariantSeed || entity.placementIndex || 0);
     } else {
       const spriteKey = getUnitSpriteKey(entity);
       if (spriteKey) {
