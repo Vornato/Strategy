@@ -57,8 +57,8 @@
               <input id="lan-link-input" type="text" placeholder="Host a LAN room to generate a join link" autocomplete="off" spellcheck="false" readonly />
             </label>
           </div>
-          <p class="lan-hint">
-            Run <code>node server.js</code> on the host machine, open this page from that machine's LAN IP such as <code>http://192.168.1.10:4173</code>, then share the generated link or room code.
+          <p id="lan-hint" class="lan-hint">
+            Run <code>node server.js</code> on the host machine, open this page from that machine's LAN IP such as <code>http://192.168.1.10:4173</code>, then share the generated link or room code. GitHub Pages can host the single-player and local split-screen build, but LAN still requires the built-in HTTP server.
           </p>
           <p id="lan-status" class="lan-status">
             LAN ready when the game is opened from <code>http://127.0.0.1:4173</code> or the host PC's LAN IP.

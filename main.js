@@ -17,6 +17,7 @@
   const joinLanCoopBtn = document.getElementById("join-lan-coop-btn");
   const lanCodeInput = document.getElementById("lan-code-input");
   const lanLinkInput = document.getElementById("lan-link-input");
+  const lanHint = document.getElementById("lan-hint");
   const lanStatus = document.getElementById("lan-status");
   const controllerStatus = document.getElementById("controller-status");
   const liveControls = document.getElementById("live-controls");
@@ -35,6 +36,57 @@
   const GRID_COUNT = Math.ceil(WORLD_SIZE / TILE_SIZE);
   const CAMERA_LIMIT = WORLD_SIZE * 0.38;
   const TAU = Math.PI * 2;
+
+  function isLanBlockedOnCurrentOrigin() {
+    return location.protocol === "https:";
+  }
+
+  function getLanIdleStatusText(sharedRoom = null) {
+    if (isLanBlockedOnCurrentOrigin()) {
+      return "GitHub Pages / HTTPS build ready for campaign and local split-screen. LAN requires opening the game from http://HOST:4173 because the built-in LAN server is HTTP-only.";
+    }
+    if (sharedRoom) {
+      return `Shared LAN link detected for room ${sharedRoom.roomCode}. Press Start to join and launch ${sharedRoom.matchType === "lan-coop" ? "co-op" : "versus"} for everyone in the room.`;
+    }
+    if (location.protocol === "file:") {
+      return "LAN requires the built-in server. Run node server.js and open http://127.0.0.1:4173.";
+    }
+    return `LAN ready on ${location.origin}. Host a room, then share this page URL and the room code.`;
+  }
+
+  function getLanHintMarkup() {
+    if (isLanBlockedOnCurrentOrigin()) {
+      return "GitHub Pages runs over <code>https://</code>, so browsers block this build from talking to the built-in <code>http://HOST:4173</code> LAN server. Use GitHub Pages for campaign and local split-screen, and open the game from the host PC's LAN URL for room hosting/joining.";
+    }
+    return "Run <code>node server.js</code> on the host machine, open this page from that machine's LAN IP such as <code>http://192.168.1.10:4173</code>, then share the generated link or room code. GitHub Pages can host the single-player and local split-screen build, but LAN still requires the built-in HTTP server.";
+  }
+
+  function syncLanOriginUi() {
+    const lanBlocked = isLanBlockedOnCurrentOrigin();
+    const disabledTitle = lanBlocked
+      ? "LAN is unavailable from HTTPS-hosted builds like GitHub Pages. Open the game from http://HOST:4173 to use LAN rooms."
+      : "";
+    for (const button of [hostLanBtn, joinLanBtn, hostLanCoopBtn, joinLanCoopBtn]) {
+      if (!button) continue;
+      button.disabled = lanBlocked;
+      button.title = disabledTitle;
+    }
+    if (lanCodeInput) {
+      lanCodeInput.disabled = lanBlocked;
+      lanCodeInput.title = disabledTitle;
+      if (lanBlocked && !lanCodeInput.value) lanCodeInput.placeholder = "LAN disabled on HTTPS build";
+      else lanCodeInput.placeholder = "ABCDE";
+    }
+    if (lanHint) lanHint.innerHTML = getLanHintMarkup();
+  }
+
+  function ensureLanAvailableFromCurrentOrigin() {
+    if (!isLanBlockedOnCurrentOrigin()) return true;
+    setLanLink("");
+    setLanStatus(getLanIdleStatusText());
+    syncLanOriginUi();
+    return false;
+  }
 
   const ownerColors = {
     player: "#68d7ff",
@@ -369,9 +421,7 @@
       linkRoomCode: "",
       linkMatchType: null,
       linkApiBase: "",
-      statusText: location.protocol === "file:"
-        ? "LAN requires the built-in server. Run node server.js and open http://127.0.0.1:4173."
-        : `LAN ready on ${location.origin}. Host a room, then share this page URL and the room code.`,
+      statusText: getLanIdleStatusText(),
     },
   };
 
@@ -1038,7 +1088,7 @@
       startBtn.disabled = Boolean(state.lan.started);
       return;
     }
-    if (state.mode === "menu" && !state.lan.clientId && state.lan.linkRoomCode) {
+    if (state.mode === "menu" && !state.lan.clientId && state.lan.linkRoomCode && !isLanBlockedOnCurrentOrigin()) {
       startBtn.textContent = `Start Shared ${state.lan.linkMatchType === "lan-coop" ? "LAN Co-op" : "LAN Versus"}`;
       startBtn.disabled = false;
       return;
@@ -1071,13 +1121,8 @@
     state.lan.linkApiBase = sharedRoom ? sharedRoom.apiBase : "";
     if (state.lan.linkApiBase) state.lan.apiBase = state.lan.linkApiBase;
     if (sharedRoom && lanCodeInput) lanCodeInput.value = sharedRoom.roomCode;
-    setLanStatus(
-      sharedRoom
-        ? `Shared LAN link detected for room ${sharedRoom.roomCode}. Press Start to join and launch ${sharedRoom.matchType === "lan-coop" ? "co-op" : "versus"} for everyone in the room.`
-        : location.protocol === "file:"
-        ? "LAN requires the built-in server. Run node server.js and open http://127.0.0.1:4173."
-        : `LAN ready on ${location.origin}. Host a room, then share this page URL and the room code.`,
-    );
+    setLanStatus(getLanIdleStatusText(sharedRoom && !isLanBlockedOnCurrentOrigin() ? sharedRoom : null));
+    syncLanOriginUi();
     syncMenuButtons();
   }
 
@@ -1362,6 +1407,7 @@
     if (joinLanBtn) joinLanBtn.textContent = "Join LAN Versus";
     if (hostLanCoopBtn) hostLanCoopBtn.textContent = "Host LAN Co-op";
     if (joinLanCoopBtn) joinLanCoopBtn.textContent = "Join LAN Co-op";
+    syncLanOriginUi();
     if (audioState.lastResultCue !== state.mode) {
       audioState.lastResultCue = state.mode;
       playUiSound(state.mode === "victory" ? "victory" : "defeat", { volume: 0.92, cooldown: 0.2 });
@@ -1483,6 +1529,7 @@
   }
 
   async function requestLanRoomStart() {
+    if (!ensureLanAvailableFromCurrentOrigin()) return;
     if (!hasLanSession()) {
       setLanStatus("Host or join a LAN room first.");
       return;
@@ -1575,6 +1622,7 @@
   }
 
   async function startLanHostMatch(matchType = "lan") {
+    if (!ensureLanAvailableFromCurrentOrigin()) return;
     setLanLink("");
     setLanStatus(`Creating ${getMatchLabel(normalizeLanMatchType(matchType))} LAN room...`);
     try {
@@ -1607,6 +1655,7 @@
   }
 
   async function joinLanMatch(matchType = "lan", options = {}) {
+    if (!ensureLanAvailableFromCurrentOrigin()) return;
     const roomCode = sanitizeRoomCode(options.roomCode || (lanCodeInput && lanCodeInput.value));
     if (!roomCode) {
       setLanStatus("Enter the host room code first.");
@@ -1655,7 +1704,7 @@
       await requestLanRoomStart();
       return;
     }
-    if (state.mode === "menu" && !state.lan.clientId && state.lan.linkRoomCode) {
+    if (state.mode === "menu" && !state.lan.clientId && state.lan.linkRoomCode && !isLanBlockedOnCurrentOrigin()) {
       await joinLanMatch(state.lan.linkMatchType || "lan", {
         roomCode: state.lan.linkRoomCode,
         apiBase: state.lan.linkApiBase,
@@ -8387,6 +8436,7 @@
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
     joinLanMatch("lan-coop");
   });
+  syncLanOriginUi();
   if (difficultyBtn) difficultyBtn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.48, cooldown: 0.04 });
     toggleDifficultyMode();
