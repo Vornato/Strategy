@@ -16,6 +16,34 @@
           Build an empire, collect taxes, harvest the frontier, and crush rival nations
           across a rotating war map.
         </p>
+        <div class="map-panel" aria-label="Map selection">
+          <div class="map-panel-head">
+            <p class="controller-title">Battlefield</p>
+            <p class="map-panel-copy">Choose which level to generate for the next match.</p>
+          </div>
+          <div class="map-strip">
+            <button type="button" class="map-card active" data-map-preset="green">
+              <img src="assets/environment/maps/green map.png" alt="Green map preview" />
+              <span class="map-card-title">Green Map</span>
+              <span class="map-card-copy">Lush rivers, forests, hills, and the broadest build space.</span>
+            </button>
+            <button type="button" class="map-card" data-map-preset="canyon">
+              <img src="assets/environment/maps/Canyon.png" alt="Canyon map preview" />
+              <span class="map-card-title">Canyon</span>
+              <span class="map-card-copy">Layered ravines, choke points, and dangerous stone corridors.</span>
+            </button>
+            <button type="button" class="map-card" data-map-preset="desert">
+              <img src="assets/environment/maps/Desert.png" alt="Desert map preview" />
+              <span class="map-card-title">Desert</span>
+              <span class="map-card-copy">Wide dunes, heat attrition, and oasis river fighting lanes.</span>
+            </button>
+            <button type="button" class="map-card" data-map-preset="ocean">
+              <img src="assets/environment/maps/ocean.png" alt="Ocean map preview" />
+              <span class="map-card-title">Ocean</span>
+              <span class="map-card-copy">Coastal mainland with ocean borders, marsh coves, and shipping lanes.</span>
+            </button>
+          </div>
+        </div>
         <div class="control-grid">
           <div><span>Pan map</span><strong>Hold right mouse + drag</strong></div>
           <div><span>Rotate map</span><strong>Hold middle mouse + drag</strong></div>
@@ -70,12 +98,6 @@
             Connect one controller for solo pad support or up to four controllers for local split-screen matches.
           </p>
         </div>
-        <div class="art-strip" aria-label="Top Knights environment artwork">
-          <img src="assets/environment/maps/green map.png" alt="Green river map art" />
-          <img src="assets/environment/maps/Canyon.png" alt="Canyon map art" />
-          <img src="assets/environment/maps/Desert.png" alt="Desert map art" />
-          <img src="assets/environment/maps/ocean.png" alt="Ocean map art" />
-        </div>
       </div>
     </div>
     <div id="live-controls" class="live-controls hidden" aria-label="Live game controls">
@@ -88,6 +110,50 @@
         <button id="speed-ultra-btn" type="button" class="live-pill secondary-live">5x</button>
       </div>
       <p id="assist-status" class="assist-status">Normal pressure. Enemy forces behave as usual.</p>
+    </div>
+    <div id="slash-overlay" class="slash-overlay hidden" aria-label="Slash command">
+      <div class="slash-panel">
+        <span class="slash-label">Command</span>
+        <input id="slash-command-input" type="text" autocomplete="off" spellcheck="false" placeholder="/admin" />
+      </div>
+    </div>
+    <div id="admin-overlay" class="admin-overlay hidden" aria-label="Admin panel">
+      <div class="admin-panel">
+        <div class="admin-panel-head">
+          <div>
+            <p class="controller-title">Admin Panel</p>
+            <p id="admin-status" class="admin-status">Type a command like <code>rock</code>, arm it, then click the map to place points.</p>
+          </div>
+          <button id="admin-close-btn" type="button" class="secondary-btn admin-close-btn">Close</button>
+        </div>
+        <div class="admin-toolbar">
+          <label class="admin-field admin-field-wide">
+            <span>Command</span>
+            <input id="admin-command-input" type="text" autocomplete="off" spellcheck="false" placeholder="rock, tree, desert, royal keep, militia squad, erase" />
+          </label>
+          <label class="admin-field">
+            <span>Owner</span>
+            <select id="admin-owner-select">
+              <option value="player">Player</option>
+              <option value="player1">Player 1</option>
+              <option value="player2">Player 2</option>
+              <option value="player3">Player 3</option>
+              <option value="player4">Player 4</option>
+              <option value="enemy1">Enemy 1</option>
+              <option value="enemy2">Enemy 2</option>
+              <option value="neutral" selected>Neutral</option>
+            </select>
+          </label>
+          <button id="admin-arm-btn" type="button" class="secondary-btn admin-action-btn">Arm Tool</button>
+          <button id="admin-clear-points-btn" type="button" class="secondary-btn admin-action-btn">Clear Points</button>
+          <button id="admin-clear-log-btn" type="button" class="secondary-btn admin-action-btn">Clear Log</button>
+          <button id="admin-copy-log-btn" type="button" class="secondary-btn admin-action-btn">Copy Log</button>
+        </div>
+        <p class="admin-help">
+          Slash command: type <code>/admin</code> during a match. Supported actions include resources, units, buildings, biome painting, and <code>erase</code>. Every click is logged with coordinates below.
+        </p>
+        <textarea id="admin-log" class="admin-log" readonly></textarea>
+      </div>
     </div>
     <script src="sprite-data.js"></script>
     <script src="main.js"></script>

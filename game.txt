@@ -28,6 +28,7 @@ Features:
 - The in-game UI now uses a stronger icon pass with framed item glyphs, category badges, richer catalog cards, polished quick-bar slots, and upgraded left-bottom selection cards so assets, weapons, and selections read more clearly at a glance.
 - Local PNG art from the `assets` folder now overrides the generated sprite set wherever matching files exist, with the imported building, weapon, resource, and HUD art rendered about 1.2x larger for stronger battlefield/UI presence while unmatched entries still fall back safely to the built-in sprites.
 - The main start menu now uses a more compact responsive layout with shorter cards/buttons and safe vertical scrolling so the lower LAN section stays reachable on shorter screens.
+- The main menu now includes four selectable battlefield presets: `Green Map`, `Canyon`, `Desert`, and `Ocean`, each with its own preview card and distinct terrain-generation profile.
 - Menu option for `2 Players Split Screen` with local versus mode on the same map.
 - Local split-screen now also supports `3P` and `4P` versus plus `3P` and `4P` co-op, with automatic 3-way and 4-way viewport layouts and controller assignment for up to four gamepads.
 - Local controller support now scales from solo pad play up to four controllers, with left-stick cursor control, right-stick camera movement, right-stick press rotation, `A` select/click, `B` weapons menu, `X` assets menu, and `Y` deselect.
@@ -36,6 +37,8 @@ Features:
 - Every current building PNG in `assets/buildings` is now wired into the live asset sprite override system; where duplicate art exists for the same building type, the game uses those extra images as alternate visual variants instead of leaving them unused.
 - Split-screen cameras, per-player HUDs, per-player quick bars and resources, and head-to-head win/lose states when one side loses every unit and structure.
 - Expanded biome system with deserts, canyons, deadlands, rivers, marshes, forests, hills, roads, and meadows.
+- Typing `/admin` during a match opens an in-game admin panel where you can arm typed commands like `rock`, `tree`, biome names, building names, weapon/unit names, animals, civilians, and `erase`, then click the map to place or paint them while the panel logs every action.
+- The admin panel now keeps persistent point markers on the battlefield, shows a detailed copyable text log with exact coordinates and tool names, and updates the live terrain cache so custom biome painting immediately changes the visible map.
 - Terrain now changes movement speed, tower/ranged advantage, structure productivity, build permissions, and environmental attrition for units and buildings depending on where they stand.
 - Clicking an already selected quick-bar item or single selected unit a second time now deselects it.
 - LAN versus support over the built-in Node server with room-code hosting and joining from localhost or a host machine's LAN IP.
@@ -107,3 +110,5 @@ Change Log:
 - 2026-03-18: Added a GitHub Pages deployment workflow that ships only the static game files, and made the menu HTTPS-aware so Pages builds keep campaign/local split-screen available while disabling the HTTP-only LAN room controls with a clear explanation.
 - 2026-03-18: Finished the full `assets/buildings` photo pass by wiring every current building PNG into the game, including new advanced-structure art like `command hall`, `radar hub`, `capital wall`, and `steel bunker`, while duplicate keep/house photos now appear as alternate in-game building variants.
 - 2026-03-18: Fixed mouse-position drift by converting raw browser `clientX` / `clientY` input into canvas-space coordinates before viewport selection, hover tests, clicks, drag-box updates, panning, and wheel-panel hit checks.
+- 2026-03-18: Added four real map presets (`Green Map`, `Canyon`, `Desert`, and `Ocean`) with menu selection, preset-aware terrain generation, ocean biomes, safer settlement/base land overrides, and LAN snapshot syncing for the selected battlefield layout.
+- 2026-03-18: Added the `/admin` in-match editor with command-armed spawning/painting for resources, biomes, buildings, units, civilians, animals, and erase actions, plus on-map point markers and a detailed copyable admin log of every clicked placement.

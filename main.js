@@ -15,6 +15,7 @@
   const joinLanBtn = document.getElementById("join-lan-btn");
   const hostLanCoopBtn = document.getElementById("host-lan-coop-btn");
   const joinLanCoopBtn = document.getElementById("join-lan-coop-btn");
+  const mapPresetButtons = Array.from(document.querySelectorAll("[data-map-preset]"));
   const lanCodeInput = document.getElementById("lan-code-input");
   const lanLinkInput = document.getElementById("lan-link-input");
   const lanHint = document.getElementById("lan-hint");
@@ -28,6 +29,18 @@
   const speedFastBtn = document.getElementById("speed-fast-btn");
   const speedUltraBtn = document.getElementById("speed-ultra-btn");
   const assistStatus = document.getElementById("assist-status");
+  const slashOverlay = document.getElementById("slash-overlay");
+  const slashCommandInput = document.getElementById("slash-command-input");
+  const adminOverlay = document.getElementById("admin-overlay");
+  const adminStatus = document.getElementById("admin-status");
+  const adminCommandInput = document.getElementById("admin-command-input");
+  const adminOwnerSelect = document.getElementById("admin-owner-select");
+  const adminArmBtn = document.getElementById("admin-arm-btn");
+  const adminClearPointsBtn = document.getElementById("admin-clear-points-btn");
+  const adminClearLogBtn = document.getElementById("admin-clear-log-btn");
+  const adminCopyLogBtn = document.getElementById("admin-copy-log-btn");
+  const adminCloseBtn = document.getElementById("admin-close-btn");
+  const adminLog = document.getElementById("admin-log");
   const DEFAULT_LAN_SERVER_PORT = 4173;
 
   const WORLD_SIZE = 4600;
@@ -36,6 +49,7 @@
   const GRID_COUNT = Math.ceil(WORLD_SIZE / TILE_SIZE);
   const CAMERA_LIMIT = WORLD_SIZE * 0.38;
   const TAU = Math.PI * 2;
+  const MAP_PRESET_ORDER = ["green", "canyon", "desert", "ocean"];
 
   function isLanBlockedOnCurrentOrigin() {
     return location.protocol === "https:";
@@ -294,6 +308,7 @@
     forest: ["#36563a", "#24402c", "#4f7050"],
     hill: ["#8b7b62", "#6e614d", "#b09c7d"],
     river: ["#275f87", "#1e4f72", "#4d97c9"],
+    ocean: ["#16384f", "#1e4f72", "#3d81a8"],
     marsh: ["#60735b", "#465444", "#7a8e6e"],
     desert: ["#b6965f", "#d0b37b", "#8f7347"],
     canyon: ["#824d34", "#a76442", "#603625"],
@@ -306,13 +321,42 @@
     forest: { label: "Forest", move: 0.88, vehicleMove: 0.74, structure: 0.94, blocked: false },
     hill: { label: "Hill", move: 0.93, vehicleMove: 0.86, structure: 1.04, blocked: false, towerRange: 1.08 },
     river: { label: "River", move: 0.52, vehicleMove: 0.46, structure: 0.4, blocked: true, allow: new Set(["bridge", "dock"]) },
+    ocean: { label: "Ocean", move: 0.3, vehicleMove: 0.24, structure: 0.22, blocked: true, allow: new Set(["bridge", "dock", "hover_port"]) },
     marsh: { label: "Marsh", move: 0.7, vehicleMove: 0.54, structure: 0.82, blocked: false },
     desert: { label: "Desert", move: 0.82, vehicleMove: 0.72, structure: 0.9, attrition: { flesh: 1.3 }, blocked: false },
     canyon: { label: "Canyon", move: 0.68, vehicleMove: 0.5, structure: 0.72, blocked: true, towerRange: 1.12, allow: new Set(["bridge", "tower", "radar", "outpost", "wall", "capital-wall", "gate"]) },
     deadlands: { label: "Deadlands", move: 0.76, vehicleMove: 0.68, structure: 0.76, attrition: { flesh: 2.1, wood: 0.9 }, blocked: false },
     road: { label: "Road", move: 1.12, vehicleMove: 1.08, structure: 1.02, blocked: false },
   };
-  const wetBiomes = new Set(["river", "marsh"]);
+  const wetBiomes = new Set(["river", "marsh", "ocean"]);
+  const mapPresetCatalog = {
+    green: { id: "green", label: "Green Map", shortLabel: "Green", desc: "Balanced lush terrain with rivers, forests, roads, and open build space." },
+    canyon: { id: "canyon", label: "Canyon", shortLabel: "Canyon", desc: "Ravines, cliffs, canyon choke routes, and harsher central pressure." },
+    desert: { id: "desert", label: "Desert", shortLabel: "Desert", desc: "Expansive desert pressure, oasis rivers, and more attrition-heavy routes." },
+    ocean: { id: "ocean", label: "Ocean", shortLabel: "Ocean", desc: "Coastal mainland with ocean edges, marsh coves, and shipping lanes." },
+  };
+  const homelandAnchorZones = [
+    { x: -1180, y: 980, radius: 330 },
+    { x: -1180, y: 1500, radius: 340 },
+    { x: 1320, y: -1160, radius: 320 },
+    { x: 1440, y: 1180, radius: 320 },
+    { x: -1540, y: 1500, radius: 340 },
+    { x: 1540, y: 1500, radius: 340 },
+    { x: 1540, y: -1500, radius: 340 },
+    { x: -1540, y: -1500, radius: 340 },
+    { x: 0, y: -1620, radius: 320 },
+    { x: -1330, y: 1080, radius: 300 },
+    { x: -1540, y: 1080, radius: 300 },
+    { x: -1120, y: 1080, radius: 300 },
+    { x: -940, y: -180, radius: 210 },
+    { x: 760, y: 880, radius: 210 },
+    { x: 1120, y: -1060, radius: 210 },
+  ];
+  const neutralVillageCenters = [
+    { x: -940, y: -180, houses: 5, radius: 220 },
+    { x: 760, y: 880, houses: 4, radius: 220 },
+    { x: 1120, y: -1060, houses: 5, radius: 220 },
+  ];
 
   const rareDropCatalog = [
     { id: "axe", name: "Battle Axe", bonus: 4, rangeBonus: 0, projectile: null, tint: "#c9d1d8" },
@@ -327,6 +371,7 @@
   const state = {
     mode: "menu",
     matchType: "single",
+    mapPreset: "green",
     activeOwner: "player",
     activeViewport: null,
     players: {},
@@ -353,6 +398,7 @@
       dragStartScreenY: 0,
     },
     world: {
+      preset: "green",
       tiles: [],
       trees: [],
       rocks: [],
@@ -422,6 +468,16 @@
       linkMatchType: null,
       linkApiBase: "",
       statusText: getLanIdleStatusText(),
+    },
+    admin: {
+      slashOpen: false,
+      panelOpen: false,
+      commandText: "rock",
+      activeTool: null,
+      owner: "neutral",
+      statusText: "Type a command like rock, arm it, then click the map to place points.",
+      log: [],
+      points: [],
     },
   };
 
@@ -1071,6 +1127,389 @@
     if (lanLinkInput) lanLinkInput.value = state.lan.joinUrl;
   }
 
+  function sanitizeMapPreset(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return mapPresetCatalog[normalized] ? normalized : "green";
+  }
+
+  function getMapPresetDef(value = state.mapPreset) {
+    return mapPresetCatalog[sanitizeMapPreset(value)] || mapPresetCatalog.green;
+  }
+
+  function syncMapPresetUi() {
+    const activePreset = sanitizeMapPreset(state.mapPreset);
+    for (const button of mapPresetButtons) {
+      const preset = sanitizeMapPreset(button.dataset.mapPreset);
+      const active = preset === activePreset;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+      button.title = getMapPresetDef(preset).desc;
+    }
+  }
+
+  function setMapPreset(value, options = {}) {
+    const preset = sanitizeMapPreset(value);
+    state.mapPreset = preset;
+    state.world.preset = preset;
+    syncMapPresetUi();
+    if (options.notify) notify(`${getMapPresetDef(preset).label} selected for the next battle.`, "#8fd8ff");
+  }
+
+  function isTextInputTarget(target) {
+    if (!target) return false;
+    const tag = String(target.tagName || "").toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" || Boolean(target.isContentEditable);
+  }
+
+  function setAdminStatus(text) {
+    state.admin.statusText = text;
+    if (adminStatus) adminStatus.innerHTML = text;
+  }
+
+  function getAdminLogSnapshotText() {
+    const lines = [
+      `Map Preset: ${getMapPresetDef(state.world.preset || state.mapPreset).label}`,
+      `Armed Tool: ${state.admin.activeTool ? state.admin.activeTool.label : "None"}`,
+      `Owner: ${state.admin.owner}`,
+      `Point Count: ${state.admin.points.length}`,
+      "",
+      "Points:",
+    ];
+    if (state.admin.points.length) {
+      state.admin.points.forEach((point, index) => {
+        const owner = point.owner ? ` owner=${point.owner}` : "";
+        const detail = point.detail ? ` ${point.detail}` : "";
+        lines.push(`${index + 1}. ${point.label} @ (${Math.round(point.x)}, ${Math.round(point.y)})${owner}${detail}`);
+      });
+    } else {
+      lines.push(`Admin panel ready on ${getMapPresetDef().label}. Type a command, arm it, then click the map.`);
+    }
+    lines.push("", "Detailed Log:");
+    if (state.admin.log.length) lines.push(...state.admin.log);
+    else lines.push("(no log entries yet)");
+    return lines.join("\n");
+  }
+
+  function refreshAdminLogUi() {
+    if (adminLog) {
+      adminLog.value = getAdminLogSnapshotText();
+      adminLog.scrollTop = adminLog.scrollHeight;
+    }
+  }
+
+  function syncAdminUi() {
+    if (slashOverlay) slashOverlay.classList.toggle("hidden", !state.admin.slashOpen);
+    if (adminOverlay) adminOverlay.classList.toggle("hidden", !state.admin.panelOpen);
+    if (adminCommandInput && adminCommandInput.value !== state.admin.commandText) adminCommandInput.value = state.admin.commandText;
+    if (adminOwnerSelect) adminOwnerSelect.value = state.admin.owner;
+    setAdminStatus(state.admin.statusText);
+    refreshAdminLogUi();
+  }
+
+  function addAdminLog(message, details = {}) {
+    const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const parts = [`[${stamp}]`, message];
+    if (details.command) parts.push(`tool=${details.command}`);
+    if (Number.isFinite(details.x) && Number.isFinite(details.y)) parts.push(`point=(${Math.round(details.x)}, ${Math.round(details.y)})`);
+    if (details.owner) parts.push(`owner=${details.owner}`);
+    if (details.extra) parts.push(details.extra);
+    state.admin.log.push(parts.join(" | "));
+    if (state.admin.log.length > 220) state.admin.log.splice(0, state.admin.log.length - 220);
+    refreshAdminLogUi();
+  }
+
+  function openSlashCommand(initialValue = "/admin") {
+    if (state.mode !== "playing") return;
+    state.admin.slashOpen = true;
+    syncAdminUi();
+    if (slashCommandInput) {
+      slashCommandInput.value = initialValue;
+      window.setTimeout(() => {
+        slashCommandInput.focus();
+        slashCommandInput.setSelectionRange(slashCommandInput.value.length, slashCommandInput.value.length);
+      }, 0);
+    }
+  }
+
+  function closeSlashCommand() {
+    state.admin.slashOpen = false;
+    syncAdminUi();
+  }
+
+  function openAdminPanel(options = {}) {
+    if (state.mode !== "playing") return;
+    state.admin.panelOpen = true;
+    state.admin.slashOpen = false;
+    if (!state.admin.activeTool) setAdminStatus("Admin panel active. Type a command like <code>rock</code>, press Arm Tool, then click the map.");
+    syncAdminUi();
+    if (options.focus !== false && adminCommandInput) {
+      window.setTimeout(() => {
+        adminCommandInput.focus();
+        adminCommandInput.select();
+      }, 0);
+    }
+  }
+
+  function closeAdminPanel() {
+    state.admin.panelOpen = false;
+    state.admin.slashOpen = false;
+    syncAdminUi();
+  }
+
+  function clearAdminPoints() {
+    state.admin.points = [];
+    setAdminStatus("Admin points cleared.");
+    addAdminLog("Cleared admin point markers.");
+    syncAdminUi();
+  }
+
+  function clearAdminLog() {
+    state.admin.log = [];
+    setAdminStatus("Admin log cleared.");
+    refreshAdminLogUi();
+  }
+
+  async function copyAdminLog() {
+    const text = getAdminLogSnapshotText();
+    try {
+      await navigator.clipboard.writeText(text);
+      setAdminStatus("Admin log copied to the clipboard.");
+      addAdminLog("Copied admin log to clipboard.");
+    } catch (error) {
+      setAdminStatus("Copy failed. Select the log box and copy it manually.");
+      addAdminLog("Clipboard copy failed.", { extra: error && error.message ? error.message : "manual copy required" });
+    }
+    syncAdminUi();
+  }
+
+  function executeSlashCommand(raw) {
+    const normalized = String(raw || "").trim().replace(/^\/+/, "").toLowerCase();
+    if (!normalized) {
+      closeSlashCommand();
+      return;
+    }
+    if (normalized === "admin") {
+      openAdminPanel();
+      addAdminLog("Opened admin panel from slash command.");
+      return;
+    }
+    if (normalized === "admin close") {
+      closeAdminPanel();
+      addAdminLog("Closed admin panel from slash command.");
+      return;
+    }
+    if (normalized.startsWith("admin ")) {
+      openAdminPanel({ focus: false });
+      armAdminToolFromCommand(normalized.slice(6), { log: true });
+      closeSlashCommand();
+      return;
+    }
+    setAdminStatus(`Unknown slash command <code>/${normalized}</code>. Use <code>/admin</code>.`);
+    addAdminLog("Unknown slash command.", { extra: `/${normalized}` });
+    closeSlashCommand();
+  }
+
+  function getAdminOwner() {
+    return String(state.admin.owner || "neutral");
+  }
+
+  function normalizeAdminCommand(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[\/]+/g, " ")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getAdminToolLabel(tool) {
+    if (!tool) return "admin tool";
+    return tool.label || tool.command || tool.kind || "admin tool";
+  }
+
+  function resolveAdminTool(raw) {
+    const command = normalizeAdminCommand(raw);
+    if (!command) return null;
+
+    if (["erase", "delete", "remove", "clear"].includes(command)) {
+      return {
+        kind: "erase",
+        command,
+        label: "Erase",
+        color: "#ff9b89",
+        usesOwner: false,
+      };
+    }
+
+    if (["rock", "rocks", "stone", "stone rock", "boulder"].includes(command)) {
+      return {
+        kind: "resource",
+        resourceKind: "rock",
+        spriteKey: "rock_1",
+        accentKey: null,
+        command,
+        label: "Rock",
+        color: "#d7e4ef",
+        usesOwner: false,
+      };
+    }
+
+    if (["desert rock", "canyon rock", "desert_rock"].includes(command)) {
+      return {
+        kind: "resource",
+        resourceKind: "rock",
+        spriteKey: "desert_rock",
+        accentKey: "dried_bush",
+        command,
+        label: "Desert Rock",
+        color: "#f1c7a3",
+        usesOwner: false,
+      };
+    }
+
+    if (["tree", "trees", "tree 1", "tree1", "forest tree"].includes(command)) {
+      return {
+        kind: "resource",
+        resourceKind: "tree",
+        spriteKey: "tree_1",
+        accentKey: "bush",
+        command,
+        label: "Tree",
+        color: "#9fe0a4",
+        usesOwner: false,
+      };
+    }
+
+    if (["tree 2", "tree2"].includes(command)) {
+      return {
+        kind: "resource",
+        resourceKind: "tree",
+        spriteKey: "tree_2",
+        accentKey: "bush",
+        command,
+        label: "Tree 2",
+        color: "#9fe0a4",
+        usesOwner: false,
+      };
+    }
+
+    if (["civilian", "villager", "npc", "citizen"].includes(command)) {
+      return {
+        kind: "civilian",
+        command,
+        label: "Civilian",
+        color: "#ffe29a",
+        usesOwner: true,
+      };
+    }
+
+    if (["deer", "boar"].includes(command)) {
+      return {
+        kind: "animal",
+        species: command,
+        command,
+        label: command === "boar" ? "Boar" : "Deer",
+        color: command === "boar" ? "#d7a47e" : "#f0d3a1",
+        usesOwner: false,
+      };
+    }
+
+    const biomeAliases = {
+      meadow: ["meadow", "grass", "green", "green map"],
+      forest: ["forest", "woods", "woodland"],
+      hill: ["hill", "hills", "ridge"],
+      river: ["river", "water", "stream"],
+      ocean: ["ocean", "sea", "coast", "coastal water"],
+      marsh: ["marsh", "swamp", "bog"],
+      desert: ["desert", "sand", "dunes"],
+      canyon: ["canyon", "ravine", "gorge"],
+      deadlands: ["deadlands", "dead lands", "blight", "wasteland"],
+      road: ["road", "path", "trail"],
+    };
+    for (const [biome, aliases] of Object.entries(biomeAliases)) {
+      if (aliases.includes(command)) {
+        return {
+          kind: "biome",
+          biome,
+          command,
+          label: terrainEffects[biome].label,
+          color: terrainPalette[biome][1],
+          usesOwner: false,
+        };
+      }
+    }
+
+    const assetMatch = assetCatalog.find((item) => {
+      const probes = [item.id, item.name];
+      return probes.some((probe) => normalizeAdminCommand(probe) === command);
+    });
+    if (assetMatch) {
+      return {
+        kind: "asset",
+        item: assetMatch,
+        command,
+        label: assetMatch.name,
+        color: "#8fd8ff",
+        usesOwner: true,
+      };
+    }
+
+    const weaponMatch = weaponCatalog.find((item) => {
+      const probes = [item.id, item.name, item.role];
+      return probes.some((probe) => normalizeAdminCommand(probe) === command);
+    });
+    if (weaponMatch) {
+      return {
+        kind: "weapon",
+        item: weaponMatch,
+        command,
+        label: weaponMatch.name,
+        color: weaponMatch.type === "ability" ? "#ffb484" : "#9fe0a4",
+        usesOwner: true,
+      };
+    }
+
+    return null;
+  }
+
+  function armAdminToolFromCommand(raw = state.admin.commandText, options = {}) {
+    const nextCommand = String(raw || "").trim();
+    state.admin.commandText = nextCommand;
+    const tool = resolveAdminTool(nextCommand);
+    if (!tool) {
+      state.admin.activeTool = null;
+      setAdminStatus(`Unknown admin command <code>${nextCommand || "(empty)"}</code>. Try <code>rock</code>, <code>tree</code>, <code>desert</code>, <code>royal keep</code>, <code>militia squad</code>, or <code>erase</code>.`);
+      if (options.log !== false) addAdminLog("Unknown admin tool.", { command: nextCommand || "(empty)" });
+      syncAdminUi();
+      return null;
+    }
+    state.admin.activeTool = tool;
+    const owner = tool.usesOwner ? getAdminOwner() : "";
+    const action = tool.kind === "biome"
+      ? "paint tiles"
+      : tool.kind === "erase"
+        ? "erase the nearest object or reset a tile"
+        : "place it";
+    setAdminStatus(`Armed <code>${tool.label}</code>. Click the map to ${action}${owner ? ` for <code>${owner}</code>` : ""}.`);
+    if (options.log !== false) addAdminLog("Armed admin tool.", { command: tool.command, owner: owner || null, extra: tool.label });
+    syncAdminUi();
+    return tool;
+  }
+
+  function addAdminPoint(point) {
+    state.admin.points.push({
+      id: createId("admin-point"),
+      x: point.x,
+      y: point.y,
+      label: point.label,
+      owner: point.owner || "",
+      tint: point.tint || "#8fd8ff",
+      detail: point.detail || "",
+    });
+    if (state.admin.points.length > 160) state.admin.points.splice(0, state.admin.points.length - 160);
+    refreshAdminLogUi();
+  }
+
   function getLanShareOrigin() {
     const source = state.lan.apiBase || state.lan.linkApiBase || state.lan.joinUrl || (location.protocol !== "file:" ? location.origin : "");
     if (!source) return "the host machine";
@@ -1340,6 +1779,7 @@
     return {
       mode: state.mode,
       matchType: state.matchType,
+      mapPreset: state.world.preset || state.mapPreset,
       winnerOwner: state.winnerOwner,
       loserOwner: state.loserOwner,
       time: state.time,
@@ -1362,6 +1802,8 @@
         ]),
       ),
       world: {
+        preset: state.world.preset || state.mapPreset,
+        tiles: state.world.tiles.map((tile) => ({ ...tile })),
         trees: state.world.trees.map((tree) => ({ ...tree })),
         rocks: state.world.rocks.map((rock) => ({ ...rock })),
         civilians: state.world.civilians.map((civilian) => ({ ...civilian })),
@@ -1379,6 +1821,8 @@
 
   function restoreLanWorld(snapshot) {
     const world = snapshot.world || {};
+    state.world.preset = sanitizeMapPreset(world.preset || snapshot.mapPreset || state.world.preset);
+    state.world.tiles = (world.tiles || []).map((tile) => ({ ...tile }));
     state.world.trees = (world.trees || []).map((tree) => ({ ...tree }));
     state.world.rocks = (world.rocks || []).map((rock) => ({ ...rock }));
     state.world.civilians = (world.civilians || []).map((civilian) => ({ ...civilian }));
@@ -1396,6 +1840,7 @@
     }));
     state.world.notifications = (world.notifications || []).map((note) => ({ ...note }));
     state.world.quests = (world.quests || []).map((quest) => ({ ...quest }));
+    if (state.world.tiles.length) renderTerrainCache();
   }
 
   function showMatchResultOverlay() {
@@ -1452,6 +1897,7 @@
   function applyLanSnapshot(snapshot) {
     if (!snapshot) return;
     state.matchType = snapshot.matchType || state.matchType;
+    if (snapshot.mapPreset) setMapPreset(snapshot.mapPreset);
     state.lan.roomMatchType = state.matchType;
     state.mode = snapshot.mode || state.mode;
     state.winnerOwner = snapshot.winnerOwner || null;
@@ -2697,6 +3143,21 @@
 
   function getEnvironmentMood(biome = ((getTileAtWorld(state.camera.x, state.camera.y) || {}).biome || "meadow")) {
     switch (biome) {
+      case "ocean":
+        return {
+          skyTop: "#05111b",
+          skyMid: "#0b2d45",
+          skyBottom: "#081118",
+          sunCore: "rgba(229,244,255,0.48)",
+          sunGlow: "rgba(129,204,255,0.24)",
+          skyGlow: "rgba(114,207,255,0.2)",
+          ember: "rgba(164,220,255,0.08)",
+          horizon: "rgba(205,237,255,0.1)",
+          groundWash: "rgba(134,211,255,0.16)",
+          groundShade: "rgba(7,22,34,0.14)",
+          water: "rgba(233,247,255,0.32)",
+          heat: "rgba(134,211,255,0.08)",
+        };
       case "desert":
         return {
           skyTop: "#09131b",
@@ -3370,7 +3831,99 @@
     }
   }
 
+  function getCivilianCentersForPreset(preset = state.world.preset) {
+    if (preset === "ocean") {
+      return [
+        { x: -880, y: -120, houses: 5, radius: 230 },
+        { x: 700, y: 760, houses: 4, radius: 220 },
+        { x: 1040, y: -920, houses: 5, radius: 230 },
+      ];
+    }
+    return neutralVillageCenters.map((center) => ({ ...center }));
+  }
+
+  function getMapBiomeForPreset(preset, sample) {
+    const { nx, ny, noise, heat, fracture, blight } = sample;
+    const centerX = nx - 0.5;
+    const centerY = ny - 0.5;
+    const radial = Math.hypot(centerX, centerY);
+    const roadBand = Math.abs(centerY + Math.sin(nx * 6.4) * 0.05) < 0.022 && nx > 0.16 && nx < 0.84;
+    const riverBand = Math.abs(centerX + Math.sin(ny * 8.4) * 0.08) < 0.055;
+
+    if (preset === "canyon") {
+      const canyonSpine = Math.abs(centerY + Math.sin(nx * 8.8) * 0.11) < 0.1 + fracture * 0.04;
+      const canyonFork = Math.abs(centerX + Math.sin(ny * 7.2) * 0.06) < 0.05 && radial < 0.42;
+      if (canyonSpine || canyonFork || (fracture > 0.74 && radial < 0.5)) return "canyon";
+      if (riverBand && ny > 0.14 && ny < 0.86) return "river";
+      if (heat > 0.56 || radial > 0.45) return "desert";
+      if (noise > 0.34) return "hill";
+      if (blight > 0.42 && (nx < 0.2 || nx > 0.8)) return "deadlands";
+      if (noise > -0.08) return "meadow";
+      return "forest";
+    }
+
+    if (preset === "desert") {
+      const oasisBand = Math.abs(centerX + Math.sin(ny * 9.2) * 0.09) < 0.06;
+      const canyonCuts = Math.abs(centerX + Math.sin(ny * 10.4) * 0.13) < 0.11 && fracture > 0.44 && ny > 0.1 && ny < 0.9;
+      if (oasisBand) return "river";
+      if (Math.abs(centerX + Math.sin(ny * 9.2) * 0.09) < 0.11 && noise < -0.06) return "marsh";
+      if (canyonCuts) return "canyon";
+      if (blight > 0.42 && (nx < 0.18 || nx > 0.82)) return "deadlands";
+      if (noise > 0.6) return "hill";
+      if (roadBand) return "road";
+      if (Math.abs(centerX + Math.sin(ny * 9.2) * 0.09) < 0.13 && noise > 0.14) return "forest";
+      return "desert";
+    }
+
+    if (preset === "ocean") {
+      const coastNoise = Math.sin(nx * 9.4) * 0.04 + Math.cos(ny * 7.6) * 0.04 + noise * 0.06;
+      const outerSea = radial > 0.44 + coastNoise;
+      const westBay = nx < 0.24 && Math.abs(ny - 0.58) < 0.19 + Math.sin(ny * 10.2) * 0.03;
+      const eastBay = nx > 0.72 && Math.abs(ny - 0.38) < 0.18 + Math.cos(ny * 8.6) * 0.03;
+      const centerChannel = Math.abs(centerX + Math.sin(ny * 7.8) * 0.09) < 0.048 && ny > 0.16 && ny < 0.84;
+      if (outerSea || westBay || eastBay) return "ocean";
+      if (centerChannel) return "river";
+      if (radial > 0.36 || westBay || eastBay) return "marsh";
+      if (noise > 0.5) return "hill";
+      if (noise > 0.12) return "forest";
+      if (blight > 0.46 && ny > 0.72) return "deadlands";
+      if (roadBand) return "road";
+      return "meadow";
+    }
+
+    const centerCanyonBand = nx > 0.28 && nx < 0.76 &&
+      Math.abs(ny - 0.52) < 0.14 + 0.04 * Math.sin(nx * 11.5) &&
+      Math.abs(nx - 0.52) > 0.06;
+    if (Math.abs(nx - 0.52) < 0.07 + 0.03 * Math.sin(ny * 10)) return "river";
+    if ((ny < 0.18 && heat > 0.38) || (nx > 0.72 && ny < 0.4 && heat > 0.26)) return "desert";
+    if (centerCanyonBand || (fracture > 0.74 && nx > 0.16 && nx < 0.86 && ny > 0.1 && ny < 0.9)) return "canyon";
+    if ((nx < 0.22 && ny > 0.68 && blight > 0.06) || (nx > 0.78 && ny > 0.74 && blight > -0.02)) return "deadlands";
+    if (noise > 0.6) return "hill";
+    if (noise > 0.18) return "forest";
+    if (noise < -0.48) return "marsh";
+    if (Math.abs(ny - 0.52) < 0.03 && nx > 0.14 && nx < 0.84) return "road";
+    return "meadow";
+  }
+
+  function applySafeZoneBiomeOverride(baseBiome, x, y, noise, safeZones) {
+    let biome = baseBiome;
+    for (const anchor of safeZones) {
+      if (Math.hypot(x - anchor.x, y - anchor.y) < anchor.radius) {
+        biome = Math.abs(y - anchor.y) < 54 ? "road" : noise > 0.42 ? "hill" : "meadow";
+        break;
+      }
+    }
+    return biome;
+  }
+
   function createWorld() {
+    const preset = sanitizeMapPreset(state.mapPreset || state.world.preset);
+    const civilianCenters = getCivilianCentersForPreset(preset);
+    const safeZones = [
+      ...homelandAnchorZones,
+      ...civilianCenters.map((center) => ({ x: center.x, y: center.y, radius: center.radius || 220 })),
+    ];
+    state.world.preset = preset;
     state.world.tiles.length = 0;
     state.world.trees.length = 0;
     state.world.rocks.length = 0;
@@ -3400,42 +3953,8 @@
         const heat = Math.sin(nx * 5.1 - ny * 3.4) * 0.45 + rand(gx * 83 + gy * 41) * 0.45;
         const fracture = Math.abs(Math.sin(nx * 14.5 + ny * 7.3) + Math.cos(nx * 4.7 - ny * 9.5)) * 0.5;
         const blight = Math.sin((nx - ny) * 9.3) * 0.4 + rand(gx * 211 + gy * 59) * 0.3;
-        const centerCanyonBand = nx > 0.28 && nx < 0.76 &&
-          Math.abs(ny - 0.52) < 0.14 + 0.04 * Math.sin(nx * 11.5) &&
-          Math.abs(nx - 0.52) > 0.06;
-        let biome = "meadow";
-        if (Math.abs(nx - 0.52) < 0.07 + 0.03 * Math.sin(ny * 10)) biome = "river";
-        else if ((ny < 0.18 && heat > 0.38) || (nx > 0.72 && ny < 0.4 && heat > 0.26)) biome = "desert";
-        else if (centerCanyonBand || (fracture > 0.74 && nx > 0.16 && nx < 0.86 && ny > 0.1 && ny < 0.9)) biome = "canyon";
-        else if ((nx < 0.22 && ny > 0.68 && blight > 0.06) || (nx > 0.78 && ny > 0.74 && blight > -0.02)) biome = "deadlands";
-        else if (noise > 0.6) biome = "hill";
-        else if (noise > 0.18) biome = "forest";
-        else if (noise < -0.48) biome = "marsh";
-        else if (Math.abs(ny - 0.52) < 0.03 && nx > 0.14 && nx < 0.84) biome = "road";
-
-        const homelandAnchors = [
-          { x: -1180, y: 980, radius: 330 },
-          { x: -1180, y: 1500, radius: 340 },
-          { x: 1320, y: -1160, radius: 320 },
-          { x: 1440, y: 1180, radius: 320 },
-          { x: -1540, y: 1500, radius: 340 },
-          { x: 1540, y: 1500, radius: 340 },
-          { x: 1540, y: -1500, radius: 340 },
-          { x: -1540, y: -1500, radius: 340 },
-          { x: 0, y: -1620, radius: 320 },
-          { x: -1330, y: 1080, radius: 300 },
-          { x: -1540, y: 1080, radius: 300 },
-          { x: -1120, y: 1080, radius: 300 },
-          { x: -940, y: -180, radius: 210 },
-          { x: 760, y: 880, radius: 210 },
-          { x: 1120, y: -1060, radius: 210 },
-        ];
-        for (const anchor of homelandAnchors) {
-          if (Math.hypot(x - anchor.x, y - anchor.y) < anchor.radius) {
-            biome = Math.abs(y - anchor.y) < 54 ? "road" : noise > 0.42 ? "hill" : "meadow";
-            break;
-          }
-        }
+        let biome = getMapBiomeForPreset(preset, { x, y, nx, ny, noise, heat, fracture, blight });
+        biome = applySafeZoneBiomeOverride(biome, x, y, noise, safeZones);
 
         state.world.tiles.push({ x, y, biome, gx, gy, noise, heat, fracture, blight });
 
@@ -3514,11 +4033,6 @@
       }
     }
 
-    const civilianCenters = [
-      { x: -940, y: -180, houses: 5 },
-      { x: 760, y: 880, houses: 4 },
-      { x: 1120, y: -1060, houses: 5 },
-    ];
     for (const center of civilianCenters) {
       const market = spawnBuilding("neutral", "market", center.x + randomRange(center.x * 0.41, -110, 110), center.y + randomRange(center.y * 0.53, -86, 86), randomRange(center.x * 0.32, -0.3, 0.3));
       const granary = spawnBuilding("neutral", "granary", center.x + randomRange(center.y * 0.27, -140, 140), center.y + randomRange(center.x * 0.18, -94, 94), randomRange(center.y * 0.15, -0.2, 0.2));
@@ -3552,12 +4066,14 @@
       }
     }
 
+    const animalSpawnTiles = state.world.tiles.filter((tile) => tile.biome !== "ocean" && tile.biome !== "river");
     for (let i = 0; i < 22; i += 1) {
+      const tile = animalSpawnTiles[Math.floor(rand(i * 41 + 7) * animalSpawnTiles.length)] || state.world.tiles[i % state.world.tiles.length];
       state.world.animals.push({
         id: createId("animal"),
         kind: "animal",
-        x: randomRange(i * 90 + 1, -HALF_WORLD * 0.78, HALF_WORLD * 0.78),
-        y: randomRange(i * 120 + 3, -HALF_WORLD * 0.78, HALF_WORLD * 0.78),
+        x: tile.x + randomRange(i * 90 + 1, -TILE_SIZE * 0.32, TILE_SIZE * 0.32),
+        y: tile.y + randomRange(i * 120 + 3, -TILE_SIZE * 0.32, TILE_SIZE * 0.32),
         vx: 0,
         vy: 0,
         hp: 46,
@@ -3688,22 +4204,32 @@
       } else {
         for (const [side, neighbor] of neighbors) {
           if (neighbor && wetBiomes.has(neighbor.biome)) continue;
-          const bankShade = tile.biome === "river" ? "rgba(10,41,66,0.12)" : "rgba(23,40,28,0.1)";
-          const bankGlow = tile.biome === "river" ? "rgba(214,245,255,0.08)" : "rgba(192,222,170,0.06)";
+          const bankShade = tile.biome === "ocean"
+            ? "rgba(6,31,48,0.18)"
+            : tile.biome === "river"
+              ? "rgba(10,41,66,0.12)"
+              : "rgba(23,40,28,0.1)";
+          const bankGlow = tile.biome === "ocean"
+            ? "rgba(214,245,255,0.12)"
+            : tile.biome === "river"
+              ? "rgba(214,245,255,0.08)"
+              : "rgba(192,222,170,0.06)";
           paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, bankShade, "rgba(0,0,0,0)", TILE_SIZE * 0.14);
           paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, bankGlow, "rgba(0,0,0,0)", TILE_SIZE * 0.08);
         }
       }
       const underGlow = mapCtx.createRadialGradient(sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.38, 6, sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.38, TILE_SIZE * 0.72);
-      underGlow.addColorStop(0, tile.biome === "river" ? "rgba(210,239,255,0.1)" : tile.biome === "desert" ? "rgba(255,232,173,0.08)" : tile.biome === "deadlands" ? "rgba(136,88,116,0.08)" : "rgba(255,255,255,0.04)");
+      underGlow.addColorStop(0, tile.biome === "ocean" ? "rgba(198,236,255,0.14)" : tile.biome === "river" ? "rgba(210,239,255,0.1)" : tile.biome === "desert" ? "rgba(255,232,173,0.08)" : tile.biome === "deadlands" ? "rgba(136,88,116,0.08)" : "rgba(255,255,255,0.04)");
       underGlow.addColorStop(1, "rgba(0,0,0,0)");
       mapCtx.fillStyle = underGlow;
       mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-      mapCtx.fillStyle = tile.biome === "river" ? "rgba(255,255,255,0.06)" : tile.biome === "desert" ? "rgba(255,243,214,0.03)" : "rgba(255,255,255,0.018)";
+      mapCtx.fillStyle = tile.biome === "ocean" ? "rgba(255,255,255,0.08)" : tile.biome === "river" ? "rgba(255,255,255,0.06)" : tile.biome === "desert" ? "rgba(255,243,214,0.03)" : "rgba(255,255,255,0.018)";
       for (let i = 0; i < 8; i += 1) {
         const px = sx + randomRange(tile.gx * 37 + tile.gy * 19 + i, 6, TILE_SIZE - 10);
         const py = sy + randomRange(tile.gx * 31 + tile.gy * 27 + i, 6, TILE_SIZE - 10);
-        if (tile.biome === "river") {
+        if (tile.biome === "ocean") {
+          mapCtx.fillRect(px, py, 14, 1.8);
+        } else if (tile.biome === "river") {
           mapCtx.fillRect(px, py, 12, 1.6);
         } else if (tile.biome === "desert") {
           mapCtx.fillRect(px, py, 10, 1.2);
@@ -3823,6 +4349,17 @@
         mapCtx.moveTo(sx + 6, sy + TILE_SIZE * 0.62);
         mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.28, sy + TILE_SIZE * 0.54, sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.78, sx + TILE_SIZE - 10, sy + TILE_SIZE * 0.68);
         mapCtx.stroke();
+      }
+      if (tile.biome === "ocean") {
+        mapCtx.strokeStyle = "rgba(205,240,255,0.18)";
+        mapCtx.lineWidth = 1.6;
+        for (let i = 0; i < 2; i += 1) {
+          const foamY = sy + TILE_SIZE * (0.28 + i * 0.28);
+          mapCtx.beginPath();
+          mapCtx.moveTo(sx + 10, foamY);
+          mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.32, foamY - 5, sx + TILE_SIZE * 0.62, foamY + 7, sx + TILE_SIZE - 10, foamY);
+          mapCtx.stroke();
+        }
       }
       if (tile.biome === "road") {
         mapCtx.fillStyle = "rgba(255,228,162,0.05)";
@@ -4164,9 +4701,9 @@
       }
       const terrainSamples = sampleTerrainUnderFootprint(x, y, TILE_SIZE * item.footprint * 0.5);
       if (terrainSamples.some((terrain) => !isStructureAllowedOnTerrain(item, terrain))) return "That structure cannot be placed on this terrain.";
-      if (item.id === "bridge" && !pointNearWater(x, y)) return "Bridges must cross the river corridor.";
-      if (item.id === "dock" && !pointNearWater(x, y)) return "Docks must be placed on the river corridor.";
-      if (item.id === "hover_port" && !pointNearWater(x, y)) return "Hover Ports must be placed beside the river corridor.";
+      if (item.id === "bridge" && !pointNearBridgeableGap(x, y)) return "Bridges need water or canyon ground nearby.";
+      if (item.id === "dock" && !pointNearWater(x, y)) return "Docks must be placed beside water.";
+      if (item.id === "hover_port" && !pointNearWater(x, y)) return "Hover Ports must be placed beside water.";
       if (item.id === "farm" && terrainSamples.some((terrain) => terrain.label === "Deadlands" || terrain.label === "Desert" || terrain.label === "Canyon")) return "Farms need gentler ground than desert, canyon, or deadlands.";
       if ((item.id === "village_house" || item.id === "market" || item.id === "chapel") && terrainSamples.some((terrain) => terrain.label === "Canyon")) return "Settlements cannot be placed inside canyon terrain.";
     }
@@ -4201,8 +4738,283 @@
     if (resources) resources.stone += amount;
   }
 
+  function sampleNearbyBiomes(x, y, radius = TILE_SIZE * 0.8) {
+    const offsets = [
+      [0, 0],
+      [-radius, 0],
+      [radius, 0],
+      [0, -radius],
+      [0, radius],
+      [-radius * 0.6, -radius * 0.6],
+      [radius * 0.6, -radius * 0.6],
+      [-radius * 0.6, radius * 0.6],
+      [radius * 0.6, radius * 0.6],
+    ];
+    return offsets
+      .map(([ox, oy]) => getTileAtWorld(x + ox, y + oy))
+      .filter(Boolean)
+      .map((tile) => tile.biome);
+  }
+
   function pointNearWater(x, y) {
-    return Math.abs(x) < 240 && y > -HALF_WORLD + 280 && y < HALF_WORLD - 280;
+    return sampleNearbyBiomes(x, y, TILE_SIZE * 0.9).some((biome) => wetBiomes.has(biome));
+  }
+
+  function pointNearBridgeableGap(x, y) {
+    return sampleNearbyBiomes(x, y, TILE_SIZE * 1.05).some((biome) => wetBiomes.has(biome) || biome === "canyon");
+  }
+
+  function createAdminTree(x, y, tool) {
+    const radius = tool && tool.spriteKey === "tree_2" ? 30 : 28;
+    const tree = {
+      id: createId("tree"),
+      x,
+      y,
+      radius,
+      baseRadius: radius,
+      spriteKey: (tool && tool.spriteKey) || "tree_1",
+      accentKey: tool && tool.accentKey ? tool.accentKey : "bush",
+      accentOffsetX: randomRange(x * 0.13 + y, -radius * 0.36, radius * 0.36),
+      accentOffsetY: randomRange(y * 0.09 + x, radius * 0.06, radius * 0.42),
+      hp: 84,
+      maxHp: 84,
+      chunkHp: 28,
+      chunkMaxHp: 28,
+      chunksRemaining: 3,
+      maxChunks: 3,
+      rewardCoins: 8,
+      rewardResource: 10,
+      lastWorkedTimer: 0,
+      kind: "tree",
+    };
+    state.world.trees.push(tree);
+    return tree;
+  }
+
+  function createAdminRock(x, y, tool) {
+    const radius = tool && tool.spriteKey === "desert_rock" ? 24 : 28;
+    const rock = {
+      id: createId("rock"),
+      x,
+      y,
+      radius,
+      baseRadius: radius,
+      spriteKey: (tool && tool.spriteKey) || "rock_1",
+      accentKey: tool && tool.accentKey ? tool.accentKey : null,
+      accentOffsetX: randomRange(x * 0.08 + y, -radius * 0.34, radius * 0.34),
+      accentOffsetY: randomRange(y * 0.12 + x, radius * 0.08, radius * 0.5),
+      hp: 120,
+      maxHp: 120,
+      chunkHp: 30,
+      chunkMaxHp: 30,
+      chunksRemaining: 4,
+      maxChunks: 4,
+      rewardCoins: 10,
+      rewardResource: 10,
+      lastWorkedTimer: 0,
+      kind: "rock",
+    };
+    state.world.rocks.push(rock);
+    return rock;
+  }
+
+  function createAdminCivilian(owner, x, y) {
+    const civilian = {
+      id: createId("civilian"),
+      kind: "civilian",
+      owner,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      homeX: x,
+      homeY: y,
+      homeBuildingId: null,
+      wanderTimer: randomRange(x * 0.2 + y, 1, 4),
+      radius: 9,
+      coinPouch: 10,
+      maxCoinPouch: 16,
+      taxBatch: 6,
+      lastTaxedTimer: 0,
+    };
+    state.world.civilians.push(civilian);
+    return civilian;
+  }
+
+  function createAdminAnimal(species, x, y) {
+    const animal = {
+      id: createId("animal"),
+      kind: "animal",
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      hp: 46,
+      radius: 11,
+      wanderTimer: randomRange(x * 0.1 + y, 0.5, 3.2),
+      species,
+      fleeTimer: 0,
+    };
+    state.world.animals.push(animal);
+    return animal;
+  }
+
+  function getAdminEntityLabel(entity) {
+    if (!entity) return "object";
+    if (entity.kind === "tree") return "Tree";
+    if (entity.kind === "rock") return "Rock";
+    if (entity.kind === "animal") return entity.species === "boar" ? "Boar" : "Deer";
+    if (entity.kind === "civilian") return "Civilian";
+    return getSelectionEntityName(entity) || entity.itemId || entity.role || entity.kind;
+  }
+
+  function findAdminEraseTarget(x, y) {
+    const collection = [
+      ...state.world.buildings,
+      ...state.world.units,
+      ...state.world.trees,
+      ...state.world.rocks,
+      ...state.world.animals,
+      ...state.world.civilians,
+    ];
+    return findNearest(collection, x, y, (entity) => Math.hypot(entity.x - x, entity.y - y) <= (entity.radius || 12) + 34);
+  }
+
+  function applyAdminToolAt(x, y) {
+    const tool = state.admin.activeTool;
+    if (!tool) {
+      setAdminStatus("Arm an admin tool first.");
+      playUiSound("error", { volume: 0.66, cooldown: 0.05 });
+      return { success: false, consumed: false };
+    }
+    if (isLanClient()) {
+      setAdminStatus("Admin edits are host-only during LAN matches.");
+      addAdminLog("Blocked admin edit on LAN guest.", { command: tool.command, x, y });
+      playUiSound("error", { volume: 0.66, cooldown: 0.05 });
+      syncAdminUi();
+      return { success: false, consumed: true };
+    }
+
+    const owner = tool.usesOwner ? getAdminOwner() : "";
+    if (tool.kind === "resource") {
+      const entity = tool.resourceKind === "tree"
+        ? createAdminTree(x, y, tool)
+        : createAdminRock(x, y, tool);
+      addAdminPoint({ x, y, label: tool.label, owner, tint: tool.color, detail: `${entity.kind} placed` });
+      addAdminLog("Placed admin resource.", { command: tool.command, x, y, extra: tool.label });
+      setAdminStatus(`${tool.label} placed at (${Math.round(x)}, ${Math.round(y)}).`);
+      playWorldSound(tool.resourceKind === "tree" ? "harvestWood" : "harvestStone", x, y, { cooldown: 0.04, volume: 0.56 });
+      return { success: true, consumed: true };
+    }
+
+    if (tool.kind === "civilian") {
+      createAdminCivilian(owner || "neutral", x, y);
+      addAdminPoint({ x, y, label: tool.label, owner: owner || "neutral", tint: tool.color, detail: "civilian spawned" });
+      addAdminLog("Spawned civilian.", { command: tool.command, x, y, owner: owner || "neutral" });
+      setAdminStatus(`Civilian spawned for ${owner || "neutral"} at (${Math.round(x)}, ${Math.round(y)}).`);
+      playWorldSound("deployUnit", x, y, { cooldown: 0.04, volume: 0.52 });
+      return { success: true, consumed: true };
+    }
+
+    if (tool.kind === "animal") {
+      createAdminAnimal(tool.species, x, y);
+      addAdminPoint({ x, y, label: tool.label, tint: tool.color, detail: "animal spawned" });
+      addAdminLog("Spawned animal.", { command: tool.command, x, y, extra: tool.label });
+      setAdminStatus(`${tool.label} spawned at (${Math.round(x)}, ${Math.round(y)}).`);
+      playWorldSound("deployUnit", x, y, { cooldown: 0.04, volume: 0.48 });
+      return { success: true, consumed: true };
+    }
+
+    if (tool.kind === "biome") {
+      const tile = getTileAtWorld(x, y);
+      if (!tile) {
+        setAdminStatus("That point is outside the battlefield.");
+        playUiSound("error", { volume: 0.66, cooldown: 0.05 });
+        return { success: false, consumed: true };
+      }
+      tile.biome = tool.biome;
+      renderTerrainCache();
+      addAdminPoint({ x: tile.x, y: tile.y, label: tool.label, tint: tool.color, detail: `tile ${tile.gx},${tile.gy}` });
+      addAdminLog("Painted admin biome.", { command: tool.command, x: tile.x, y: tile.y, extra: `tile=${tile.gx},${tile.gy}` });
+      setAdminStatus(`${tool.label} painted on tile ${tile.gx}, ${tile.gy}.`);
+      playUiSound("panelOpen", { volume: 0.42, cooldown: 0.05 });
+      return { success: true, consumed: true };
+    }
+
+    if (tool.kind === "erase") {
+      const target = findAdminEraseTarget(x, y);
+      if (target) {
+        if (isResourceNode(target)) removeResourceNode(target);
+        else removeEntity(target);
+        const label = getAdminEntityLabel(target);
+        addAdminPoint({ x, y, label: "Erase", tint: tool.color, detail: `removed ${label}` });
+        addAdminLog("Erased map object.", { command: tool.command, x, y, extra: label });
+        setAdminStatus(`${label} erased.`);
+        playWorldSound("impactBlast", x, y, { cooldown: 0.04, volume: 0.46 });
+        return { success: true, consumed: true };
+      }
+      const tile = getTileAtWorld(x, y);
+      if (tile && tile.biome !== "meadow") {
+        const previous = tile.biome;
+        tile.biome = "meadow";
+        renderTerrainCache();
+        addAdminPoint({ x: tile.x, y: tile.y, label: "Erase", tint: tool.color, detail: `tile reset from ${previous}` });
+        addAdminLog("Reset painted tile.", { command: tool.command, x: tile.x, y: tile.y, extra: previous });
+        setAdminStatus(`Tile reset from ${terrainEffects[previous].label} to Meadow.`);
+        playUiSound("clear", { volume: 0.4, cooldown: 0.05 });
+        return { success: true, consumed: true };
+      }
+      setAdminStatus("Nothing close enough to erase.");
+      playUiSound("error", { volume: 0.66, cooldown: 0.05 });
+      return { success: false, consumed: true };
+    }
+
+    if (tool.kind === "asset") {
+      for (const building of state.world.buildings) {
+        if (Math.hypot(building.x - x, building.y - y) < building.radius + TILE_SIZE * tool.item.footprint * 0.4) {
+          setAdminStatus(`${tool.item.name} overlaps another building here.`);
+          addAdminLog("Blocked admin building placement.", { command: tool.command, x, y, owner, extra: "overlap" });
+          playUiSound("error", { volume: 0.66, cooldown: 0.05 });
+          return { success: false, consumed: true };
+        }
+      }
+      spawnBuilding(owner || "neutral", tool.item.id, x, y, 0, { manualPlacement: isHumanOwner(owner) });
+      addAdminPoint({ x, y, label: tool.item.name, owner, tint: tool.color, detail: "building placed" });
+      addAdminLog("Placed admin building.", { command: tool.command, x, y, owner, extra: tool.item.id });
+      setAdminStatus(`${tool.item.name} placed for ${owner}.`);
+      playWorldSound("deployStructure", x, y, { cooldown: 0.04, volume: 0.66 });
+      return { success: true, consumed: true };
+    }
+
+    if (tool.kind === "weapon") {
+      if (tool.item.type === "ability") {
+        resolveAbility(tool.item, x, y, owner || "neutral");
+      } else if (tool.item.type === "deployable" && tool.item.id === "machine_gun") {
+        const bunker = spawnBuilding(owner || "neutral", "bunker", x, y, 0, { manualPlacement: isHumanOwner(owner) });
+        if (bunker) {
+          bunker.hp = tool.item.hp;
+          bunker.maxHp = tool.item.hp;
+          bunker.armor = tool.item.armor;
+        }
+      } else {
+        spawnWeaponUnit(owner || "neutral", tool.item, x + randomRange(x, -12, 12), y + randomRange(y, -12, 12));
+      }
+      addAdminPoint({ x, y, label: tool.item.name, owner, tint: tool.color, detail: tool.item.type });
+      addAdminLog("Placed admin weapon.", { command: tool.command, x, y, owner, extra: tool.item.id });
+      setAdminStatus(`${tool.item.name} placed for ${owner}.`);
+      playWorldSound(tool.item.type === "ability" ? "deployAbility" : "deployUnit", x, y, { cooldown: 0.04, volume: 0.64 });
+      return { success: true, consumed: true };
+    }
+
+    return { success: false, consumed: true };
+  }
+
+  function handleAdminPlacement(worldX, worldY) {
+    if (!state.admin.panelOpen || !state.admin.activeTool) return false;
+    const result = applyAdminToolAt(worldX, worldY);
+    if (result && result.success && isLanHost()) pushLanSnapshot();
+    syncAdminUi();
+    return Boolean(result && result.consumed);
   }
 
   function isPlacementBlocked(item, x, y) {
@@ -5170,6 +5982,7 @@
     const shade = clamp(1 - distance / 1500 + wave, 0.22, 1.08);
     if (biome === "forest") return shadeRgb(58, 82, 48, shade);
     if (biome === "hill") return shadeRgb(120, 108, 78, shade);
+    if (biome === "ocean") return shadeRgb(42, 96, 132, shade + Math.sin(state.time * 2.8 + worldY * 0.018) * 0.1);
     if (biome === "river") return shadeRgb(62, 122, 156, shade + Math.sin(state.time * 2.4 + worldY * 0.02) * 0.08);
     if (biome === "marsh") return shadeRgb(68, 96, 72, shade);
     if (biome === "desert") return shadeRgb(170, 138, 86, shade);
@@ -5988,6 +6801,7 @@
     drawPlacementGhost();
     drawSelectionWorld();
     drawFogOfWar();
+    drawAdminPoints();
     ctx.restore();
   }
 
@@ -6712,6 +7526,40 @@
     const rh = Math.abs(b.y - a.y);
     ctx.fillRect(rx, ry, rw, rh);
     ctx.strokeRect(rx, ry, rw, rh);
+    ctx.restore();
+  }
+
+  function drawAdminPoints() {
+    if (!state.admin.points.length) return;
+    ctx.save();
+    ctx.textAlign = "center";
+    for (let i = 0; i < state.admin.points.length; i += 1) {
+      const point = state.admin.points[i];
+      const pulse = 0.86 + Math.sin(state.time * 2.6 + i * 0.7) * 0.08;
+      const radius = 18 / state.camera.zoom;
+      ctx.fillStyle = withAlpha(point.tint || "#8fd8ff", 0.16);
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius * 1.2 * pulse, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = withAlpha(point.tint || "#8fd8ff", 0.92);
+      ctx.lineWidth = 2.2 / state.camera.zoom;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius * pulse, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(point.x - radius * 0.55, point.y);
+      ctx.lineTo(point.x + radius * 0.55, point.y);
+      ctx.moveTo(point.x, point.y - radius * 0.55);
+      ctx.lineTo(point.x, point.y + radius * 0.55);
+      ctx.stroke();
+      const labelY = point.y - radius - 18 / state.camera.zoom;
+      const labelW = Math.max(64 / state.camera.zoom, (point.label.length * 8.6) / state.camera.zoom);
+      roundRect(ctx, point.x - labelW * 0.5, labelY - 11 / state.camera.zoom, labelW, 18 / state.camera.zoom, 8 / state.camera.zoom, "rgba(7,14,20,0.84)", withAlpha(point.tint || "#8fd8ff", 0.34));
+      ctx.fillStyle = "#f1f6fa";
+      ctx.font = `700 ${Math.round(12 / Math.max(0.48, state.camera.zoom))}px Cambria`;
+      ctx.fillText(point.label, point.x, labelY + 2 / state.camera.zoom);
+    }
+    ctx.textAlign = "left";
     ctx.restore();
   }
 
@@ -7814,6 +8662,7 @@
 
   function handleLeftMove(player, x, y) {
     setActivePlayerContext(player, getViewportForPlayer(player));
+    if (state.admin.panelOpen && state.admin.activeTool) return;
     const dx = x - state.input.dragStartScreenX;
     const dy = y - state.input.dragStartScreenY;
     if (state.input.leftDown && !state.ui.draggingItemId && Math.hypot(dx, dy) > 12) {
@@ -7897,6 +8746,11 @@
       const itemId = quickSlots[slot.side][slot.index];
       state.ui.activePlacementId = state.ui.activePlacementId === itemId ? null : itemId;
       playUiSound("uiClick", { volume: 0.5, cooldown: 0.04 });
+      state.input.leftDown = false;
+      state.input.actionSource = null;
+      return;
+    }
+    if (handleAdminPlacement(worldPos.x, worldPos.y)) {
       state.input.leftDown = false;
       state.input.actionSource = null;
       return;
@@ -8090,8 +8944,45 @@
   }
 
   function handleKey(event) {
-    const fpPlayer = getFirstPersonActivePlayer();
     const key = event.key.toLowerCase();
+    const fpPlayer = getFirstPersonActivePlayer();
+    const typingTarget = isTextInputTarget(event.target);
+    if (typingTarget) {
+      if (state.admin.slashOpen && key === "enter") {
+        event.preventDefault();
+        executeSlashCommand(slashCommandInput ? slashCommandInput.value : "");
+        return;
+      }
+      if (state.admin.panelOpen && key === "enter" && event.target === adminCommandInput) {
+        event.preventDefault();
+        armAdminToolFromCommand(adminCommandInput ? adminCommandInput.value : state.admin.commandText);
+        return;
+      }
+      if (key === "escape") {
+        event.preventDefault();
+        if (state.admin.slashOpen) closeSlashCommand();
+        else if (state.admin.panelOpen) closeAdminPanel();
+        return;
+      }
+      return;
+    }
+    if (state.mode === "playing" && key === "/" && !fpPlayer) {
+      event.preventDefault();
+      openSlashCommand("/");
+      return;
+    }
+    if (state.admin.slashOpen) {
+      if (key === "escape") {
+        event.preventDefault();
+        closeSlashCommand();
+        return;
+      }
+      if (key === "enter") {
+        event.preventDefault();
+        executeSlashCommand(slashCommandInput ? slashCommandInput.value : "");
+        return;
+      }
+    }
     if (key === "w") state.keys.forward = true;
     else if (key === "s") state.keys.back = true;
     else if (key === "a") state.keys.left = true;
@@ -8107,6 +8998,11 @@
       if (fpPlayer) {
         event.preventDefault();
         exitFirstPerson(fpPlayer);
+        return;
+      }
+      if (state.admin.panelOpen) {
+        event.preventDefault();
+        closeAdminPanel();
         return;
       }
       if (!document.fullscreenElement) {
@@ -8148,11 +9044,16 @@
     exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
     if (matchType !== "lan" && matchType !== "lan-coop") resetLanSessionState();
     initializePlayers(matchType, playerCount);
+    state.world.preset = sanitizeMapPreset(state.mapPreset);
     state.keys.forward = false;
     state.keys.back = false;
     state.keys.left = false;
     state.keys.right = false;
     state.keys.sprint = false;
+    state.admin.slashOpen = false;
+    state.admin.panelOpen = false;
+    state.admin.points = [];
+    syncAdminUi();
     for (const player of getHumanPlayers()) clampCursorToViewport(player);
     state.mode = "playing";
     state.winnerOwner = null;
@@ -8165,6 +9066,7 @@
     state.difficulty.hardPressureApplied = false;
     audioState.lastResultCue = null;
     createWorld();
+    addAdminLog("Loaded battlefield.", { extra: getMapPresetDef(state.world.preset).label });
     if (isHardModeActive()) applyHardDifficultyPressure();
     updateFogOfWar();
     overlay.classList.add("hidden");
@@ -8178,6 +9080,7 @@
     const payload = {
       mode: state.mode,
       matchType: state.matchType,
+      mapPreset: state.world.preset || state.mapPreset,
       winnerOwner: state.winnerOwner,
       loserOwner: state.loserOwner,
       time: Number(state.time.toFixed(1)),
@@ -8373,6 +9276,7 @@
       }
       return;
     }
+    if (event.target !== canvas) return;
     const pointer = clientToCanvasPoint(event.clientX, event.clientY);
     const player = getPlayerForScreenPoint(pointer.x, pointer.y);
     setActivePlayerContext(player, getViewportForPlayer(player));
@@ -8428,6 +9332,12 @@
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
     handlePrimaryStart().catch((error) => {
       setLanStatus(`Unable to start this mode: ${error.message}`);
+    });
+  });
+  mapPresetButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.48, cooldown: 0.04 });
+      setMapPreset(button.dataset.mapPreset, { notify: true });
     });
   });
   versusBtn.addEventListener("click", () => {
@@ -8505,12 +9415,61 @@
     lanLinkInput.addEventListener("focus", selectLanLink);
     lanLinkInput.addEventListener("click", selectLanLink);
   }
+  if (adminCommandInput) {
+    adminCommandInput.addEventListener("input", () => {
+      state.admin.commandText = adminCommandInput.value;
+    });
+  }
+  if (adminOwnerSelect) {
+    adminOwnerSelect.addEventListener("change", () => {
+      state.admin.owner = adminOwnerSelect.value || "neutral";
+      if (state.admin.activeTool && state.admin.activeTool.usesOwner) {
+        setAdminStatus(`Owner changed to <code>${state.admin.owner}</code> for <code>${getAdminToolLabel(state.admin.activeTool)}</code>.`);
+      } else {
+        setAdminStatus(`Admin owner changed to <code>${state.admin.owner}</code>.`);
+      }
+      addAdminLog("Changed admin owner.", { owner: state.admin.owner });
+      syncAdminUi();
+    });
+  }
+  if (adminArmBtn) {
+    adminArmBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.46, cooldown: 0.04 });
+      armAdminToolFromCommand(adminCommandInput ? adminCommandInput.value : state.admin.commandText);
+    });
+  }
+  if (adminClearPointsBtn) {
+    adminClearPointsBtn.addEventListener("click", () => {
+      playUiSound("clear", { volume: 0.42, cooldown: 0.04 });
+      clearAdminPoints();
+    });
+  }
+  if (adminClearLogBtn) {
+    adminClearLogBtn.addEventListener("click", () => {
+      playUiSound("clear", { volume: 0.42, cooldown: 0.04 });
+      clearAdminLog();
+    });
+  }
+  if (adminCopyLogBtn) {
+    adminCopyLogBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.46, cooldown: 0.04 });
+      copyAdminLog().catch(() => {});
+    });
+  }
+  if (adminCloseBtn) {
+    adminCloseBtn.addEventListener("click", () => {
+      playUiSound("panelClose", { volume: 0.44, cooldown: 0.04 });
+      closeAdminPanel();
+    });
+  }
 
   window.render_game_to_text = renderGameToText;
   window.advanceTime = advanceTime;
 
   resize();
+  syncMapPresetUi();
   resetLanSessionState();
+  syncAdminUi();
   initializePlayers("single");
   for (const player of getHumanPlayers()) clampCursorToViewport(player);
   createWorld();
