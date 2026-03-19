@@ -1729,8 +1729,17 @@ h1 {
 
 #start-btn.menu-art-hitbox {
   padding: 0;
+  border: 1px solid rgba(222, 168, 84, 0.38);
   border-radius: 4px;
   color: transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 226, 160, 0.04), rgba(255, 183, 72, 0.02)),
+    rgba(10, 14, 20, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(84, 53, 18, 0.88) inset,
+    0 0 0 3px rgba(247, 194, 102, 0.12) inset,
+    0 0 18px rgba(255, 176, 64, 0.08);
+  filter: none;
 }
 
 #start-btn.menu-art-hitbox:hover,
