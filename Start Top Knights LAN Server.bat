@@ -2,6 +2,15 @@
 setlocal
 cd /d "%~dp0"
 
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+  echo This script requires administrator privileges to properly configure the firewall for LAN access.
+  echo Please right-click the batch file and select "Run as administrator".
+  echo.
+  pause
+  exit /b 1
+)
+
 title Top Knights LAN Server
 
 where node >nul 2>nul
@@ -31,7 +40,10 @@ echo ============================================
 echo.
 echo Starting local server on port %PORT%...
 echo.
-echo Use this for LAN play:
+echo IMPORTANT: Open the game in your browser by visiting:
+echo   http://127.0.0.1:%PORT%
+echo.
+echo For LAN play:
 echo 1. Keep this window open while hosting.
 echo 2. If Windows Firewall asks, allow Private network access.
 echo 3. Open the LOCAL or LAN URL printed by the server below.

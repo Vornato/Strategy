@@ -122,6 +122,10 @@
                   <span>Room Code</span>
                   <input id="lan-code-input" type="text" maxlength="5" placeholder="ABCDE" autocomplete="off" spellcheck="false" />
                 </label>
+                <label class="lan-field">
+                  <span>Host IP (optional)</span>
+                  <input id="lan-host-ip-input" type="text" placeholder="192.168.x.x" autocomplete="off" spellcheck="false" />
+                </label>
                 <label class="lan-field lan-field-wide">
                   <span>Share Link</span>
                   <input id="lan-link-input" type="text" placeholder="Host a LAN room to generate a join link" autocomplete="off" spellcheck="false" readonly />
@@ -133,6 +137,13 @@
                 <button id="host-lan-coop-btn" type="button" class="secondary-btn lan-action hidden">Host LAN Co-op</button>
                 <button id="join-lan-coop-btn" type="button" class="secondary-btn lan-action hidden">Join LAN Co-op</button>
               </div>
+              <div id="lan-player-indicator" class="lan-player-indicator hidden">
+                <div class="lan-player-dots">
+                  <div class="lan-player-dot host-player" title="Host"></div>
+                  <div class="lan-player-dot guest-player hidden" title="Guest"></div>
+                </div>
+              </div>
+              <button id="lan-start-btn" type="button" class="primary-btn lan-action hidden">Start Game</button>
               <p id="lan-hint" class="lan-hint">Run <code>node server.js</code> on the host machine, open this page from that machine's LAN IP such as <code>http://192.168.1.10:4173</code>, then share the generated link or room code. GitHub Pages can host the single-player and local split-screen build, but LAN still requires the built-in HTTP server.</p>
               <p id="lan-status" class="lan-status">Select a map, then host or join the room.</p>
             </div>

@@ -880,10 +880,10 @@
     TECH_TREE_DEFS.flatMap((tech) => (tech.unlocks || []).map((itemId) => [itemId, tech.id])),
   );
   const BOSS_WAVE_SEQUENCE = [
-    { wave: 3, bossId: "iron_behemoth" },
-    { wave: 6, bossId: "necro_bell_tower" },
-    { wave: 9, bossId: "storm_engine" },
-    { wave: 12, bossId: "sand_worm" },
+    { wave: 5, minTime: 150, bossId: "iron_behemoth" },
+    { wave: 8, minTime: 280, bossId: "necro_bell_tower" },
+    { wave: 11, minTime: 410, bossId: "storm_engine" },
+    { wave: 14, minTime: 540, bossId: "sand_worm" },
   ];
   const BOSS_ENCOUNTER_DEFS = {
     iron_behemoth: {
@@ -1260,6 +1260,7 @@
       rail_fort: { src: "assets/buildings/rail fort.png" },
       watch_tower: { src: "assets/buildings/watch_tower.png" },
       farm: { src: "assets/buildings/farmstead.png" },
+      airstrip: { variants: ["assets/New/airstrip.png"] },
     },
     units: {
       militia: { variants: ["assets/Weapons/militia_squad.png", "assets/Weapons/militia.png"] },
@@ -1285,13 +1286,32 @@
       missileCarrier: { src: "assets/Weapons/missile_carrier.png" },
       hovercraft: { src: "assets/Weapons/hovercraft.png" },
       apc: { src: "assets/Weapons/apc.png" },
-      warWagon: { src: "assets/Weapons/war_wagon.png" },
+      warWagon: { variants: ["assets/New/war wagon.png", "assets/Weapons/war_wagon.png"] },
       sapper: { src: "assets/Weapons/sappers.png" },
       sniper: { src: "assets/Weapons/sniper_team.png" },
       medic: { src: "assets/Weapons/medic_team.png" },
       drone: { src: "assets/Weapons/drone_swarm.png" },
       stealthDrone: { src: "assets/Weapons/stealth_drone.png" },
       copter: { src: "assets/Weapons/attack_copter.png" },
+      aaHalftrack: { variants: ["assets/New/AA halftrack.png"] },
+      assaultSkiff: { variants: ["assets/New/assault skiff.png"] },
+      bomb: { variants: ["assets/New/bomb strike.png"] },
+      buster: { variants: ["assets/New/bunker buster bomb.png"] },
+      carpet: { variants: ["assets/New/carpet bomb.png"] },
+      cluster: { variants: ["assets/New/cluster bomb.png"] },
+      crossbowman: { variants: ["assets/New/crossbow volley.png"] },
+      emp: { variants: ["assets/New/emp burst.png"] },
+      fireCart: { variants: ["assets/New/fire cart.png"] },
+      flameTank: { variants: ["assets/New/flame tank.png"] },
+      gravity: { variants: ["assets/New/gravity bomb.png"] },
+      gunship: { variants: ["assets/New/gunship.png"] },
+      nuke: { variants: ["assets/New/Tactical Nuke.png"] },
+      orbital: { variants: ["assets/New/orbital laser.png"] },
+      paladin: { variants: ["assets/New/paladin charge.png"] },
+      railgunTank: { variants: ["assets/New/railgun tank.png"] },
+      repair: { variants: ["assets/New/repair drone.png"] },
+      shieldCarrier: { variants: ["assets/New/shield carier.png"] },
+      siegeMech: { variants: ["assets/New/siege mech.png"] },
     },
     resources: {
       tree_1: { src: "assets/environment/Resources/Tree1.png" },
@@ -3845,6 +3865,14 @@
   async function handlePrimaryStart() {
     if (isLanLobbyActive()) {
       await requestLanRoomStart();
+      return;
+    }
+    if (state.lan.linkRoomCode) {
+      await joinLanMatch(state.lan.linkMatchType || "lan", {
+        roomCode: state.lan.linkRoomCode,
+        apiBase: state.lan.linkApiBase || state.lan.apiBase,
+        startAfterJoin: true,
+      });
       return;
     }
     openSingleplayerMenu();
@@ -6876,7 +6904,7 @@
       });
     }
     const pendingBoss = BOSS_WAVE_SEQUENCE[state.boss.waveCursor];
-    if (pendingBoss && pendingBoss.wave === state.waves.index && !getActiveBossEntity()) {
+    if (pendingBoss && state.waves.index >= pendingBoss.wave && state.time >= (pendingBoss.minTime || 0) && !getActiveBossEntity()) {
       spawnBossEncounter(pendingBoss.bossId, enemyKeeps[0] ? enemyKeeps[0].owner : "enemy1");
       state.boss.waveCursor += 1;
     }
@@ -8127,7 +8155,7 @@
     const profile = getViewportUiProfile(viewport);
     const scale = profile.scale;
     const w = Math.min(viewport.w - 28 * scale, 940 * scale);
-    const h = Math.min(viewport.h - 36 * scale, 560 * scale);
+    const h = Math.min(viewport.h - 36 * scale, 620 * scale);
     const x = viewport.x + (viewport.w - w) * 0.5;
     const y = viewport.y + Math.max(22 * scale, (viewport.h - h) * 0.5);
     const padding = 18 * scale;

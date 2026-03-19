@@ -25,9 +25,10 @@ const mime = {
 function setCorsHeaders(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Private-Network-Access");
   res.setHeader("Access-Control-Max-Age", "86400");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 }
 
 function sendJson(res, status, payload) {
@@ -101,7 +102,10 @@ function touchRoom(room) {
 function cleanupRooms() {
   const cutoff = Date.now() - ROOM_TTL_MS;
   for (const [code, room] of rooms.entries()) {
-    if (room.touchedAt < cutoff) rooms.delete(code);
+    if (room.touchedAt < cutoff) {
+      console.log(`[${new Date().toISOString()}] Room ${code} expired and was cleaned up`);
+      rooms.delete(code);
+    }
   }
 }
 
@@ -158,15 +162,22 @@ function getShareBase(req) {
   return `http://127.0.0.1:${port}`;
 }
 
+function getClientIp(req) {
+  return req.socket?.remoteAddress || req.connection?.remoteAddress || "unknown";
+}
+
 setInterval(cleanupRooms, 60_000).unref();
 
 async function handleApi(req, res, pathname) {
+  const clientIp = getClientIp(req);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${pathname} from ${clientIp}`);
   if (req.method === "POST" && pathname === "/api/lan/host") {
     const body = await readJson(req);
     const room = createRoom();
     room.matchType = normalizeLanMatchType(body.matchType);
     const apiBase = getShareBase(req);
     const joinUrl = `${apiBase}/?room=${encodeURIComponent(room.code)}&match=${encodeURIComponent(room.matchType)}&server=${encodeURIComponent(apiBase)}`;
+    console.log(`[${new Date().toISOString()}] Room created: ${room.code} by host ${room.hostClientId} from ${clientIp}`);
     sendJson(res, 200, {
       ok: true,
       role: "host",
@@ -184,10 +195,12 @@ async function handleApi(req, res, pathname) {
     const roomCode = String(body.roomCode || "").trim().toUpperCase();
     const room = rooms.get(roomCode);
     if (!room) {
+      console.log(`[${new Date().toISOString()}] Join failed: Room ${roomCode} not found from ${clientIp}`);
       sendJson(res, 404, { ok: false, error: "Room not found." });
       return true;
     }
     if (room.guestClientId) {
+      console.log(`[${new Date().toISOString()}] Join failed: Room ${roomCode} already has a guest from ${clientIp}`);
       sendJson(res, 409, { ok: false, error: "Room already has a guest." });
       return true;
     }
@@ -195,6 +208,7 @@ async function handleApi(req, res, pathname) {
     touchRoom(room);
     const apiBase = getShareBase(req);
     const joinUrl = `${apiBase}/?room=${encodeURIComponent(room.code)}&match=${encodeURIComponent(room.matchType)}&server=${encodeURIComponent(apiBase)}`;
+    console.log(`[${new Date().toISOString()}] Guest joined room ${room.code}: ${room.guestClientId} from ${clientIp}`);
     sendJson(res, 200, {
       ok: true,
       role: "guest",
@@ -214,6 +228,7 @@ async function handleApi(req, res, pathname) {
     const clientId = String(body.clientId || "");
     const room = getRoomByClient(clientId);
     if (!room) {
+      console.log(`[${new Date().toISOString()}] Poll failed: LAN room not found for client ${clientId} from ${clientIp}`);
       sendJson(res, 404, { ok: false, error: "LAN room not found." });
       return true;
     }
@@ -253,6 +268,7 @@ async function handleApi(req, res, pathname) {
     room.startedAt = room.startedAt || Date.now();
     room.startRequestedBy = clientId === room.hostClientId ? "host" : "guest";
     touchRoom(room);
+    console.log(`[${new Date().toISOString()}] Game started in room ${room.code} by ${room.startRequestedBy} from ${clientIp}`);
     sendJson(res, 200, {
       ok: true,
       roomCode: room.code,
@@ -275,6 +291,7 @@ async function handleApi(req, res, pathname) {
     room.snapshot = body.snapshot || null;
     room.snapshotRevision += 1;
     touchRoom(room);
+    console.log(`[${new Date().toISOString()}] State published in room ${room.code} by host from ${clientIp}: revision ${room.snapshotRevision}`);
     sendJson(res, 200, { ok: true, snapshotRevision: room.snapshotRevision, guestJoined: Boolean(room.guestClientId) });
     return true;
   }
@@ -294,6 +311,7 @@ async function handleApi(req, res, pathname) {
     room.nextCommandIndex += 1;
     touchRoom(room);
     if (room.commands.length > 400) room.commands.splice(0, room.commands.length - 400);
+    console.log(`[${new Date().toISOString()}] Command sent in room ${room.code} by guest from ${clientIp}: index ${room.nextCommandIndex - 1}`);
     sendJson(res, 200, { ok: true, commandIndex: room.nextCommandIndex - 1 });
     return true;
   }
@@ -302,7 +320,14 @@ async function handleApi(req, res, pathname) {
 }
 
 function serveStatic(req, res, pathname) {
-  const requestPath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const requestPathRaw = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  let requestPath;
+  try {
+    requestPath = decodeURIComponent(requestPathRaw);
+  } catch {
+    requestPath = requestPathRaw;
+  }
+
   const normalized = path.normalize(requestPath).replace(/^(\.\.(\/|\\|$))+/, "");
   const filePath = path.join(root, normalized);
   if (!filePath.startsWith(root)) {

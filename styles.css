@@ -1366,6 +1366,48 @@ h1 {
   flex: 1 1 220px;
 }
 
+.lan-player-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(156, 211, 245, 0.08);
+}
+
+.lan-player-dots {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.lan-player-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(159, 216, 255, 0.4);
+  border: 2px solid rgba(159, 216, 255, 0.8);
+  box-shadow: 0 0 8px rgba(159, 216, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.lan-player-dot.guest-player {
+  background: rgba(100, 200, 255, 0.5);
+  border-color: rgba(100, 200, 255, 1);
+  box-shadow: 0 0 12px rgba(100, 200, 255, 0.5);
+}
+
+.lan-player-dot.hidden {
+  opacity: 0.2;
+  box-shadow: none;
+}
+
+#lan-start-btn {
+  margin-top: 12px;
+  width: 100%;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

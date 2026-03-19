@@ -6,6 +6,7 @@ const { chromium } = require("playwright");
 const OUT_DIR = path.join(__dirname, "output", "web-game", "verify-lan-shared-start");
 const HOST_URL = "http://127.0.0.1:4173";
 const PORT = 4173;
+const VIEWPORT = { width: 1440, height: 900 };
 
 function scoreLanAddress(address) {
   if (/^192\.168\./.test(address)) return 0;
@@ -34,11 +35,37 @@ function getExpectedLanBase() {
   return `http://${candidates[0].address}:${PORT}`;
 }
 
+function worldToScreen(camera, world, viewport = VIEWPORT) {
+  const dx = world.x - camera.x;
+  const dy = world.y - camera.y;
+  const cos = Math.cos(camera.rotation);
+  const sin = Math.sin(camera.rotation);
+  return {
+    x: viewport.width / 2 + (dx * cos - dy * sin) * camera.zoom,
+    y: viewport.height / 2 + (dx * sin + dy * cos) * camera.zoom,
+  };
+}
+
+function boundsFromPoints(points, padding = 18) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return {
+    x1: Math.min(...xs) - padding,
+    y1: Math.min(...ys) - padding,
+    x2: Math.max(...xs) + padding,
+    y2: Math.max(...ys) + padding,
+  };
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 async function getState(page) {
   return page.evaluate(() => JSON.parse(window.render_game_to_text()));
 }
 
-async function waitForState(page, predicate, timeoutMs = 8000) {
+async function waitForState(page, predicate, timeoutMs = 12000) {
   const startedAt = Date.now();
   let lastState = null;
   while (Date.now() - startedAt < timeoutMs) {
@@ -49,63 +76,165 @@ async function waitForState(page, predicate, timeoutMs = 8000) {
   throw new Error(`Timed out waiting for state. Last state: ${JSON.stringify(lastState)}`);
 }
 
+function getPlayerState(state, owner) {
+  return (state.players || []).find((player) => player.owner === owner) || null;
+}
+
+function getLocalPlayerState(state) {
+  return getPlayerState(state, state.lan && state.lan.localOwner);
+}
+
+function pickControllableUnits(playerState, count = 2) {
+  const units = (playerState && playerState.units) || [];
+  const preferred = units.filter((unit) => unit.role !== "captain");
+  const picked = (preferred.length ? preferred : units).slice(0, count);
+  if (!picked.length) throw new Error(`No controllable units found for ${playerState ? playerState.owner : "unknown owner"}.`);
+  return picked;
+}
+
+function pickMoveTarget(playerState, units) {
+  const centroid = units.reduce((sum, unit) => ({
+    x: sum.x + unit.x,
+    y: sum.y + unit.y,
+  }), { x: 0, y: 0 });
+  centroid.x /= units.length;
+  centroid.y /= units.length;
+  const offsets = [
+    { x: 240, y: 120 },
+    { x: 240, y: -120 },
+    { x: -240, y: 120 },
+    { x: -240, y: -120 },
+    { x: 0, y: 260 },
+    { x: 0, y: -260 },
+  ];
+  for (const offset of offsets) {
+    const world = { x: centroid.x + offset.x, y: centroid.y + offset.y };
+    const screen = worldToScreen(playerState.camera, world);
+    if (screen.x >= 120 && screen.x <= VIEWPORT.width - 120 && screen.y >= 120 && screen.y <= VIEWPORT.height - 180) {
+      return { world, screen };
+    }
+  }
+  const fallbackWorld = { x: centroid.x + 160, y: centroid.y + 160 };
+  const fallbackScreen = worldToScreen(playerState.camera, fallbackWorld);
+  return {
+    world: fallbackWorld,
+    screen: {
+      x: clamp(fallbackScreen.x, 120, VIEWPORT.width - 120),
+      y: clamp(fallbackScreen.y, 120, VIEWPORT.height - 180),
+    },
+  };
+}
+
+async function hostRoom(page) {
+  await page.evaluate(() => document.getElementById("multiplayer-btn").click());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.getElementById("menu-host-lan-versus-btn").click());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelector('.map-card[data-map-preset="green"]').click());
+  await page.waitForTimeout(300);
+  await page.evaluate(() => document.getElementById("host-lan-btn").click());
+  await page.waitForFunction(() => document.getElementById("lan-link-input").value.includes("?room="), { timeout: 15000 });
+  return page.locator("#lan-link-input").inputValue();
+}
+
+async function joinSharedRoom(page) {
+  await page.evaluate(() => document.getElementById("menu-start-btn").click());
+}
+
+async function dragSelect(page, playerState, units) {
+  const points = units.map((unit) => worldToScreen(playerState.camera, unit));
+  const bounds = boundsFromPoints(points, 20);
+  await page.mouse.move(bounds.x1, bounds.y1);
+  await page.mouse.down({ button: "left" });
+  await page.mouse.move(bounds.x2, bounds.y2, { steps: 8 });
+  await page.mouse.up({ button: "left" });
+  await page.waitForTimeout(180);
+}
+
+async function issueMoveOrder(page, playerState, units) {
+  await dragSelect(page, playerState, units);
+  const target = pickMoveTarget(playerState, units);
+  await page.mouse.click(target.screen.x, target.screen.y, { button: "left" });
+  return {
+    selectedUnitIds: units.map((unit) => unit.id),
+    targetWorld: {
+      x: Math.round(target.world.x),
+      y: Math.round(target.world.y),
+    },
+    targetScreen: {
+      x: Math.round(target.screen.x),
+      y: Math.round(target.screen.y),
+    },
+  };
+}
+
+function unitsHaveMoveOrder(state, owner, unitIds) {
+  const player = getPlayerState(state, owner);
+  if (!player) return false;
+  const matching = (player.units || []).filter((unit) => unitIds.includes(unit.id));
+  return matching.length > 0 && matching.every((unit) => unit.order === "move");
+}
+
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true });
-  const hostContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const guestContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const hostContext = await browser.newContext({ viewport: VIEWPORT });
+  const guestContext = await browser.newContext({ viewport: VIEWPORT });
   const hostPage = await hostContext.newPage();
   const guestPage = await guestContext.newPage();
 
   await hostPage.goto(HOST_URL, { waitUntil: "domcontentloaded" });
-  await hostPage.click("#host-lan-btn");
-  await hostPage.waitForFunction(() => {
-    const linkInput = document.getElementById("lan-link-input");
-    return linkInput && linkInput.value.includes("?room=");
-  });
-
-  const shareLink = await hostPage.locator("#lan-link-input").inputValue();
-  const roomCode = await hostPage.locator("#lan-code-input").inputValue();
+  const shareLink = await hostRoom(hostPage);
+  console.log(`[verify-lan] hosted room link: ${shareLink}`);
   const expectedLanBase = getExpectedLanBase();
   if (!shareLink) throw new Error("Host did not receive a generated LAN share link.");
   if (expectedLanBase && !shareLink.startsWith(expectedLanBase)) {
     throw new Error(`Expected share link to use ${expectedLanBase}, received ${shareLink}`);
   }
 
-  const hostLobbyState = await getState(hostPage);
-
   await guestPage.goto(shareLink, { waitUntil: "domcontentloaded" });
-  await guestPage.waitForFunction(() => {
-    const startButton = document.getElementById("start-btn");
-    return startButton && /Start Shared LAN/.test(startButton.textContent || "");
-  });
-  const guestLobbyState = await getState(guestPage);
-
-  await guestPage.click("#start-btn");
+  await joinSharedRoom(guestPage);
+  console.log("[verify-lan] guest opened shared link and pressed Start");
 
   const hostPlayingState = await waitForState(
     hostPage,
     (state) => state.mode === "playing" && state.matchType === "lan" && state.lan && state.lan.started,
+    30000,
   );
+  console.log("[verify-lan] host entered live LAN match");
   const guestPlayingState = await waitForState(
     guestPage,
     (state) => state.mode === "playing" && state.matchType === "lan" && state.lan && state.lan.started,
+    30000,
   );
+  console.log("[verify-lan] guest entered live LAN match");
 
-  await guestPage.waitForFunction(() => {
-    const status = document.getElementById("lan-status");
-    return status && /Connected as Player 2|live battle/i.test(status.textContent || "");
-  });
-  await hostPage.waitForTimeout(300);
-  await guestPage.waitForTimeout(600);
+  if ((hostPlayingState.players || []).length !== 2 || (guestPlayingState.players || []).length !== 2) {
+    throw new Error("Expected both host and guest to see both LAN players in the live match.");
+  }
 
+  const hostLocalOwner = hostPlayingState.lan.localOwner;
+  const guestLocalOwner = guestPlayingState.lan.localOwner;
+  const hostLocalPlayer = getLocalPlayerState(hostPlayingState);
+  const guestLocalPlayer = getLocalPlayerState(guestPlayingState);
+  if (!hostLocalPlayer || !guestLocalPlayer) throw new Error("Missing local player state after LAN match start.");
+
+  const hostUnits = pickControllableUnits(hostLocalPlayer);
+  const hostMove = await issueMoveOrder(hostPage, hostLocalPlayer, hostUnits);
+  console.log(`[verify-lan] host issued move order with units: ${hostMove.selectedUnitIds.join(", ")}`);
+  await waitForState(hostPage, (state) => unitsHaveMoveOrder(state, hostLocalOwner, hostMove.selectedUnitIds));
+  await waitForState(guestPage, (state) => unitsHaveMoveOrder(state, hostLocalOwner, hostMove.selectedUnitIds));
+  console.log("[verify-lan] guest received host move order state");
+
+  const guestStateBeforeMove = await getState(guestPage);
+  const guestPlayerBeforeMove = getLocalPlayerState(guestStateBeforeMove);
+  const guestUnits = pickControllableUnits(guestPlayerBeforeMove);
+  const guestMove = await issueMoveOrder(guestPage, guestPlayerBeforeMove, guestUnits);
+  console.log(`[verify-lan] guest issued move order with units: ${guestMove.selectedUnitIds.join(", ")}`);
+  await waitForState(hostPage, (state) => unitsHaveMoveOrder(state, guestLocalOwner, guestMove.selectedUnitIds));
+  const guestFinalState = await waitForState(guestPage, (state) => unitsHaveMoveOrder(state, guestLocalOwner, guestMove.selectedUnitIds));
   const hostFinalState = await getState(hostPage);
-  const guestFinalState = await getState(guestPage);
-
-  const hostStatus = await hostPage.locator("#lan-status").textContent();
-  const guestStatus = await guestPage.locator("#lan-status").textContent();
-  const hostStartLabel = await hostPage.locator("#start-btn").textContent();
-  const guestStartLabel = await guestPage.locator("#start-btn").textContent();
+  console.log("[verify-lan] host and guest both received guest move order state");
 
   await hostPage.screenshot({ path: path.join(OUT_DIR, "host-room-live.png"), fullPage: true });
   await guestPage.screenshot({ path: path.join(OUT_DIR, "guest-room-live.png"), fullPage: true });
@@ -113,34 +242,29 @@ async function main() {
   const summary = {
     expectedLanBase,
     shareLink,
-    roomCode,
-    hostLobbyLan: hostLobbyState.lan,
-    guestLobbyLan: guestLobbyState.lan,
-    hostPlaying: {
-      mode: hostFinalState.mode,
-      matchType: hostFinalState.matchType,
+    host: {
+      localOwner: hostLocalOwner,
       lan: hostFinalState.lan,
-      players: hostFinalState.players.map((player) => ({
-        owner: player.owner,
-        coins: player.resources.coins,
-      })),
+      playerCountVisible: (hostFinalState.players || []).length,
+      moveOrder: hostMove,
+      hostViewOfGuestMoveApplied: unitsHaveMoveOrder(hostFinalState, guestLocalOwner, guestMove.selectedUnitIds),
     },
-    guestPlaying: {
-      mode: guestFinalState.mode,
-      matchType: guestFinalState.matchType,
+    guest: {
+      localOwner: guestLocalOwner,
       lan: guestFinalState.lan,
-      players: guestFinalState.players.map((player) => ({
-        owner: player.owner,
-        coins: player.resources.coins,
-      })),
+      playerCountVisible: (guestFinalState.players || []).length,
+      moveOrder: guestMove,
+      guestViewOfHostMoveApplied: unitsHaveMoveOrder(guestFinalState, hostLocalOwner, hostMove.selectedUnitIds),
     },
-    hostStatus,
-    guestStatus,
-    hostStartLabel,
-    guestStartLabel,
+    orders: {
+      hostUnitsAfterHostMove: getPlayerState(hostFinalState, hostLocalOwner).units.filter((unit) => hostMove.selectedUnitIds.includes(unit.id)),
+      guestUnitsSeenByGuestAfterGuestMove: getPlayerState(guestFinalState, guestLocalOwner).units.filter((unit) => guestMove.selectedUnitIds.includes(unit.id)),
+      hostViewOfGuestUnitsAfterGuestMove: getPlayerState(hostFinalState, guestLocalOwner).units.filter((unit) => guestMove.selectedUnitIds.includes(unit.id)),
+    },
   };
 
   await fs.writeFile(path.join(OUT_DIR, "summary.json"), JSON.stringify(summary, null, 2));
+  console.log("[verify-lan] verification complete");
   await browser.close();
 }
 
