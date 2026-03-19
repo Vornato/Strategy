@@ -4,7 +4,12 @@
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const overlay = document.getElementById("menu-overlay");
+  const menuTitle = overlay ? overlay.querySelector("h1") : null;
+  const menuIntro = overlay ? overlay.querySelector(".intro") : null;
+  const menuNavButtons = Array.from(document.querySelectorAll("[data-menu-section]"));
+  const menuPanels = Array.from(document.querySelectorAll("[data-menu-panel]"));
   const startBtn = document.getElementById("start-btn");
+  const resumeBtn = document.getElementById("resume-btn");
   const versusBtn = document.getElementById("versus-btn");
   const versus3Btn = document.getElementById("versus-3-btn");
   const versus4Btn = document.getElementById("versus-4-btn");
@@ -16,6 +21,7 @@
   const hostLanCoopBtn = document.getElementById("host-lan-coop-btn");
   const joinLanCoopBtn = document.getElementById("join-lan-coop-btn");
   const settingsBtn = document.getElementById("settings-btn");
+  const exitBtn = document.getElementById("exit-btn");
   const mapPresetButtons = Array.from(document.querySelectorAll("[data-map-preset]"));
   const lanPanel = document.getElementById("lan-panel");
   const lanInputs = document.getElementById("lan-inputs");
@@ -33,6 +39,7 @@
   const speedUltraBtn = document.getElementById("speed-ultra-btn");
   const helpBtn = document.getElementById("help-btn");
   const liveSettingsBtn = document.getElementById("live-settings-btn");
+  const saveMatchBtn = document.getElementById("save-match-btn");
   const assistStatus = document.getElementById("assist-status");
   const settingsOverlay = document.getElementById("settings-overlay");
   const settingsCloseBtn = document.getElementById("settings-close-btn");
@@ -62,6 +69,9 @@
   const lanActionButtons = [hostLanBtn, joinLanBtn, hostLanCoopBtn, joinLanCoopBtn];
   const DEFAULT_LAN_SERVER_PORT = 4173;
   const SETTINGS_STORAGE_KEY = "top-knights-settings-v1";
+  const SOLO_SAVE_STORAGE_KEY = "top-knights-solo-save-v1";
+  const DEFAULT_MENU_TITLE = menuTitle ? menuTitle.textContent : "Top Knights";
+  const DEFAULT_MENU_INTRO = menuIntro ? menuIntro.textContent : "";
 
   const WORLD_SIZE = 4600;
   const TILE_SIZE = 92;
@@ -271,6 +281,35 @@
     try {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
     } catch (error) {}
+  }
+
+  function loadStoredSoloSave() {
+    try {
+      const raw = localStorage.getItem(SOLO_SAVE_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && parsed.version === 1 && parsed.matchType === "single" ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearStoredSoloSave() {
+    try {
+      localStorage.removeItem(SOLO_SAVE_STORAGE_KEY);
+    } catch (error) {}
+  }
+
+  function formatSaveDuration(seconds = 0) {
+    const total = Math.max(0, Math.floor(seconds || 0));
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    if (mins >= 60) {
+      const hours = Math.floor(mins / 60);
+      const rem = mins % 60;
+      return `${hours}h ${rem}m`;
+    }
+    return mins > 0 ? `${mins}m ${String(secs).padStart(2, "0")}s` : `${secs}s`;
   }
 
   function getGraphicsPreset() {
@@ -663,6 +702,11 @@
     settingsUi: {
       listeningAction: null,
     },
+    save: {
+      autosaveTimer: 0,
+      lastStatus: "",
+      lastSavedAt: 0,
+    },
     ids: 0,
     selectedIds: new Set(),
     waves: {
@@ -718,6 +762,10 @@
       statusText: "Type a command like rock, arm it, then click the map to place points.",
       log: [],
       points: [],
+    },
+    runtime: {
+      formationProgress: new Map(),
+      lastPlacementUndo: null,
     },
   };
 
@@ -1937,19 +1985,50 @@
     return state.mode === "menu" && Boolean(state.lan.clientId) && Boolean(state.lan.roomCode) && Boolean(state.lan.roomMatchType);
   }
 
+  function getMenuSectionForMatch(matchType = state.matchType) {
+    if (matchType === "versus" || matchType === "coop" || matchType === "lan" || matchType === "lan-coop") return "multiplayer";
+    return "singleplayer";
+  }
+
+  function setMenuSection(section = "singleplayer") {
+    const next = section === "multiplayer" || section === "system" ? section : "singleplayer";
+    menuNavButtons.forEach((button) => {
+      const active = button.dataset.menuSection === next;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    menuPanels.forEach((panel) => {
+      panel.classList.toggle("active", panel.dataset.menuPanel === next);
+    });
+  }
+
   function syncMenuButtons() {
     if (!startBtn) return;
     if (isLanLobbyActive()) {
+      setMenuSection("multiplayer");
       startBtn.textContent = state.lan.started
         ? "LAN Room Starting..."
         : state.lan.role === "host"
           ? "Start Hosted LAN Room"
           : "Start Joined LAN Room";
       startBtn.disabled = Boolean(state.lan.started);
+      if (resumeBtn) resumeBtn.classList.add("hidden");
       return;
     }
-    startBtn.textContent = "Launch Campaign";
+    startBtn.textContent = "Play Solo";
     startBtn.disabled = false;
+    const soloSave = loadStoredSoloSave();
+    if (resumeBtn) {
+      const hasResume = Boolean(soloSave);
+      resumeBtn.classList.toggle("hidden", !hasResume);
+      resumeBtn.disabled = !hasResume;
+      resumeBtn.textContent = hasResume
+        ? `Resume Solo (${formatSaveDuration(soloSave.time || 0)})`
+        : "Resume Solo";
+      resumeBtn.title = hasResume
+        ? `Resume your last saved solo campaign from ${formatSaveDuration(soloSave.time || 0)} into the run.`
+        : "No solo save is currently available.";
+    }
   }
 
   function resetLanSessionState() {
@@ -2026,6 +2105,13 @@
     if (liveSettingsBtn) {
       liveSettingsBtn.textContent = `Settings (${formatKeybindLabel(getKeybind("openSettings"))})`;
       liveSettingsBtn.title = "Adjust graphics, audio, font size, and color assist without leaving the match.";
+    }
+    if (saveMatchBtn) {
+      saveMatchBtn.textContent = state.matchType === "single" ? "Save Solo" : "Save Solo Only";
+      saveMatchBtn.disabled = state.mode !== "playing" || state.matchType !== "single";
+      saveMatchBtn.title = state.matchType === "single"
+        ? "Save the current solo campaign so it can be resumed from the menu after reloading."
+        : "Saving is currently available for solo campaign only.";
     }
     const assistControlsDisabled = !hasLocalAssistAuthority();
     const speedDisabled = isLanMatch();
@@ -2271,6 +2357,190 @@
     if (state.world.tiles.length) renderTerrainCache();
   }
 
+  function snapshotHelpState(help) {
+    const source = help || createHelpState();
+    return {
+      open: Boolean(source.open),
+      steps: Object.fromEntries(TUTORIAL_STEP_ORDER.map((step) => [step, Boolean(source.steps && source.steps[step])])),
+      lastCompletedStep: source.lastCompletedStep || null,
+      lastCompletedAt: Number.isFinite(source.lastCompletedAt) ? source.lastCompletedAt : -999,
+    };
+  }
+
+  function snapshotPlayerUi(player) {
+    const ui = player && player.ui ? player.ui : state.ui;
+    return {
+      openPanel: ui.openPanel || null,
+      activePlacementId: ui.activePlacementId || null,
+      placementAngle: Number.isFinite(ui.placementAngle) ? ui.placementAngle : 0,
+      relocatingBuildingId: ui.relocatingBuildingId || null,
+      panelScroll: { ...(ui.panelScroll || { assets: 0, weapons: 0 }) },
+      panelSearch: { ...(ui.panelSearch || { assets: "", weapons: "" }) },
+      panelCategory: { ...(ui.panelCategory || { assets: "all", weapons: "all" }) },
+      panelCollapsed: { ...(ui.panelCollapsed || { assets: false, weapons: false }) },
+      panelSearchFocus: ui.panelSearchFocus || null,
+      recentMessage: ui.recentMessage || "",
+      help: snapshotHelpState(ui.help),
+    };
+  }
+
+  function snapshotPlayerFog(player) {
+    return player && player.fog
+      ? {
+        explored: Array.from(player.fog.explored || []),
+      }
+      : { explored: [] };
+  }
+
+  function rebuildFogMask(player) {
+    if (!player || !player.fog) return;
+    const fog = player.fog;
+    fog.maskCtx.clearRect(0, 0, FOG_TEXTURE_SIZE, FOG_TEXTURE_SIZE);
+    fog.maskCtx.fillStyle = "rgba(5, 8, 13, 0.92)";
+    fog.maskCtx.fillRect(0, 0, FOG_TEXTURE_SIZE, FOG_TEXTURE_SIZE);
+    const cellW = FOG_TEXTURE_SIZE / FOG_GRID_COUNT;
+    const cellH = FOG_TEXTURE_SIZE / FOG_GRID_COUNT;
+    fog.maskCtx.save();
+    fog.maskCtx.globalCompositeOperation = "destination-out";
+    fog.maskCtx.fillStyle = "rgba(255,255,255,0.9)";
+    for (let index = 0; index < fog.explored.length; index += 1) {
+      if (!fog.explored[index]) continue;
+      const gx = index % FOG_GRID_COUNT;
+      const gy = Math.floor(index / FOG_GRID_COUNT);
+      fog.maskCtx.fillRect(gx * cellW, gy * cellH, cellW + 0.6, cellH + 0.6);
+    }
+    fog.maskCtx.restore();
+  }
+
+  function restorePlayerSaveData(player, data) {
+    if (!player || !data) return;
+    if (data.resources) {
+      player.resources.coins = Number.isFinite(data.resources.coins) ? data.resources.coins : player.resources.coins;
+      player.resources.wood = Number.isFinite(data.resources.wood) ? data.resources.wood : player.resources.wood;
+      player.resources.stone = Number.isFinite(data.resources.stone) ? data.resources.stone : player.resources.stone;
+    }
+    if (data.quickSlots) {
+      player.quickSlots.assets = [...(data.quickSlots.assets || player.quickSlots.assets)];
+      player.quickSlots.weapons = [...(data.quickSlots.weapons || player.quickSlots.weapons)];
+    }
+    if (data.camera) {
+      player.camera.x = Number.isFinite(data.camera.x) ? data.camera.x : player.camera.x;
+      player.camera.y = Number.isFinite(data.camera.y) ? data.camera.y : player.camera.y;
+      player.camera.zoom = Number.isFinite(data.camera.zoom) ? data.camera.zoom : player.camera.zoom;
+      player.camera.rotation = Number.isFinite(data.camera.rotation) ? data.camera.rotation : player.camera.rotation;
+    }
+    if (data.ui) {
+      player.ui.openPanel = data.ui.openPanel || null;
+      player.ui.activePlacementId = data.ui.activePlacementId || null;
+      player.ui.placementAngle = Number.isFinite(data.ui.placementAngle) ? data.ui.placementAngle : 0;
+      player.ui.relocatingBuildingId = data.ui.relocatingBuildingId || null;
+      player.ui.panelScroll = { assets: 0, weapons: 0, ...(data.ui.panelScroll || {}) };
+      player.ui.panelSearch = { assets: "", weapons: "", ...(data.ui.panelSearch || {}) };
+      player.ui.panelCategory = { assets: "all", weapons: "all", ...(data.ui.panelCategory || {}) };
+      player.ui.panelCollapsed = { assets: false, weapons: false, ...(data.ui.panelCollapsed || {}) };
+      player.ui.panelSearchFocus = data.ui.panelSearchFocus || null;
+      player.ui.recentMessage = data.ui.recentMessage || player.ui.recentMessage;
+      player.ui.help = snapshotHelpState(data.ui.help);
+    }
+    player.selectedIds = new Set(Array.isArray(data.selectedIds) ? data.selectedIds : []);
+    if (data.fog && Array.isArray(data.fog.explored)) {
+      player.fog.explored = Uint8Array.from(data.fog.explored.map((value) => (value ? 1 : 0)));
+      player.fog.exploredCount = player.fog.explored.reduce((sum, value) => sum + (value ? 1 : 0), 0);
+      rebuildFogMask(player);
+    } else {
+      resetFogOfWar(player);
+    }
+  }
+
+  function serializeSoloSave(reason = "manual") {
+    if (state.mode !== "playing" || state.matchType !== "single") return null;
+    const snapshot = serializeLanSnapshot();
+    snapshot.version = 1;
+    snapshot.saveType = "solo";
+    snapshot.reason = reason;
+    snapshot.savedAt = Date.now();
+    snapshot.speed = { ...state.speed };
+    for (const [owner, player] of Object.entries(state.players)) {
+      if (!snapshot.players[owner]) snapshot.players[owner] = {};
+      snapshot.players[owner].camera = { ...player.camera };
+      snapshot.players[owner].ui = snapshotPlayerUi(player);
+      snapshot.players[owner].selectedIds = [...player.selectedIds];
+      snapshot.players[owner].fog = snapshotPlayerFog(player);
+    }
+    return snapshot;
+  }
+
+  function persistSoloSave(reason = "manual", options = {}) {
+    const snapshot = serializeSoloSave(reason);
+    if (!snapshot) return false;
+    try {
+      localStorage.setItem(SOLO_SAVE_STORAGE_KEY, JSON.stringify(snapshot));
+      state.save.lastSavedAt = snapshot.savedAt;
+      state.save.lastStatus = options.statusText || (reason === "autosave" ? "Solo campaign autosaved." : "Solo campaign saved.");
+      if (options.notify !== false) notify(state.save.lastStatus, "#8fd8ff", { lowPriority: true });
+      syncMenuButtons();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function restoreSoloSave(snapshot = loadStoredSoloSave()) {
+    if (!snapshot) return false;
+    resetLanSessionState();
+    initializePlayers("single", 1);
+    state.mode = "playing";
+    state.matchType = "single";
+    state.mapPreset = sanitizeMapPreset(snapshot.mapPreset || state.mapPreset);
+    state.world.preset = state.mapPreset;
+    syncMapPresetUi();
+    state.winnerOwner = null;
+    state.loserOwner = null;
+    state.time = Number.isFinite(snapshot.time) ? snapshot.time : 0;
+    state.ids = Number.isFinite(snapshot.ids) ? snapshot.ids : 0;
+    state.waves = { ...state.waves, ...(snapshot.waves || {}) };
+    state.difficulty = { ...state.difficulty, ...(snapshot.difficulty || {}) };
+    state.speed = { ...state.speed, ...(snapshot.speed || {}) };
+    state.taxPulseLock = false;
+    state.save.autosaveTimer = 0;
+    state.admin.slashOpen = false;
+    state.admin.panelOpen = false;
+    state.admin.points = [];
+    state.runtime.lastPlacementUndo = null;
+    restoreLanWorld(snapshot);
+    for (const [owner, data] of Object.entries(snapshot.players || {})) {
+      restorePlayerSaveData(state.players[owner], data);
+    }
+    const player = getPrimaryPlayer();
+    if (player) {
+      player.ui.recentMessage = `Solo campaign resumed. Press ${formatKeybindLabel(getKeybind("help"))} for controls, ${formatKeybindLabel(getKeybind("openSettings"))} for live settings, or use Save Solo before leaving.`;
+      setActivePlayerContext(player, getViewportForPlayer(player));
+      clampCursorToViewport(player);
+    }
+    overlay.classList.add("hidden");
+    setMenuSection("singleplayer");
+    if (menuTitle) menuTitle.textContent = DEFAULT_MENU_TITLE;
+    if (menuIntro) menuIntro.textContent = DEFAULT_MENU_INTRO;
+    updateFogOfWar();
+    syncAdminUi();
+    syncMenuButtons();
+    syncLiveControls();
+    return true;
+  }
+
+  function handleExitRequest() {
+    if (history.length > 1) {
+      history.back();
+      return;
+    }
+    try {
+      window.close();
+    } catch (error) {}
+    window.setTimeout(() => {
+      if (!document.hidden) location.replace("about:blank");
+    }, 120);
+  }
+
   function showMatchResultOverlay() {
     exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
     overlay.classList.remove("hidden");
@@ -2313,6 +2583,7 @@
     if (joinLanBtn) joinLanBtn.textContent = "Join LAN Versus";
     if (hostLanCoopBtn) hostLanCoopBtn.textContent = "Host LAN Co-op";
     if (joinLanCoopBtn) joinLanCoopBtn.textContent = "Join LAN Co-op";
+    setMenuSection(getMenuSectionForMatch(state.matchType));
     syncLanOriginUi();
     if (audioState.lastResultCue !== state.mode) {
       audioState.lastResultCue = state.mode;
@@ -3966,6 +4237,35 @@
     return assignments;
   }
 
+  function rebuildFormationProgressCache() {
+    state.runtime.formationProgress = new Map();
+    for (const unit of state.world.units) {
+      if (!unit.formationMoveId || !unit.formationSlot || !unit.moveTarget) continue;
+      const distanceToSlot = Math.hypot(unit.formationSlot.x - unit.x, unit.formationSlot.y - unit.y);
+      const entry = state.runtime.formationProgress.get(unit.formationMoveId) || {
+        count: 0,
+        maxDistance: 0,
+        minDistance: Infinity,
+      };
+      entry.count += 1;
+      entry.maxDistance = Math.max(entry.maxDistance, distanceToSlot);
+      entry.minDistance = Math.min(entry.minDistance, distanceToSlot);
+      state.runtime.formationProgress.set(unit.formationMoveId, entry);
+    }
+  }
+
+  function getFormationSpeedMultiplier(unit) {
+    if (!unit || !unit.formationMoveId || !unit.formationSlot) return 1;
+    const group = state.runtime.formationProgress.get(unit.formationMoveId);
+    if (!group || group.count < 2) return 1;
+    const spread = group.maxDistance - group.minDistance;
+    if (spread < 64) return 1;
+    const distanceToSlot = Math.hypot(unit.formationSlot.x - unit.x, unit.formationSlot.y - unit.y);
+    const lead = Math.max(0, group.maxDistance - distanceToSlot);
+    if (lead < 44) return 1;
+    return clamp(1 - (lead - 44) / Math.max(160, spread * 1.3), 0.72, 1);
+  }
+
   function angleLerp(a, b, t) {
     let diff = ((b - a + Math.PI) % TAU) - Math.PI;
     if (diff < -Math.PI) diff += TAU;
@@ -4190,8 +4490,16 @@
     return table[projectileType] ?? 1;
   }
 
-  function notify(text, tint = "#d6ae63") {
-    state.world.notifications.push({ id: createId("note"), text, tint, ttl: 4.5, owner: null });
+  function notify(text, tint = "#d6ae63", options = {}) {
+    const owner = options.owner || null;
+    const lowPriority = Boolean(options.lowPriority);
+    const previous = state.world.notifications[state.world.notifications.length - 1];
+    if (previous && previous.text === text && previous.tint === tint && previous.owner === owner) {
+      previous.ttl = Math.max(previous.ttl, options.ttl || 4.5);
+      previous.lowPriority = lowPriority;
+    } else {
+      state.world.notifications.push({ id: createId("note"), text, tint, ttl: options.ttl || 4.5, owner, lowPriority });
+    }
     for (const player of getHumanPlayers()) player.ui.recentMessage = text;
   }
 
@@ -4506,7 +4814,7 @@
       spawnEffect("blast", resource.x, resource.y, resource.radius * 0.34, resource.kind === "tree" ? "#d9b36e" : "#e6eef5", 0.18);
       if (options.showMessage !== false) {
         const rewardLabel = resource.kind === "tree" ? `${resource.rewardResource || 0} wood` : `${resource.rewardResource || 0} stone`;
-        notify(`${resource.kind === "tree" ? "Timber" : "Stone"} secured +${resource.rewardCoins || 0} coins • ${rewardLabel}`, "#7df2ab");
+        notify(`${resource.kind === "tree" ? "Timber" : "Stone"} secured +${resource.rewardCoins || 0} coins • ${rewardLabel}`, "#7df2ab", { lowPriority: true });
       }
       if (resource.chunksRemaining <= 0) {
         removeResourceNode(resource);
@@ -4554,7 +4862,7 @@
     spawnEffect("dropPulse", target.x, target.y - (target.kind === "building" ? target.radius * 0.45 : 8), 20, "#ffd889", 0.44);
     playWorldSound("taxCollect", target.x, target.y, { cooldown: 0.18, volume: 0.78 });
     if (options.showMessage !== false) {
-      notify(`${target.kind === "civilian" ? "Villager dues" : "Village taxes"} +${payout} coins`, "#ffd889");
+      notify(`${target.kind === "civilian" ? "Villager dues" : "Village taxes"} +${payout} coins`, "#ffd889", { lowPriority: true });
     }
     return payout;
   }
@@ -5542,7 +5850,7 @@
         index: i < 4 ? i : i - 4,
       });
     }
-    return { x, y, slotSize, gap, slots };
+    return { x, y, slotSize, gap, slots, scale };
   }
 
   function getCatalogCategoryDefs(type) {
@@ -5944,6 +6252,57 @@
     state.selectedIds.delete(building.id);
     if (player && player.selectedIds) player.selectedIds.delete(building.id);
     if (!explicitBuilding || player === getActivePlayerState()) clearBuildingRelocation(player, { clearPlacement: true });
+    return true;
+  }
+
+  function rememberPlacementUndo(entry) {
+    if (!entry || !entry.owner) return;
+    state.runtime.lastPlacementUndo = {
+      ...entry,
+      expiresAt: state.time + 18,
+    };
+  }
+
+  function getValidPlacementUndo(player = getActivePlayerState()) {
+    const undo = state.runtime.lastPlacementUndo;
+    if (!undo) return null;
+    if (!player || undo.owner !== player.owner) return null;
+    if (undo.expiresAt <= state.time) {
+      state.runtime.lastPlacementUndo = null;
+      return null;
+    }
+    return undo;
+  }
+
+  function undoLastPlacement(player = getActivePlayerState()) {
+    const undo = getValidPlacementUndo(player);
+    if (!undo) {
+      notify("No recent building placement is available to undo.", "#ffb484");
+      return false;
+    }
+    const building = state.world.buildings.find((entry) => entry.id === undo.buildingId && entry.owner === undo.owner);
+    if (!building) {
+      state.runtime.lastPlacementUndo = null;
+      notify("That placement can no longer be undone.", "#ffb484");
+      return false;
+    }
+    if (undo.type === "build") {
+      addCoins(undo.owner, Math.max(0, undo.cost || 0));
+      spawnEffect("debris", building.x, building.y, building.radius * 0.9, ownerColors[building.owner] || "#d5d5d5", 0.45);
+      removeEntity(building);
+      state.selectedIds.delete(building.id);
+      if (player && player.selectedIds) player.selectedIds.delete(building.id);
+      notify(`${undo.label || building.def.name} undone. Full refund: +${Math.max(0, undo.cost || 0)} coins.`, "#ffd889");
+    } else if (undo.type === "relocate" && undo.previous) {
+      building.x = undo.previous.x;
+      building.y = undo.previous.y;
+      building.angle = undo.previous.angle;
+      notify(`${undo.label || building.def.name} moved back to its previous position.`, "#8fd8ff");
+    } else {
+      state.runtime.lastPlacementUndo = null;
+      return false;
+    }
+    state.runtime.lastPlacementUndo = null;
     return true;
   }
 
@@ -6541,21 +6900,39 @@
       return false;
     }
     if (isRelocation && relocationBuilding) {
+      rememberPlacementUndo({
+        type: "relocate",
+        owner,
+        buildingId: relocationBuilding.id,
+        label: item.name,
+        previous: {
+          x: relocationBuilding.x,
+          y: relocationBuilding.y,
+          angle: relocationBuilding.angle || 0,
+        },
+      });
       relocationBuilding.x = x;
       relocationBuilding.y = y;
       relocationBuilding.angle = angle;
       relocationBuilding.manualPlacement = true;
       state.ids += 1;
       relocationBuilding.placementIndex = state.ids;
-      notify(`${item.name} repositioned.`, "#7df2ab");
+      notify(`${item.name} repositioned. Press Z to undo.`, "#7df2ab");
       playWorldSound("deployStructure", x, y, { cooldown: 0.08, volume: 0.78 });
       return true;
     }
     if (assetCatalog.includes(item)) {
       spendCoins(item.cost, owner);
-      spawnBuilding(owner, item.id, x, y, angle, { manualPlacement: true });
+      const building = spawnBuilding(owner, item.id, x, y, angle, { manualPlacement: true });
+      rememberPlacementUndo({
+        type: "build",
+        owner,
+        buildingId: building && building.id,
+        cost: item.cost,
+        label: item.name,
+      });
       incrementQuest("build", 1);
-      notify(`${item.name} deployed.`, "#7df2ab");
+      notify(`${item.name} deployed. Press Z to undo or Delete to salvage later.`, "#7df2ab");
       playWorldSound("deployStructure", x, y, { cooldown: 0.08, volume: 0.82 });
       return true;
     }
@@ -6946,7 +7323,7 @@
     if (unit.moveTarget) {
       const steeringTarget = resolveUnitSteeringTarget(unit, dt);
       const n = normalize(steeringTarget.x - unit.x, steeringTarget.y - unit.y);
-      const desiredSpeed = unit.speed * terrainMove * (unit.empTimer > 0 ? 0.55 : 1);
+      const desiredSpeed = unit.speed * terrainMove * (unit.empTimer > 0 ? 0.55 : 1) * getFormationSpeedMultiplier(unit);
       unit.vx += n.x * desiredSpeed * dt * 4.2;
       unit.vy += n.y * desiredSpeed * dt * 4.2;
       unit.angle = angleLerp(unit.angle, Math.atan2(n.y, n.x), 0.12);
@@ -7131,7 +7508,7 @@
     const income = getPassiveIncomeForOwner(owner);
     if (income > 0) {
       addCoins(owner, income);
-      notify(`Treasury income delivered +${income} coins`, "#7df2ab");
+      notify(`Treasury income delivered +${income} coins`, "#7df2ab", { lowPriority: true });
     }
   }
 
@@ -7175,6 +7552,7 @@
     if (isLanClient()) return;
     const simDt = dt * state.speed.multiplier;
     state.time += simDt;
+    if (state.runtime.lastPlacementUndo && state.runtime.lastPlacementUndo.expiresAt <= state.time) state.runtime.lastPlacementUndo = null;
     if (isPvEMatch() && state.difficulty.ceasefireTimer > 0) {
       state.difficulty.ceasefireTimer = Math.max(0, state.difficulty.ceasefireTimer - simDt);
       if (state.difficulty.ceasefireTimer === 0) notify("Ceasefire expired. Enemy armies are active again.", "#ffb484");
@@ -7192,6 +7570,7 @@
 
     updateEnemyWaves(simDt);
     updateResourceNodes(simDt);
+    rebuildFormationProgressCache();
     for (const civilian of state.world.civilians) updateCivilian(civilian, simDt);
     for (const animal of state.world.animals) updateAnimal(animal, simDt);
     for (const building of [...state.world.buildings]) updateBuilding(building, simDt);
@@ -7200,6 +7579,15 @@
     updateDrops(simDt);
     updateEffects(simDt);
     updateNotifications(simDt);
+    if (state.matchType === "single") {
+      state.save.autosaveTimer += simDt;
+      if (state.save.autosaveTimer >= 12) {
+        persistSoloSave("autosave", { notify: false, statusText: "Solo campaign autosaved." });
+        state.save.autosaveTimer = 0;
+      }
+    } else {
+      state.save.autosaveTimer = 0;
+    }
 
     if (isCompetitiveMatch()) {
       const aliveOwners = getHumanOwners().filter((owner) => ownerHasForces(owner));
@@ -9391,9 +9779,9 @@
     const contentY = y + 18 * scale;
     const rowGap = (profile.tight ? 34 : 42) * scale;
     const colW = (panelW - 34 * scale) / 4;
-    const labelSize = (profile.tight ? 10 : profile.compact ? 11 : 12) * scale;
-    const valueSize = (profile.tight ? 14 : profile.compact ? 16 : 20) * scale;
-    const lineGap = (profile.tight ? 16 : 22) * scale;
+    const labelSize = (profile.tight ? 10.5 : profile.compact ? 11.5 : 12) * scale;
+    const valueSize = (profile.tight ? 16 : profile.compact ? 17.5 : 20) * scale;
+    const lineGap = (profile.tight ? 17 : 22) * scale;
     stats.slice(0, 4).forEach((stat, index) => {
       drawHudStat(contentX + colW * index, contentY, stat.label, stat.value, stat.tint, {
         labelSize,
@@ -9602,8 +9990,8 @@
     ctx.font = `${Math.round((layout.profile.tight ? 9 : 10) * layout.scale)}px Cambria`;
     const footer = player.inputMode === "controller"
       ? `A select | X assets | B weapons | Y clear | ${formatKeybindLabel(getKeybind("openSettings"))} settings | ${formatKeybindLabel(getKeybind("help"))} guide`
-      : `${formatKeybindLabel(getKeybind("openAssets"))} assets | ${formatKeybindLabel(getKeybind("openWeapons"))} weapons | ${formatKeybindLabel(getKeybind("rotatePlacement"))} rotate | ${formatKeybindLabel(getKeybind("moveBuilding"))} move | ${formatKeybindLabel(getKeybind("openSettings"))} settings`;
-    const supportLine = `${formatKeybindLabel(getKeybind("toggleDifficulty"))} difficulty | ${formatKeybindLabel(getKeybind("ceasefire"))} ceasefire | ${formatKeybindLabel(getKeybind("speedSlow"))}/${formatKeybindLabel(getKeybind("speedNormal"))}/${formatKeybindLabel(getKeybind("speedFast"))}/${formatKeybindLabel(getKeybind("speedUltra"))} speeds | ${formatKeybindLabel(getKeybind("demolishBuilding"))} demolish`;
+      : `${formatKeybindLabel(getKeybind("openAssets"))} assets | ${formatKeybindLabel(getKeybind("openWeapons"))} weapons | ${formatKeybindLabel(getKeybind("rotatePlacement"))} rotate | ${formatKeybindLabel(getKeybind("moveBuilding"))} move | Z undo | ${formatKeybindLabel(getKeybind("openSettings"))} settings`;
+    const supportLine = `${formatKeybindLabel(getKeybind("toggleDifficulty"))} difficulty | ${formatKeybindLabel(getKeybind("ceasefire"))} ceasefire | ${formatKeybindLabel(getKeybind("speedSlow"))}/${formatKeybindLabel(getKeybind("speedNormal"))}/${formatKeybindLabel(getKeybind("speedFast"))}/${formatKeybindLabel(getKeybind("speedUltra"))} speeds | ${formatKeybindLabel(getKeybind("demolishBuilding"))} demolish | save solo button`;
     ctx.fillText(truncateTextToWidth(footer, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + layout.h - 24 * layout.scale);
     ctx.fillStyle = "#8297a4";
     ctx.font = `${Math.round((layout.profile.tight ? 8 : 9) * layout.scale)}px Cambria`;
@@ -10177,6 +10565,7 @@
   function drawBottomBar() {
     const layout = getBottomBarLayout();
     const quickSlots = getQuickSlots();
+    const scale = layout.scale || 1;
     const frameX = layout.x - 22;
     const frameY = layout.y - 24;
     const frameW = layout.slotSize * 8 + layout.gap * 7 + 44;
@@ -10234,11 +10623,17 @@
         continue;
       }
       const affordable = canAfford(item.id);
-      roundRect(ctx, slot.x + 10, slot.y + 14, slot.w - 20, 40, 14, "rgba(0,0,0,0.14)", withAlpha(theme.edge, 0.16));
-      drawItemGlyph(item, slot.x + 15, slot.y + 15, 40, !affordable);
+      const iconSize = Math.min(slot.w - 24 * scale, 42 * scale);
+      const iconX = slot.x + (slot.w - iconSize) * 0.5;
+      const iconY = slot.y + 14 * scale;
+      roundRect(ctx, iconX - 4 * scale, iconY - 3 * scale, iconSize + 8 * scale, iconSize + 8 * scale, 14 * scale, "rgba(0,0,0,0.14)", withAlpha(theme.edge, 0.16));
+      drawItemGlyph(item, iconX, iconY, iconSize, !affordable);
       ctx.fillStyle = "#f3ece0";
-      ctx.font = "700 10px Cambria";
-      wrapText(item.name, slot.x + 8, slot.y + slot.h - 17, slot.w - 16, 11);
+      ctx.font = `700 ${Math.round(10 * scale)}px Cambria`;
+      const nameLines = getClampedTextLines(item.name, slot.w - 14 * scale, 2);
+      nameLines.forEach((line, lineIndex) => {
+        ctx.fillText(line, slot.x + 7 * scale, slot.y + slot.h - (18 - lineIndex * 10) * scale);
+      });
       drawLabelPill(`${item.cost}C`, slot.x + slot.w - 38, slot.y + 6, affordable ? withAlpha(theme.accent, 0.18) : "rgba(111,32,28,0.84)", affordable ? withAlpha(theme.edge, 0.26) : "rgba(255,138,128,0.62)", affordable ? "#ffe3ae" : "#ffd1cb", 0.9, 32);
       if (active) {
         ctx.fillStyle = withAlpha(theme.accent, 0.88);
@@ -10266,16 +10661,19 @@
       selectionLayout ? selectionLayout.y - 12 * scale : Infinity,
     );
     if (maxY <= startY) return;
-    const notes = state.world.notifications
-      .filter((note) => !note.owner || note.owner === getActivePlayerState().owner)
-      .slice(-profile.notificationLimit);
+    const visibleNotes = state.world.notifications.filter((note) => {
+      if (note.owner && note.owner !== getActivePlayerState().owner) return false;
+      if (profile.compact && note.lowPriority) return false;
+      return true;
+    });
+    const notes = visibleNotes.slice(-profile.notificationLimit);
     if (!notes.length) return;
     ctx.save();
     ctx.textAlign = profile.tight ? "right" : "left";
-    ctx.font = `600 ${Math.round((profile.tight ? 12 : profile.compact ? 13 : 15) * scale)}px Cambria`;
-    const maxWidth = profile.tight ? viewport.w * 0.42 : viewport.w * 0.52;
+    ctx.font = `600 ${Math.round((profile.tight ? 12.5 : profile.compact ? 14 : 15.5) * scale)}px Cambria`;
+    const maxWidth = profile.tight ? viewport.w * 0.38 : viewport.w * 0.48;
     const x = profile.tight ? viewport.x + viewport.w - 24 * scale : viewport.x + 26 * scale;
-    const lineH = (profile.tight ? 20 : 24) * scale;
+    const lineH = (profile.tight ? 21 : 25) * scale;
     let y = startY;
     notes.forEach((note) => {
       if (y > maxY) return;
@@ -10644,7 +11042,7 @@
       ctx.fillStyle = "#9fb2bc";
       ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
       const hintText = focusEntity.kind === "building" && focusEntity.owner === (getActivePlayerState() && getActivePlayerState().owner)
-        ? `Move ${formatKeybindLabel(getKeybind("moveBuilding"))} | Rotate ${formatKeybindLabel(getKeybind("rotatePlacement"))} | Demolish ${formatKeybindLabel(getKeybind("demolishBuilding"))} (+${getDemolitionRefund(focusEntity)}c)`
+        ? `Move ${formatKeybindLabel(getKeybind("moveBuilding"))} | Rotate ${formatKeybindLabel(getKeybind("rotatePlacement"))} | Undo Z | Demolish ${formatKeybindLabel(getKeybind("demolishBuilding"))} (+${getDemolitionRefund(focusEntity)}c)`
         : layout.overflowCount
           ? `Showing ${layout.entities.length} of ${layout.totalEntities}. Click icon to remove.`
           : "Click icon to remove. Eye enters first-person.";
@@ -11290,6 +11688,11 @@
       clearPlayerSelection(primary, true);
       notify("Selection cleared.");
       playUiSound("clear", { volume: 0.46, cooldown: 0.05 });
+    } else if ((key === "z" && !event.altKey && !event.metaKey) || (event.ctrlKey && key === "z")) {
+      event.preventDefault();
+      if (undoLastPlacement(primary)) playUiSound("uiClick", { volume: 0.42, cooldown: 0.04 });
+      else playUiSound("error", { volume: 0.44, cooldown: 0.04 });
+      return;
     } else if (eventMatchesAction(event, "rotatePlacement")) {
       event.preventDefault();
       rotatePlacement(primary, event.shiftKey ? -1 : 1);
@@ -11338,6 +11741,7 @@
   function startMatch(matchType = "single", playerCount = 2) {
     exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
     closeSettingsOverlay();
+    setMenuSection(getMenuSectionForMatch(matchType));
     if (matchType !== "lan" && matchType !== "lan-coop") resetLanSessionState();
     initializePlayers(matchType, playerCount);
     state.world.preset = sanitizeMapPreset(state.mapPreset);
@@ -11358,8 +11762,10 @@
     state.time = 0;
     state.ids = 0;
     state.taxPulseLock = false;
+    state.save.autosaveTimer = 0;
     state.difficulty.ceasefireTimer = 0;
     state.difficulty.hardPressureApplied = false;
+    state.runtime.lastPlacementUndo = null;
     audioState.lastResultCue = null;
     createWorld();
     addAdminLog("Loaded battlefield.", { extra: getMapPresetDef(state.world.preset).label });
@@ -11630,6 +12036,12 @@
     for (const player of getHumanPlayers()) clampCursorToViewport(player);
     draw();
   });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") persistSoloSave("autosave", { notify: false, statusText: "Solo campaign autosaved." });
+  });
+  window.addEventListener("beforeunload", () => {
+    persistSoloSave("autosave", { notify: false, statusText: "Solo campaign autosaved." });
+  });
   document.addEventListener("fullscreenchange", () => {
     resize();
     for (const player of getHumanPlayers()) clampCursorToViewport(player);
@@ -11641,6 +12053,22 @@
       setLanStatus(`Unable to start this mode: ${error.message}`);
     });
   });
+  menuNavButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      setMenuSection(button.dataset.menuSection);
+    });
+  });
+  if (resumeBtn) {
+    resumeBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+      if (!restoreSoloSave()) {
+        clearStoredSoloSave();
+        syncMenuButtons();
+        setLanStatus("The saved solo campaign could not be restored and was cleared.");
+      }
+    });
+  }
   mapPresetButtons.forEach((button) => {
     button.addEventListener("click", () => {
       playUiSound("uiClick", { volume: 0.48, cooldown: 0.04 });
@@ -11724,10 +12152,24 @@
       openSettingsOverlay();
     });
   }
+  if (exitBtn) {
+    exitBtn.addEventListener("click", () => {
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      handleExitRequest();
+    });
+  }
   if (liveSettingsBtn) {
     liveSettingsBtn.addEventListener("click", () => {
       playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
       openSettingsOverlay();
+    });
+  }
+  if (saveMatchBtn) {
+    saveMatchBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      if (!persistSoloSave("manual", { statusText: "Solo campaign saved. Use Resume Solo from the menu after reloading." })) {
+        notify("Solo saving is only available during an active solo campaign.", "#ffb484");
+      }
     });
   }
   if (settingsCloseBtn) {
@@ -11842,6 +12284,7 @@
   applySettingsToRuntime();
   syncSettingsUi();
   setSettingsOverlayOpen(false);
+  setMenuSection("singleplayer");
   syncMapPresetUi();
   resetLanSessionState();
   syncAdminUi();

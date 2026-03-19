@@ -9,99 +9,205 @@
   <body>
     <canvas id="game" aria-label="Top Knights"></canvas>
     <div id="menu-overlay" class="overlay">
-      <div class="menu-panel">
-        <p class="eyebrow">Empire Strategy Sandbox</p>
-        <h1>Top Knights</h1>
-        <p class="intro">
-          Build an empire, collect taxes, harvest the frontier, and crush rival nations
-          across a rotating war map.
-        </p>
-        <div class="map-panel" aria-label="Map selection">
-          <div class="map-panel-head">
-            <p class="controller-title">Battlefield</p>
-            <p class="map-panel-copy">Choose which level to generate for the next match.</p>
+      <div class="menu-panel modern-menu">
+        <aside class="menu-sidebar">
+          <div class="menu-brand">
+            <p class="eyebrow">Empire Strategy Sandbox</p>
+            <h1>Top Knights</h1>
+            <p class="intro">
+              Build an empire, collect taxes, harvest the frontier, and crush rival nations
+              across a rotating war map.
+            </p>
           </div>
-          <div class="map-strip">
-            <button type="button" class="map-card active" data-map-preset="green">
-              <img src="assets/environment/maps/green map.png" alt="Green map preview" />
-              <span class="map-card-title">Green Map</span>
-              <span class="map-card-copy">Lush rivers, forests, hills, and the broadest build space.</span>
+          <nav class="menu-nav" aria-label="Main menu sections">
+            <button type="button" class="menu-nav-btn active" data-menu-section="singleplayer">
+              <span class="menu-nav-label">Singleplayer</span>
+              <span class="menu-nav-copy">Campaign, resume, and map selection</span>
             </button>
-            <button type="button" class="map-card" data-map-preset="canyon">
-              <img src="assets/environment/maps/Canyon.png" alt="Canyon map preview" />
-              <span class="map-card-title">Canyon</span>
-              <span class="map-card-copy">Layered ravines, choke points, and dangerous stone corridors.</span>
+            <button type="button" class="menu-nav-btn" data-menu-section="multiplayer">
+              <span class="menu-nav-label">Multiplayer</span>
+              <span class="menu-nav-copy">Split-screen, co-op, and LAN rooms</span>
             </button>
-            <button type="button" class="map-card" data-map-preset="desert">
-              <img src="assets/environment/maps/Desert.png" alt="Desert map preview" />
-              <span class="map-card-title">Desert</span>
-              <span class="map-card-copy">Wide dunes, heat attrition, and oasis river fighting lanes.</span>
+            <button type="button" class="menu-nav-btn" data-menu-section="system">
+              <span class="menu-nav-label">System</span>
+              <span class="menu-nav-copy">Settings, help, and exit</span>
             </button>
-            <button type="button" class="map-card" data-map-preset="ocean">
-              <img src="assets/environment/maps/ocean.png" alt="Ocean map preview" />
-              <span class="map-card-title">Ocean</span>
-              <span class="map-card-copy">Coastal mainland with ocean borders, marsh coves, and shipping lanes.</span>
-            </button>
+          </nav>
+          <div class="menu-side-card">
+            <p class="menu-side-title">Command Primer</p>
+            <p class="menu-side-copy">Use `H` in match for the field guide, `O` for live settings, and the top bar for speed and difficulty.</p>
           </div>
-        </div>
-        <div class="control-grid">
-          <div><span>Pan map</span><strong>Hold right mouse + drag</strong></div>
-          <div><span>Rotate map</span><strong>Hold middle mouse + drag</strong></div>
-          <div><span>Zoom</span><strong>Mouse wheel</strong></div>
-          <div><span>Assets / weapons</span><strong>`E` / `Q`</strong></div>
-          <div><span>Select army</span><strong>Left drag box</strong></div>
-          <div><span>Place / command</span><strong>Left click map</strong></div>
-          <div><span>Deselect</span><strong>`X`</strong></div>
-          <div><span>Fullscreen</span><strong>`F`</strong></div>
-          <div><span>Easy / normal / hard</span><strong>Top pill or `D`</strong></div>
-          <div><span>Ceasefire</span><strong>`Esc` for 3 minutes</strong></div>
-          <div><span>Pad cursor</span><strong>Left stick</strong></div>
-          <div><span>Pad camera</span><strong>Right stick / R3 rotate / LB-RB zoom</strong></div>
-          <div><span>Pad select</span><strong>`A` click or drag-select</strong></div>
-          <div><span>Pad menus</span><strong>`X` assets / `B` weapons / `Y` clear</strong></div>
-          <div><span>Buildings</span><strong>`R` rotate • `M` move • `Delete` demolish</strong></div>
-          <div><span>Game speed</span><strong>`-`, `1`, `2`, `5`</strong></div>
-          <div><span>Tutorial / help</span><strong>`H` or live Help button</strong></div>
-          <div><span>Accessibility / remap</span><strong>Open Settings from menu or live HUD</strong></div>
-        </div>
-        <div class="match-options">
-          <button id="start-btn" type="button">Launch Campaign</button>
-          <button id="versus-btn" type="button" class="secondary-btn">2P Split-Screen Versus</button>
-          <button id="versus-3-btn" type="button" class="secondary-btn">3P Split-Screen Versus</button>
-          <button id="versus-4-btn" type="button" class="secondary-btn">4P Split-Screen Versus</button>
-          <button id="coop-btn" type="button" class="secondary-btn">2P Split-Screen Co-op</button>
-          <button id="coop-3-btn" type="button" class="secondary-btn">3P Split-Screen Co-op</button>
-          <button id="coop-4-btn" type="button" class="secondary-btn">4P Split-Screen Co-op</button>
-          <button id="host-lan-btn" type="button" class="secondary-btn lan-action">Host LAN Versus</button>
-          <button id="join-lan-btn" type="button" class="secondary-btn lan-action">Join LAN Versus</button>
-          <button id="host-lan-coop-btn" type="button" class="secondary-btn lan-action">Host LAN Co-op</button>
-          <button id="join-lan-coop-btn" type="button" class="secondary-btn lan-action">Join LAN Co-op</button>
-          <button id="settings-btn" type="button" class="secondary-btn">Settings</button>
-        </div>
-        <div id="lan-panel" class="lan-panel">
-          <div id="lan-inputs" class="lan-inputs">
-            <label class="lan-field">
-              <span>Room Code</span>
-              <input id="lan-code-input" type="text" maxlength="5" placeholder="ABCDE" autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="lan-field lan-field-wide">
-              <span>Share Link</span>
-              <input id="lan-link-input" type="text" placeholder="Host a LAN room to generate a join link" autocomplete="off" spellcheck="false" readonly />
-            </label>
-          </div>
-          <p id="lan-hint" class="lan-hint">
-            Run <code>node server.js</code> on the host machine, open this page from that machine's LAN IP such as <code>http://192.168.1.10:4173</code>, then share the generated link or room code. GitHub Pages can host the single-player and local split-screen build, but LAN still requires the built-in HTTP server.
-          </p>
-          <p id="lan-status" class="lan-status">
-            LAN ready when the game is opened from <code>http://127.0.0.1:4173</code> or the host PC's LAN IP.
-          </p>
-        </div>
-        <div class="controller-panel">
-          <p class="controller-title">Controller Join</p>
-          <p id="controller-status" class="controller-status">
-            Connect one controller for solo pad support or up to four controllers for local split-screen matches.
-          </p>
-        </div>
+        </aside>
+        <main class="menu-content">
+          <section class="menu-stage active" data-menu-panel="singleplayer">
+            <div class="menu-stage-head">
+              <div>
+                <p class="controller-title">Singleplayer</p>
+                <p class="menu-stage-copy">Start a solo campaign, continue your last save, and choose the battlefield before the war begins.</p>
+              </div>
+            </div>
+            <div class="menu-hero-grid">
+              <article class="hero-card hero-card-primary">
+                <p class="hero-kicker">Campaign</p>
+                <h2>Rule The Frontier Alone</h2>
+                <p>Build, tax, expand, and survive escalating enemy pressure in a single-view RTS campaign.</p>
+                <div class="hero-actions">
+                  <button id="start-btn" type="button">Play Solo</button>
+                  <button id="resume-btn" type="button" class="secondary-btn hidden">Resume Solo</button>
+                </div>
+              </article>
+              <article class="hero-card hero-card-compact">
+                <p class="hero-kicker">Onboarding</p>
+                <h3>Learn In Match</h3>
+                <p>The field guide opens automatically for new runs and tracks camera, catalog, selection, and command basics.</p>
+                <div class="menu-tag-row">
+                  <span class="menu-tag">`H` Help</span>
+                  <span class="menu-tag">`O` Settings</span>
+                  <span class="menu-tag">`Q` / `E` Catalogs</span>
+                </div>
+              </article>
+            </div>
+            <div class="map-panel" aria-label="Map selection">
+              <div class="map-panel-head">
+                <p class="controller-title">Battlefield</p>
+                <p class="map-panel-copy">Choose which level to generate for the next match.</p>
+              </div>
+              <div class="map-strip">
+                <button type="button" class="map-card active" data-map-preset="green">
+                  <img src="assets/environment/maps/green map.png" alt="Green map preview" />
+                  <span class="map-card-title">Green Map</span>
+                  <span class="map-card-copy">Lush rivers, forests, hills, and the broadest build space.</span>
+                </button>
+                <button type="button" class="map-card" data-map-preset="canyon">
+                  <img src="assets/environment/maps/Canyon.png" alt="Canyon map preview" />
+                  <span class="map-card-title">Canyon</span>
+                  <span class="map-card-copy">Layered ravines, choke points, and dangerous stone corridors.</span>
+                </button>
+                <button type="button" class="map-card" data-map-preset="desert">
+                  <img src="assets/environment/maps/Desert.png" alt="Desert map preview" />
+                  <span class="map-card-title">Desert</span>
+                  <span class="map-card-copy">Wide dunes, heat attrition, and oasis river fighting lanes.</span>
+                </button>
+                <button type="button" class="map-card" data-map-preset="ocean">
+                  <img src="assets/environment/maps/ocean.png" alt="Ocean map preview" />
+                  <span class="map-card-title">Ocean</span>
+                  <span class="map-card-copy">Coastal mainland with ocean borders, marsh coves, and shipping lanes.</span>
+                </button>
+              </div>
+            </div>
+            <div class="menu-card-grid menu-card-grid-tight">
+              <article class="menu-info-card">
+                <p class="menu-info-title">Camera</p>
+                <p>Right mouse pans, middle mouse rotates, and the wheel zooms. The tutorial walks this in the first run.</p>
+              </article>
+              <article class="menu-info-card">
+                <p class="menu-info-title">Core Commands</p>
+                <p>`R` rotate, `M` move building, `Delete` demolish, `Z` undo recent placement, and `- / 1 / 2 / 5` adjust time scale.</p>
+              </article>
+            </div>
+          </section>
+          <section class="menu-stage" data-menu-panel="multiplayer">
+            <div class="menu-stage-head">
+              <div>
+                <p class="controller-title">Multiplayer</p>
+                <p class="menu-stage-copy">Local split-screen and LAN options are grouped here so versus, co-op, and hosted matches stay separate from solo play.</p>
+              </div>
+            </div>
+            <div class="menu-card-grid">
+              <article class="menu-mode-card">
+                <p class="menu-info-title">Split-Screen Versus</p>
+                <div class="menu-button-grid">
+                  <button id="versus-btn" type="button" class="secondary-btn">2P Split-Screen Versus</button>
+                  <button id="versus-3-btn" type="button" class="secondary-btn">3P Split-Screen Versus</button>
+                  <button id="versus-4-btn" type="button" class="secondary-btn">4P Split-Screen Versus</button>
+                </div>
+              </article>
+              <article class="menu-mode-card">
+                <p class="menu-info-title">Split-Screen Co-op</p>
+                <div class="menu-button-grid">
+                  <button id="coop-btn" type="button" class="secondary-btn">2P Split-Screen Co-op</button>
+                  <button id="coop-3-btn" type="button" class="secondary-btn">3P Split-Screen Co-op</button>
+                  <button id="coop-4-btn" type="button" class="secondary-btn">4P Split-Screen Co-op</button>
+                </div>
+              </article>
+            </div>
+            <div id="lan-panel" class="lan-panel">
+              <div class="menu-stage-head menu-stage-head-compact">
+                <div>
+                  <p class="controller-title">LAN</p>
+                  <p class="menu-stage-copy">Host or join a local network room when the build is opened from the built-in HTTP server.</p>
+                </div>
+              </div>
+              <div class="menu-button-grid menu-button-grid-lan">
+                <button id="host-lan-btn" type="button" class="secondary-btn lan-action">Host LAN Versus</button>
+                <button id="join-lan-btn" type="button" class="secondary-btn lan-action">Join LAN Versus</button>
+                <button id="host-lan-coop-btn" type="button" class="secondary-btn lan-action">Host LAN Co-op</button>
+                <button id="join-lan-coop-btn" type="button" class="secondary-btn lan-action">Join LAN Co-op</button>
+              </div>
+              <div id="lan-inputs" class="lan-inputs">
+                <label class="lan-field">
+                  <span>Room Code</span>
+                  <input id="lan-code-input" type="text" maxlength="5" placeholder="ABCDE" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="lan-field lan-field-wide">
+                  <span>Share Link</span>
+                  <input id="lan-link-input" type="text" placeholder="Host a LAN room to generate a join link" autocomplete="off" spellcheck="false" readonly />
+                </label>
+              </div>
+              <p id="lan-hint" class="lan-hint">
+                Run <code>node server.js</code> on the host machine, open this page from that machine's LAN IP such as <code>http://192.168.1.10:4173</code>, then share the generated link or room code. GitHub Pages can host the single-player and local split-screen build, but LAN still requires the built-in HTTP server.
+              </p>
+              <p id="lan-status" class="lan-status">
+                LAN ready when the game is opened from <code>http://127.0.0.1:4173</code> or the host PC's LAN IP.
+              </p>
+            </div>
+            <div class="controller-panel">
+              <p class="controller-title">Controller Join</p>
+              <p id="controller-status" class="controller-status">
+                Connect one controller for solo pad support or up to four controllers for local split-screen matches.
+              </p>
+            </div>
+          </section>
+          <section class="menu-stage" data-menu-panel="system">
+            <div class="menu-stage-head">
+              <div>
+                <p class="controller-title">System</p>
+                <p class="menu-stage-copy">Adjust accessibility, graphics, audio, and control help from one place before you launch a match.</p>
+              </div>
+            </div>
+            <div class="menu-card-grid">
+              <article class="menu-mode-card">
+                <p class="menu-info-title">Settings</p>
+                <p class="menu-info-copy">Open the full settings panel for graphics, accessibility, audio, and key remapping.</p>
+                <div class="menu-button-grid menu-button-grid-single">
+                  <button id="settings-btn" type="button" class="secondary-btn">Open Settings</button>
+                </div>
+              </article>
+              <article class="menu-mode-card">
+                <p class="menu-info-title">Help &amp; Controls</p>
+                <div class="control-grid compact-control-grid">
+                  <div><span>Catalogs</span><strong>`Q` weapons / `E` assets</strong></div>
+                  <div><span>Selection</span><strong>Left drag box</strong></div>
+                  <div><span>Building</span><strong>`R` rotate | `M` move | `Delete` demolish</strong></div>
+                  <div><span>Field guide</span><strong>`H` in match</strong></div>
+                </div>
+              </article>
+            </div>
+            <div class="menu-card-grid menu-card-grid-tight">
+              <article class="menu-info-card">
+                <p class="menu-info-title">Accessibility</p>
+                <p>UI scale, color assist, audio sliders, and graphics quality can all be changed before or during a match.</p>
+              </article>
+              <article class="menu-info-card">
+                <p class="menu-info-title">Exit</p>
+                <p class="menu-info-copy">Leave the game page or return to the previous browser view.</p>
+                <div class="menu-button-grid menu-button-grid-single">
+                  <button id="exit-btn" type="button" class="secondary-btn danger-btn">Exit Game</button>
+                </div>
+              </article>
+            </div>
+          </section>
+        </main>
       </div>
     </div>
     <div id="live-controls" class="live-controls hidden" aria-label="Live game controls">
@@ -109,6 +215,7 @@
       <button id="ceasefire-btn" type="button" class="live-pill secondary-live">Ceasefire (C / Esc)</button>
       <button id="help-btn" type="button" class="live-pill secondary-live">Help / Tutorial (H)</button>
       <button id="live-settings-btn" type="button" class="live-pill secondary-live">Settings</button>
+      <button id="save-match-btn" type="button" class="live-pill secondary-live">Save Solo</button>
       <div class="speed-strip" role="group" aria-label="Game speed">
         <button id="speed-slow-btn" type="button" class="live-pill secondary-live">0.5x (-)</button>
         <button id="speed-normal-btn" type="button" class="live-pill">1x</button>
