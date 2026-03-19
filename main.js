@@ -6,22 +6,35 @@
   const overlay = document.getElementById("menu-overlay");
   const menuTitle = overlay ? overlay.querySelector("h1") : null;
   const menuIntro = overlay ? overlay.querySelector(".intro") : null;
-  const menuNavButtons = Array.from(document.querySelectorAll("[data-menu-section]"));
-  const menuPanels = Array.from(document.querySelectorAll("[data-menu-panel]"));
+  const menuRootScreen = document.getElementById("menu-root-screen");
+  const menuMultiplayerScreen = document.getElementById("menu-multiplayer-screen");
+  const menuLevelScreen = document.getElementById("menu-level-screen");
+  const menuQuitScreen = document.getElementById("menu-quit-screen");
   const startBtn = document.getElementById("start-btn");
   const resumeBtn = document.getElementById("resume-btn");
+  const multiplayerBtn = document.getElementById("multiplayer-btn");
+  const multiplayerBackBtn = document.getElementById("multiplayer-back-btn");
+  const levelBackBtn = document.getElementById("level-back-btn");
+  const levelMenuKicker = document.getElementById("level-menu-kicker");
+  const levelMenuCopy = document.getElementById("level-menu-copy");
   const versusBtn = document.getElementById("versus-btn");
   const versus3Btn = document.getElementById("versus-3-btn");
   const versus4Btn = document.getElementById("versus-4-btn");
   const coopBtn = document.getElementById("coop-btn");
   const coop3Btn = document.getElementById("coop-3-btn");
   const coop4Btn = document.getElementById("coop-4-btn");
+  const menuHostLanVersusBtn = document.getElementById("menu-host-lan-versus-btn");
+  const menuJoinLanVersusBtn = document.getElementById("menu-join-lan-versus-btn");
+  const menuHostLanCoopBtn = document.getElementById("menu-host-lan-coop-btn");
+  const menuJoinLanCoopBtn = document.getElementById("menu-join-lan-coop-btn");
   const hostLanBtn = document.getElementById("host-lan-btn");
   const joinLanBtn = document.getElementById("join-lan-btn");
   const hostLanCoopBtn = document.getElementById("host-lan-coop-btn");
   const joinLanCoopBtn = document.getElementById("join-lan-coop-btn");
   const settingsBtn = document.getElementById("settings-btn");
   const exitBtn = document.getElementById("exit-btn");
+  const quitConfirmBtn = document.getElementById("quit-confirm-btn");
+  const quitCancelBtn = document.getElementById("quit-cancel-btn");
   const mapPresetButtons = Array.from(document.querySelectorAll("[data-map-preset]"));
   const lanPanel = document.getElementById("lan-panel");
   const lanInputs = document.getElementById("lan-inputs");
@@ -43,6 +56,7 @@
   const assistStatus = document.getElementById("assist-status");
   const settingsOverlay = document.getElementById("settings-overlay");
   const settingsCloseBtn = document.getElementById("settings-close-btn");
+  const settingsMainMenuBtn = document.getElementById("settings-main-menu-btn");
   const graphicsQualitySelect = document.getElementById("graphics-quality-select");
   const fontScaleInput = document.getElementById("font-scale-input");
   const fontScaleValue = document.getElementById("font-scale-value");
@@ -701,6 +715,14 @@
     settings: loadStoredSettings(),
     settingsUi: {
       listeningAction: null,
+    },
+    menu: {
+      screen: "root",
+      pendingMode: "single",
+      pendingPlayerCount: 1,
+      pendingLanAction: null,
+      selectedMapPreset: "green",
+      lanArmed: false,
     },
     save: {
       autosaveTimer: 0,
@@ -1474,6 +1496,10 @@
     if (sfxVolumeInput) sfxVolumeInput.title = "Sound effects volume applies instantly in the current match.";
     if (musicVolumeInput) musicVolumeInput.title = "Music volume applies instantly in the current match.";
     if (settingsBtn) settingsBtn.title = `Open settings from the menu. During a match you can also press ${formatKeybindLabel(getKeybind("openSettings"))}.`;
+    if (settingsMainMenuBtn) {
+      settingsMainMenuBtn.classList.toggle("hidden", state.mode !== "playing");
+      settingsMainMenuBtn.title = "Leave the current match and return to the main menu.";
+    }
     for (const button of keybindButtons) {
       const action = button.dataset.keybindAction;
       if (!action) continue;
@@ -1985,50 +2011,149 @@
     return state.mode === "menu" && Boolean(state.lan.clientId) && Boolean(state.lan.roomCode) && Boolean(state.lan.roomMatchType);
   }
 
-  function getMenuSectionForMatch(matchType = state.matchType) {
-    if (matchType === "versus" || matchType === "coop" || matchType === "lan" || matchType === "lan-coop") return "multiplayer";
-    return "singleplayer";
+  function showMenuScreen(screen = "root") {
+    state.menu.screen = screen;
+    if (overlay) {
+      overlay.dataset.menuScreen = screen;
+      if (state.mode !== "victory" && state.mode !== "defeat") overlay.dataset.menuResult = "off";
+    }
+    if (menuRootScreen) menuRootScreen.classList.toggle("hidden", screen !== "root");
+    if (menuMultiplayerScreen) menuMultiplayerScreen.classList.toggle("hidden", screen !== "multiplayer");
+    if (menuLevelScreen) menuLevelScreen.classList.toggle("hidden", screen !== "levels");
+    if (menuQuitScreen) menuQuitScreen.classList.toggle("hidden", screen !== "quit");
+    if (menuRootScreen) menuRootScreen.classList.toggle("active", screen === "root");
+    if (menuMultiplayerScreen) menuMultiplayerScreen.classList.toggle("active", screen === "multiplayer");
+    if (menuLevelScreen) menuLevelScreen.classList.toggle("active", screen === "levels");
+    if (menuQuitScreen) menuQuitScreen.classList.toggle("active", screen === "quit");
   }
 
-  function setMenuSection(section = "singleplayer") {
-    const next = section === "multiplayer" || section === "system" ? section : "singleplayer";
-    menuNavButtons.forEach((button) => {
-      const active = button.dataset.menuSection === next;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-pressed", active ? "true" : "false");
-    });
-    menuPanels.forEach((panel) => {
-      panel.classList.toggle("active", panel.dataset.menuPanel === next);
-    });
+  function getPendingMenuLabel() {
+    const count = clamp(Math.round(state.menu.pendingPlayerCount || 2), 1, 4);
+    if (state.menu.pendingMode === "single") return "Singleplayer";
+    if (state.menu.pendingMode === "versus") return `${count}P Split-Screen Versus`;
+    if (state.menu.pendingMode === "coop") return `${count}P Split-Screen Co-op`;
+    const actionPrefix = state.menu.pendingLanAction === "join"
+      ? "Join"
+      : state.menu.pendingLanAction === "host"
+        ? "Host"
+        : "LAN";
+    return `${actionPrefix} ${state.menu.pendingMode === "lan-coop" ? "LAN Co-op" : "LAN Versus"}`;
+  }
+
+  function syncLanSetupVisibility() {
+    const pendingMode = state.menu.pendingMode;
+    const isLanPending = pendingMode === "lan" || pendingMode === "lan-coop";
+    const showVersusLan = pendingMode === "lan" && state.menu.lanArmed;
+    const showCoopLan = pendingMode === "lan-coop" && state.menu.lanArmed;
+    const hostOnly = state.menu.pendingLanAction === "host";
+    const joinOnly = state.menu.pendingLanAction === "join";
+    if (lanPanel) lanPanel.classList.toggle("hidden", !isLanPending || !state.menu.lanArmed);
+    if (hostLanBtn) hostLanBtn.classList.toggle("hidden", !showVersusLan || joinOnly);
+    if (joinLanBtn) joinLanBtn.classList.toggle("hidden", !showVersusLan || hostOnly);
+    if (hostLanCoopBtn) hostLanCoopBtn.classList.toggle("hidden", !showCoopLan || joinOnly);
+    if (joinLanCoopBtn) joinLanCoopBtn.classList.toggle("hidden", !showCoopLan || hostOnly);
+    if (lanInputs) lanInputs.classList.toggle("hidden", !isLanPending || !state.menu.lanArmed);
+  }
+
+  function syncMenuFlowUi() {
+    const pendingMode = state.menu.pendingMode;
+    const pendingLabel = getPendingMenuLabel();
+    if (levelMenuKicker) {
+      levelMenuKicker.textContent = pendingLabel;
+    }
+    if (levelMenuCopy) {
+      levelMenuCopy.textContent = pendingMode === "single"
+        ? "Choose a level. Selecting a battlefield starts the solo campaign immediately."
+        : pendingMode === "versus" || pendingMode === "coop"
+          ? "Choose a level. Selecting a battlefield starts the match immediately."
+          : state.menu.lanArmed
+            ? `${pendingLabel} is configured on ${getMapPresetDef(state.menu.selectedMapPreset).label}. Continue with the room action below.`
+            : "Choose a battlefield first, then continue with the selected LAN setup.";
+    }
+    if (resumeBtn) {
+      const hasResume = Boolean(loadStoredSoloSave());
+      const showResume = state.menu.screen === "levels" && pendingMode === "single" && hasResume;
+      resumeBtn.classList.toggle("hidden", !showResume);
+      resumeBtn.disabled = !hasResume;
+      if (hasResume) {
+        const save = loadStoredSoloSave();
+        resumeBtn.textContent = `Resume Solo (${formatSaveDuration(save.time || 0)})`;
+      } else {
+        resumeBtn.textContent = "Resume Solo";
+      }
+    }
+    syncLanSetupVisibility();
+  }
+
+  function openSingleplayerMenu() {
+    state.menu.pendingMode = "single";
+    state.menu.pendingPlayerCount = 1;
+    state.menu.pendingLanAction = null;
+    state.menu.lanArmed = false;
+    showMenuScreen("levels");
+    syncMenuFlowUi();
+  }
+
+  function openMultiplayerTypeMenu() {
+    state.menu.pendingMode = "versus";
+    state.menu.pendingPlayerCount = 2;
+    state.menu.pendingLanAction = null;
+    state.menu.lanArmed = false;
+    showMenuScreen("multiplayer");
+    syncMenuFlowUi();
+  }
+
+  function openLevelSelectionForMode(mode, options = {}) {
+    state.menu.pendingMode = mode;
+    state.menu.pendingPlayerCount = clamp(Math.round(options.playerCount || (mode === "single" ? 1 : 2)), 1, 4);
+    state.menu.pendingLanAction = options.lanAction || null;
+    state.menu.lanArmed = false;
+    showMenuScreen("levels");
+    syncMenuFlowUi();
+  }
+
+  function handleMenuMapSelection(preset) {
+    setMapPreset(preset);
+    state.menu.selectedMapPreset = sanitizeMapPreset(preset);
+    state.menu.lanArmed = false;
+    if (state.menu.pendingMode === "single") {
+      startMatch("single", 1);
+      return;
+    }
+    if (state.menu.pendingMode === "versus") {
+      startMatch("versus", state.menu.pendingPlayerCount || 2);
+      return;
+    }
+    if (state.menu.pendingMode === "coop") {
+      startMatch("coop", state.menu.pendingPlayerCount || 2);
+      return;
+    }
+    state.menu.lanArmed = true;
+    setLanStatus(`${getPendingMenuLabel()} ready on ${getMapPresetDef(state.menu.selectedMapPreset).label}. Continue below.`);
+    syncMenuFlowUi();
   }
 
   function syncMenuButtons() {
     if (!startBtn) return;
     if (isLanLobbyActive()) {
-      setMenuSection("multiplayer");
-      startBtn.textContent = state.lan.started
-        ? "LAN Room Starting..."
+      state.menu.pendingMode = state.lan.roomMatchType === "lan-coop" ? "lan-coop" : "lan";
+      state.menu.pendingPlayerCount = 2;
+      state.menu.pendingLanAction = state.lan.role === "client" ? "join" : "host";
+      state.menu.lanArmed = true;
+      showMenuScreen("levels");
+      setLanStatus(state.lan.started
+        ? "LAN room is already starting."
         : state.lan.role === "host"
-          ? "Start Hosted LAN Room"
-          : "Start Joined LAN Room";
-      startBtn.disabled = Boolean(state.lan.started);
-      if (resumeBtn) resumeBtn.classList.add("hidden");
+          ? "LAN room ready. Host can start when everyone is set."
+          : "Joined LAN room. Waiting for host to start.");
+      syncMenuFlowUi();
       return;
     }
-    startBtn.textContent = "Play Solo";
     startBtn.disabled = false;
-    const soloSave = loadStoredSoloSave();
-    if (resumeBtn) {
-      const hasResume = Boolean(soloSave);
-      resumeBtn.classList.toggle("hidden", !hasResume);
-      resumeBtn.disabled = !hasResume;
-      resumeBtn.textContent = hasResume
-        ? `Resume Solo (${formatSaveDuration(soloSave.time || 0)})`
-        : "Resume Solo";
-      resumeBtn.title = hasResume
-        ? `Resume your last saved solo campaign from ${formatSaveDuration(soloSave.time || 0)} into the run.`
-        : "No solo save is currently available.";
-    }
+    if (multiplayerBtn) multiplayerBtn.disabled = false;
+    if (settingsBtn) settingsBtn.disabled = false;
+    if (exitBtn) exitBtn.disabled = false;
+    syncMenuFlowUi();
   }
 
   function resetLanSessionState() {
@@ -2518,7 +2643,11 @@
       clampCursorToViewport(player);
     }
     overlay.classList.add("hidden");
-    setMenuSection("singleplayer");
+    showMenuScreen("root");
+    state.menu.pendingMode = "single";
+    state.menu.pendingPlayerCount = 1;
+    state.menu.pendingLanAction = null;
+    state.menu.lanArmed = false;
     if (menuTitle) menuTitle.textContent = DEFAULT_MENU_TITLE;
     if (menuIntro) menuIntro.textContent = DEFAULT_MENU_INTRO;
     updateFogOfWar();
@@ -2539,6 +2668,30 @@
     window.setTimeout(() => {
       if (!document.hidden) location.replace("about:blank");
     }, 120);
+  }
+
+  function returnToMainMenu() {
+    const previousMatchType = state.matchType;
+    if (state.matchType === "single") persistSoloSave("autosave", { notify: false, statusText: "Solo campaign autosaved." });
+    exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
+    closeSettingsOverlay();
+    state.mode = "menu";
+    state.winnerOwner = null;
+    state.loserOwner = null;
+    state.difficulty.ceasefireTimer = 0;
+    state.runtime.lastPlacementUndo = null;
+    if (previousMatchType === "lan" || previousMatchType === "lan-coop") resetLanSessionState();
+    overlay.classList.remove("hidden");
+    showMenuScreen("root");
+    state.menu.pendingMode = "single";
+    state.menu.pendingPlayerCount = 1;
+    state.menu.pendingLanAction = null;
+    state.menu.lanArmed = false;
+    if (menuTitle) menuTitle.textContent = DEFAULT_MENU_TITLE;
+    if (menuIntro) menuIntro.textContent = DEFAULT_MENU_INTRO;
+    syncMenuButtons();
+    syncLiveControls();
+    syncSettingsUi();
   }
 
   function showMatchResultOverlay() {
@@ -2583,7 +2736,12 @@
     if (joinLanBtn) joinLanBtn.textContent = "Join LAN Versus";
     if (hostLanCoopBtn) hostLanCoopBtn.textContent = "Host LAN Co-op";
     if (joinLanCoopBtn) joinLanCoopBtn.textContent = "Join LAN Co-op";
-    setMenuSection(getMenuSectionForMatch(state.matchType));
+    showMenuScreen("root");
+    if (overlay) overlay.dataset.menuResult = "on";
+    state.menu.pendingMode = "single";
+    state.menu.pendingPlayerCount = 1;
+    state.menu.pendingLanAction = null;
+    state.menu.lanArmed = false;
     syncLanOriginUi();
     if (audioState.lastResultCue !== state.mode) {
       audioState.lastResultCue = state.mode;
@@ -2893,7 +3051,7 @@
       await requestLanRoomStart();
       return;
     }
-    startMatch("single", 1);
+    openSingleplayerMenu();
   }
 
   function createPlayerState(owner, label, viewportIndex, camera, controllerLabel, options = {}) {
@@ -9211,15 +9369,20 @@
 
   function drawHealthRing(entity, selected) {
     const r = entity.radius + 8;
-    ctx.lineWidth = 5 / state.camera.zoom;
-    ctx.strokeStyle = selected ? "#ffe9a3" : "rgba(255,255,255,0.15)";
+    const baseStroke = selected ? "#ffe9a3" : "rgba(255,255,255,0.18)";
+    const ownerStroke = entity.owner ? ownerColors[entity.owner] || "#d7d7d7" : "#d7d7d7";
+    ctx.lineWidth = 3 / state.camera.zoom;
+    ctx.shadowColor = selected ? "rgba(255,233,163,0.34)" : withAlpha(ownerStroke, 0.24);
+    ctx.shadowBlur = 14 / Math.max(0.7, state.camera.zoom);
+    ctx.strokeStyle = baseStroke;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, TAU);
     ctx.stroke();
-    ctx.strokeStyle = entity.owner ? ownerColors[entity.owner] || "#d7d7d7" : "#d7d7d7";
+    ctx.strokeStyle = ownerStroke;
     ctx.beginPath();
     ctx.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(entity.hp / entity.maxHp, 0, 1));
     ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 
   function shouldDrawUnitHealth(unit) {
@@ -11741,7 +11904,6 @@
   function startMatch(matchType = "single", playerCount = 2) {
     exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
     closeSettingsOverlay();
-    setMenuSection(getMenuSectionForMatch(matchType));
     if (matchType !== "lan" && matchType !== "lan-coop") resetLanSessionState();
     initializePlayers(matchType, playerCount);
     state.world.preset = sanitizeMapPreset(state.mapPreset);
@@ -12053,12 +12215,33 @@
       setLanStatus(`Unable to start this mode: ${error.message}`);
     });
   });
-  menuNavButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
-      setMenuSection(button.dataset.menuSection);
+  if (multiplayerBtn) {
+    multiplayerBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+      openMultiplayerTypeMenu();
     });
-  });
+  }
+  if (multiplayerBackBtn) {
+    multiplayerBackBtn.addEventListener("click", () => {
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      showMenuScreen("root");
+      state.menu.pendingMode = "single";
+      state.menu.pendingPlayerCount = 1;
+      state.menu.pendingLanAction = null;
+      state.menu.lanArmed = false;
+      syncMenuFlowUi();
+    });
+  }
+  if (levelBackBtn) {
+    levelBackBtn.addEventListener("click", () => {
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      state.menu.pendingLanAction = null;
+      state.menu.lanArmed = false;
+      if (state.menu.pendingMode === "single") showMenuScreen("root");
+      else showMenuScreen("multiplayer");
+      syncMenuFlowUi();
+    });
+  }
   if (resumeBtn) {
     resumeBtn.addEventListener("click", () => {
       playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
@@ -12072,32 +12255,49 @@
   mapPresetButtons.forEach((button) => {
     button.addEventListener("click", () => {
       playUiSound("uiClick", { volume: 0.48, cooldown: 0.04 });
-      setMapPreset(button.dataset.mapPreset, { notify: true });
+      if (state.mode === "menu") handleMenuMapSelection(button.dataset.mapPreset);
+      else setMapPreset(button.dataset.mapPreset, { notify: true });
     });
   });
-  versusBtn.addEventListener("click", () => {
+  if (versusBtn) versusBtn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
-    startMatch("versus", 2);
+    openLevelSelectionForMode("versus", { playerCount: 2 });
   });
   if (versus3Btn) versus3Btn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
-    startMatch("versus", 3);
+    openLevelSelectionForMode("versus", { playerCount: 3 });
   });
   if (versus4Btn) versus4Btn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
-    startMatch("versus", 4);
+    openLevelSelectionForMode("versus", { playerCount: 4 });
   });
   if (coopBtn) coopBtn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
-    startMatch("coop", 2);
+    openLevelSelectionForMode("coop", { playerCount: 2 });
   });
   if (coop3Btn) coop3Btn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
-    startMatch("coop", 3);
+    openLevelSelectionForMode("coop", { playerCount: 3 });
   });
   if (coop4Btn) coop4Btn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
-    startMatch("coop", 4);
+    openLevelSelectionForMode("coop", { playerCount: 4 });
+  });
+  if (menuHostLanVersusBtn) menuHostLanVersusBtn.addEventListener("click", () => {
+    playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+    openLevelSelectionForMode("lan", { playerCount: 2, lanAction: "host" });
+  });
+  if (menuJoinLanVersusBtn) menuJoinLanVersusBtn.addEventListener("click", () => {
+    playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+    openLevelSelectionForMode("lan", { playerCount: 2, lanAction: "join" });
+  });
+  if (menuHostLanCoopBtn) menuHostLanCoopBtn.addEventListener("click", () => {
+    playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+    openLevelSelectionForMode("lan-coop", { playerCount: 2, lanAction: "host" });
+  });
+  if (menuJoinLanCoopBtn) menuJoinLanCoopBtn.addEventListener("click", () => {
+    playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+    openLevelSelectionForMode("lan-coop", { playerCount: 2, lanAction: "join" });
   });
   if (hostLanBtn) hostLanBtn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
@@ -12155,7 +12355,23 @@
   if (exitBtn) {
     exitBtn.addEventListener("click", () => {
       playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      showMenuScreen("quit");
+    });
+  }
+  if (quitConfirmBtn) {
+    quitConfirmBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
       handleExitRequest();
+    });
+  }
+  if (quitCancelBtn) {
+    quitCancelBtn.addEventListener("click", () => {
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      showMenuScreen("root");
+      state.menu.pendingMode = "single";
+      state.menu.pendingPlayerCount = 1;
+      state.menu.pendingLanAction = null;
+      state.menu.lanArmed = false;
     });
   }
   if (liveSettingsBtn) {
@@ -12176,6 +12392,12 @@
     settingsCloseBtn.addEventListener("click", () => {
       playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
       closeSettingsOverlay();
+    });
+  }
+  if (settingsMainMenuBtn) {
+    settingsMainMenuBtn.addEventListener("click", () => {
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      returnToMainMenu();
     });
   }
   if (graphicsQualitySelect) {
@@ -12284,9 +12506,14 @@
   applySettingsToRuntime();
   syncSettingsUi();
   setSettingsOverlayOpen(false);
-  setMenuSection("singleplayer");
+  showMenuScreen("root");
+  state.menu.pendingMode = "single";
+  state.menu.pendingPlayerCount = 1;
+  state.menu.pendingLanAction = null;
+  state.menu.lanArmed = false;
   syncMapPresetUi();
   resetLanSessionState();
+  syncMenuButtons();
   syncAdminUi();
   initializePlayers("single");
   for (const player of getHumanPlayers()) clampCursorToViewport(player);
