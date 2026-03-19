@@ -17,7 +17,7 @@
   const menuQuitScreen = document.getElementById("menu-quit-screen");
   const menuArtboards = Array.from(document.querySelectorAll("[data-menu-artboard]"));
   const menuAssignLayers = new Map(Array.from(document.querySelectorAll("[data-menu-assign-layer]")).map((node) => [node.dataset.menuAssignLayer, node]));
-  const startBtn = document.getElementById("start-btn");
+  const startBtn = document.getElementById("menu-start-btn");
   const resumeBtn = document.getElementById("resume-btn");
   const multiplayerBtn = document.getElementById("multiplayer-btn");
   const multiplayerBackBtn = document.getElementById("multiplayer-back-btn");
@@ -8757,6 +8757,28 @@
     };
   }
 
+  const firstPersonRenderIssueKeys = new Set();
+
+  function reportFirstPersonRenderIssue(scope, error) {
+    const details = error && error.message ? error.message : String(error || "Unknown first-person render error");
+    const key = `${scope}:${details}`;
+    if (!firstPersonRenderIssueKeys.has(key)) {
+      if (firstPersonRenderIssueKeys.size > 40) firstPersonRenderIssueKeys.clear();
+      firstPersonRenderIssueKeys.add(key);
+      console.error(`First-person render issue in ${scope}.`, error);
+    }
+  }
+
+  function runFirstPersonRenderStage(scope, callback) {
+    try {
+      callback();
+      return true;
+    } catch (error) {
+      reportFirstPersonRenderIssue(scope, error);
+      return false;
+    }
+  }
+
   function getFirstPersonWeaponLabel(unit) {
     if (unit.pickupWeapon) return String(unit.pickupWeapon).replace(/\b\w/g, (char) => char.toUpperCase());
     const entry = weaponCatalog.find((item) => item.role === unit.role);
@@ -9029,58 +9051,63 @@
       const proj = entry.projection;
       const depthFade = getFirstPersonDepthFade(proj.depth, maxDistance);
       ctx.save();
-      if (entry.kind === "projectile") ctx.globalAlpha *= lerp(1, 0.46, depthFade.fog);
-      else if (entry.kind === "effect") ctx.globalAlpha *= lerp(1, 0.56, depthFade.fog);
-      else ctx.globalAlpha *= depthFade.alpha;
-      if (entry.kind === "tree") {
-        drawFirstPersonTreeModel(entry.source, proj);
-      } else if (entry.kind === "rock") {
-        drawFirstPersonRockModel(entry.source, proj);
-      } else if (entry.kind === "building") {
-        drawFirstPersonBuildingModel(entry.source, proj, fp);
-      } else if (entry.kind === "unit" || entry.kind === "animal" || entry.kind === "civilian") {
-        drawFirstPersonUnitModel(entry.source, proj, fp);
-      } else if (entry.kind === "projectile") {
-        const projectile = entry.source;
-        const radius = Math.max(2, (projectile.projectileType === "bullet" ? 4 : 7) * proj.scale);
-        ctx.strokeStyle = projectile.projectileType === "pulse" ? "#7ef7ff" : projectile.projectileType === "rocket" || projectile.projectileType === "missile" ? "#ffb469" : "#e9e0c9";
-        ctx.lineWidth = Math.max(1, radius * 0.45);
-        ctx.beginPath();
-        ctx.moveTo(proj.x - (projectile.vx || 0) * proj.scale * 0.016, proj.y - (projectile.vy || 0) * proj.scale * 0.016);
-        ctx.lineTo(proj.x, proj.y);
-        ctx.stroke();
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.beginPath();
-        ctx.arc(proj.x, proj.y, radius, 0, TAU);
-        ctx.fill();
-      } else if (entry.kind === "effect") {
-        const effect = entry.source;
-        if (effect.ttl > 0) {
-          const alpha = clamp(effect.ttl / effect.maxTtl, 0, 1) * 0.7;
-          if (effect.type === "damageText") {
-            ctx.fillStyle = withAlpha(effect.tint || "#ffe29a", alpha);
-            ctx.font = `700 ${Math.max(14, Math.round(proj.scale * 86))}px Cambria`;
-            ctx.textAlign = "center";
-            ctx.fillText(effect.text || "0", proj.x, proj.y);
-            ctx.textAlign = "left";
-          } else {
-            const radius = Math.max(6, effect.radius * 0.22 * proj.scale);
-            if (effect.type === "smoke") {
-              ctx.fillStyle = `rgba(68,72,80,${alpha * 0.4})`;
+      try {
+        if (entry.kind === "projectile") ctx.globalAlpha *= lerp(1, 0.46, depthFade.fog);
+        else if (entry.kind === "effect") ctx.globalAlpha *= lerp(1, 0.56, depthFade.fog);
+        else ctx.globalAlpha *= depthFade.alpha;
+        if (entry.kind === "tree") {
+          drawFirstPersonTreeModel(entry.source, proj);
+        } else if (entry.kind === "rock") {
+          drawFirstPersonRockModel(entry.source, proj);
+        } else if (entry.kind === "building") {
+          drawFirstPersonBuildingModel(entry.source, proj, fp);
+        } else if (entry.kind === "unit" || entry.kind === "animal" || entry.kind === "civilian") {
+          drawFirstPersonUnitModel(entry.source, proj, fp);
+        } else if (entry.kind === "projectile") {
+          const projectile = entry.source;
+          const radius = Math.max(2, ((projectile && projectile.projectileType === "bullet") ? 4 : 7) * proj.scale);
+          ctx.strokeStyle = projectile.projectileType === "pulse" ? "#7ef7ff" : projectile.projectileType === "rocket" || projectile.projectileType === "missile" ? "#ffb469" : "#e9e0c9";
+          ctx.lineWidth = Math.max(1, radius * 0.45);
+          ctx.beginPath();
+          ctx.moveTo(proj.x - (projectile.vx || 0) * proj.scale * 0.016, proj.y - (projectile.vy || 0) * proj.scale * 0.016);
+          ctx.lineTo(proj.x, proj.y);
+          ctx.stroke();
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.beginPath();
+          ctx.arc(proj.x, proj.y, radius, 0, TAU);
+          ctx.fill();
+        } else if (entry.kind === "effect") {
+          const effect = entry.source;
+          if (effect.ttl > 0) {
+            const maxTtl = Math.max(0.001, effect.maxTtl || effect.ttl || 1);
+            const alpha = clamp(effect.ttl / maxTtl, 0, 1) * 0.7;
+            if (effect.type === "damageText") {
+              ctx.fillStyle = withAlpha(effect.tint || "#ffe29a", alpha);
+              ctx.font = `700 ${Math.max(14, Math.round(proj.scale * 86))}px Cambria`;
+              ctx.textAlign = "center";
+              ctx.fillText(effect.text || "0", proj.x, proj.y);
+              ctx.textAlign = "left";
             } else {
-              ctx.fillStyle = withAlpha(effect.tint || "#ffc48a", alpha * 0.8);
+              const radius = Math.max(6, (effect.radius || 18) * 0.22 * proj.scale);
+              if (effect.type === "smoke") {
+                ctx.fillStyle = `rgba(68,72,80,${alpha * 0.4})`;
+              } else {
+                ctx.fillStyle = withAlpha(effect.tint || "#ffc48a", alpha * 0.8);
+              }
+              ctx.beginPath();
+              ctx.arc(proj.x, proj.y - radius * 0.35, radius, 0, TAU);
+              ctx.fill();
             }
-            ctx.beginPath();
-            ctx.arc(proj.x, proj.y - radius * 0.35, radius, 0, TAU);
-            ctx.fill();
           }
         }
-      }
-      if (depthFade.fog > 0.06 && entry.kind !== "projectile" && entry.kind !== "effect") {
-        ctx.fillStyle = `rgba(194,214,224,${depthFade.fog * 0.08})`;
-        ctx.beginPath();
-        ctx.ellipse(proj.x, proj.y - 18 * proj.scale, Math.max(18, 68 * proj.scale), Math.max(12, 40 * proj.scale), 0, 0, TAU);
-        ctx.fill();
+        if (depthFade.fog > 0.06 && entry.kind !== "projectile" && entry.kind !== "effect") {
+          ctx.fillStyle = `rgba(194,214,224,${depthFade.fog * 0.08})`;
+          ctx.beginPath();
+          ctx.ellipse(proj.x, proj.y - 18 * proj.scale, Math.max(18, 68 * proj.scale), Math.max(12, 40 * proj.scale), 0, 0, TAU);
+          ctx.fill();
+        }
+      } catch (error) {
+        reportFirstPersonRenderIssue(`world object: ${entry.kind}`, error);
       }
       ctx.restore();
     }
@@ -9392,11 +9419,11 @@
       ctx.beginPath();
       ctx.rect(viewport.x, viewport.y, viewport.w, viewport.h);
       ctx.clip();
-      drawFirstPersonBackdrop(viewport, unit, fp, motion);
-      drawFirstPersonGround(viewport, unit, fp, motion);
-      drawFirstPersonWorldObjects(viewport, unit, fp, motion);
-      drawFirstPersonWeaponOverlay(viewport, unit, fp, motion);
-      drawFirstPersonPostEffects(viewport, unit, fp, motion);
+      runFirstPersonRenderStage("backdrop", () => drawFirstPersonBackdrop(viewport, unit, fp, motion));
+      runFirstPersonRenderStage("ground", () => drawFirstPersonGround(viewport, unit, fp, motion));
+      runFirstPersonRenderStage("world objects", () => drawFirstPersonWorldObjects(viewport, unit, fp, motion));
+      runFirstPersonRenderStage("weapon overlay", () => drawFirstPersonWeaponOverlay(viewport, unit, fp, motion));
+      runFirstPersonRenderStage("post effects", () => drawFirstPersonPostEffects(viewport, unit, fp, motion));
       if (fp.muzzle > 0) {
         const flash = ctx.createRadialGradient(viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, 18, viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, viewport.w * 0.28);
         flash.addColorStop(0, `rgba(255,255,228,${0.18 * fp.muzzle / 0.08})`);
@@ -9404,7 +9431,7 @@
         ctx.fillStyle = flash;
         ctx.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
       }
-      drawFirstPersonHud(viewport, unit, fp, motion);
+      runFirstPersonRenderStage("hud", () => drawFirstPersonHud(viewport, unit, fp, motion));
       ctx.restore();
     } catch (error) {
       try {
