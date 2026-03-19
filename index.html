@@ -27,8 +27,9 @@
         </div>
 
         <section id="menu-root-screen" class="menu-screen menu-art-screen active" aria-label="Main menu">
-          <div class="menu-artboard menu-artboard-root">
+          <div class="menu-artboard menu-artboard-root" data-menu-artboard="root">
             <img class="menu-art-image" src="./Menu UI/Main_menu.png" alt="Top Knights main menu artwork" />
+            <div class="menu-assign-layer" data-menu-assign-layer="root" aria-hidden="true"></div>
             <button id="start-btn" type="button" class="menu-art-hitbox root-menu-btn root-menu-btn-single">
               <span class="sr-only">Singleplayer</span>
             </button>
@@ -45,8 +46,9 @@
         </section>
 
         <section id="menu-multiplayer-screen" class="menu-screen menu-art-screen hidden" aria-label="Multiplayer type selection">
-          <div class="menu-artboard menu-artboard-multiplayer">
+          <div class="menu-artboard menu-artboard-multiplayer" data-menu-artboard="multiplayer">
             <img class="menu-art-image" src="./Menu UI/Multiplayer_selection.png" alt="Top Knights multiplayer selection artwork" />
+            <div class="menu-assign-layer" data-menu-assign-layer="multiplayer" aria-hidden="true"></div>
             <button id="versus-btn" type="button" class="menu-art-hitbox mp-btn mp-btn-versus-2">
               <span class="sr-only">2P Split-Screen Versus</span>
             </button>
@@ -255,7 +257,7 @@
     <div id="slash-overlay" class="slash-overlay hidden" aria-label="Slash command">
       <div class="slash-panel">
         <span class="slash-label">Command</span>
-        <input id="slash-command-input" type="text" autocomplete="off" spellcheck="false" placeholder="/admin" />
+        <input id="slash-command-input" type="text" autocomplete="off" spellcheck="false" placeholder="/admin or /assign" />
       </div>
     </div>
     <div id="admin-overlay" class="admin-overlay hidden" aria-label="Admin panel">
@@ -290,7 +292,7 @@
           <button id="admin-clear-log-btn" type="button" class="secondary-btn admin-action-btn">Clear Log</button>
           <button id="admin-copy-log-btn" type="button" class="secondary-btn admin-action-btn">Copy Log</button>
         </div>
-        <p class="admin-help">Slash command: type <code>/admin</code> during a match. Supported actions include resources, units, buildings, biome painting, and <code>erase</code>. Every click is logged with coordinates below.</p>
+        <p class="admin-help">Slash command: type <code>/admin</code> during a match or <code>/assign</code> in the menu. Admin tools place resources, units, buildings, and biome paint. Assign mode lets you drag menu rectangles and logs exact hitbox percentages below.</p>
         <textarea id="admin-log" class="admin-log" readonly></textarea>
       </div>
     </div>

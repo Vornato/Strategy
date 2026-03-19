@@ -15,6 +15,8 @@
   const menuMultiplayerScreen = document.getElementById("menu-multiplayer-screen");
   const menuLevelScreen = document.getElementById("menu-level-screen");
   const menuQuitScreen = document.getElementById("menu-quit-screen");
+  const menuArtboards = Array.from(document.querySelectorAll("[data-menu-artboard]"));
+  const menuAssignLayers = new Map(Array.from(document.querySelectorAll("[data-menu-assign-layer]")).map((node) => [node.dataset.menuAssignLayer, node]));
   const startBtn = document.getElementById("start-btn");
   const resumeBtn = document.getElementById("resume-btn");
   const multiplayerBtn = document.getElementById("multiplayer-btn");
@@ -811,6 +813,12 @@
       statusText: "Type a command like rock, arm it, then click the map to place points.",
       log: [],
       points: [],
+      assignMode: false,
+      assignRects: {
+        root: [],
+        multiplayer: [],
+      },
+      assignDraft: null,
     },
     runtime: {
       formationProgress: new Map(),
@@ -1743,12 +1751,182 @@
     if (adminStatus) adminStatus.innerHTML = text;
   }
 
+  function supportsMenuAssignScreen(screen = state.menu.screen) {
+    return screen === "root" || screen === "multiplayer";
+  }
+
+  function getMenuAssignScreenLabel(screen = state.menu.screen) {
+    if (screen === "root") return "Main Menu";
+    if (screen === "multiplayer") return "Multiplayer Menu";
+    return "Unsupported Menu Screen";
+  }
+
+  function getMenuAssignRects(screen = state.menu.screen) {
+    if (!supportsMenuAssignScreen(screen)) return [];
+    const rects = state.admin.assignRects[screen];
+    return Array.isArray(rects) ? rects : [];
+  }
+
+  function isMenuAssignActive() {
+    return state.mode === "menu" && state.admin.panelOpen && state.admin.assignMode;
+  }
+
+  function formatMenuAssignPercent(value) {
+    return `${Number(value || 0).toFixed(2)}%`;
+  }
+
+  function normalizeMenuAssignRect(startX, startY, endX, endY, bounds) {
+    if (!bounds || !bounds.width || !bounds.height) return null;
+    const leftPx = clamp(Math.min(startX, endX), 0, bounds.width);
+    const topPx = clamp(Math.min(startY, endY), 0, bounds.height);
+    const rightPx = clamp(Math.max(startX, endX), 0, bounds.width);
+    const bottomPx = clamp(Math.max(startY, endY), 0, bounds.height);
+    const widthPx = Math.max(0, rightPx - leftPx);
+    const heightPx = Math.max(0, bottomPx - topPx);
+    return {
+      left: leftPx / bounds.width * 100,
+      top: topPx / bounds.height * 100,
+      width: widthPx / bounds.width * 100,
+      height: heightPx / bounds.height * 100,
+    };
+  }
+
+  function getMenuAssignCssSnippet(rect, selector = ".menu-art-hitbox") {
+    return `${selector} { left: ${formatMenuAssignPercent(rect.left)}; top: ${formatMenuAssignPercent(rect.top)}; width: ${formatMenuAssignPercent(rect.width)}; height: ${formatMenuAssignPercent(rect.height)}; }`;
+  }
+
+  function refreshMenuAssignLayers() {
+    const visible = isMenuAssignActive();
+    for (const artboard of menuArtboards) {
+      const screen = artboard.dataset.menuArtboard;
+      const layer = menuAssignLayers.get(screen);
+      if (!layer) continue;
+      const activeScreen = visible && state.menu.screen === screen;
+      artboard.classList.toggle("is-assigning", activeScreen);
+      if (!visible) {
+        layer.innerHTML = "";
+        continue;
+      }
+      const rects = getMenuAssignRects(screen);
+      const draft = state.admin.assignDraft && state.admin.assignDraft.screen === screen ? state.admin.assignDraft.rect : null;
+      const segments = [];
+      for (let i = 0; i < rects.length; i += 1) {
+        const rect = rects[i];
+        segments.push(
+          `<div class="menu-assign-rect" style="left:${rect.left}%;top:${rect.top}%;width:${rect.width}%;height:${rect.height}%;">` +
+          `<span class="menu-assign-label">${screen} ${i + 1}</span></div>`,
+        );
+      }
+      if (draft) {
+        segments.push(
+          `<div class="menu-assign-rect is-draft" style="left:${draft.left}%;top:${draft.top}%;width:${draft.width}%;height:${draft.height}%;">` +
+          `<span class="menu-assign-label">draft</span></div>`,
+        );
+      }
+      layer.innerHTML = segments.join("");
+    }
+  }
+
+  function setMenuAssignMode(enabled, screen = state.menu.screen) {
+    state.admin.assignMode = Boolean(enabled);
+    state.admin.assignDraft = null;
+    state.admin.activeTool = enabled ? null : state.admin.activeTool;
+    if (enabled) {
+      if (supportsMenuAssignScreen(screen)) {
+        setAdminStatus(`Assign mode active on <code>${getMenuAssignScreenLabel(screen)}</code>. Drag on the artwork to log hitbox rectangles as CSS percentages.`);
+      } else {
+        setAdminStatus("Assign mode is open, but the current screen has no fullscreen menu artwork. Switch to the main or multiplayer menu first.");
+      }
+    } else if (state.mode === "menu") {
+      setAdminStatus("Assign mode closed.");
+    }
+    refreshAdminLogUi();
+    refreshMenuAssignLayers();
+  }
+
+  function addMenuAssignRect(screen, rect) {
+    if (!supportsMenuAssignScreen(screen) || !rect) return null;
+    const normalized = {
+      screen,
+      left: Number(rect.left.toFixed(2)),
+      top: Number(rect.top.toFixed(2)),
+      width: Number(rect.width.toFixed(2)),
+      height: Number(rect.height.toFixed(2)),
+    };
+    state.admin.assignRects[screen].push(normalized);
+    if (state.admin.assignRects[screen].length > 160) state.admin.assignRects[screen].splice(0, state.admin.assignRects[screen].length - 160);
+    addAdminLog("Assigned menu rectangle.", {
+      extra: `screen=${screen} | ${getMenuAssignCssSnippet(normalized)}`,
+    });
+    setAdminStatus(`Logged rectangle ${state.admin.assignRects[screen].length} on <code>${getMenuAssignScreenLabel(screen)}</code>.`);
+    refreshAdminLogUi();
+    refreshMenuAssignLayers();
+    return normalized;
+  }
+
+  function getMenuAssignBoardMetrics(artboard) {
+    if (!artboard) return null;
+    const bounds = artboard.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return null;
+    return {
+      screen: artboard.dataset.menuArtboard || state.menu.screen,
+      bounds,
+    };
+  }
+
+  function beginMenuAssignDrag(event, artboard) {
+    if (!isMenuAssignActive() || !supportsMenuAssignScreen(state.menu.screen)) return false;
+    const metrics = getMenuAssignBoardMetrics(artboard);
+    if (!metrics || metrics.screen !== state.menu.screen) return false;
+    const localX = clamp(event.clientX - metrics.bounds.left, 0, metrics.bounds.width);
+    const localY = clamp(event.clientY - metrics.bounds.top, 0, metrics.bounds.height);
+    state.admin.assignDraft = {
+      screen: metrics.screen,
+      pointerId: event.pointerId,
+      startX: localX,
+      startY: localY,
+      rect: normalizeMenuAssignRect(localX, localY, localX, localY, metrics.bounds),
+    };
+    refreshMenuAssignLayers();
+    return true;
+  }
+
+  function updateMenuAssignDrag(event) {
+    const draft = state.admin.assignDraft;
+    if (!draft || draft.pointerId !== event.pointerId) return false;
+    const artboard = menuArtboards.find((node) => node.dataset.menuArtboard === draft.screen);
+    const metrics = getMenuAssignBoardMetrics(artboard);
+    if (!metrics) return false;
+    const localX = clamp(event.clientX - metrics.bounds.left, 0, metrics.bounds.width);
+    const localY = clamp(event.clientY - metrics.bounds.top, 0, metrics.bounds.height);
+    draft.rect = normalizeMenuAssignRect(draft.startX, draft.startY, localX, localY, metrics.bounds);
+    refreshMenuAssignLayers();
+    return true;
+  }
+
+  function finishMenuAssignDrag(event) {
+    const draft = state.admin.assignDraft;
+    if (!draft || draft.pointerId !== event.pointerId) return false;
+    const rect = draft.rect;
+    state.admin.assignDraft = null;
+    if (!rect || rect.width < 0.3 || rect.height < 0.3) {
+      setAdminStatus("Assign drag cancelled. Drag a visible rectangle on the current menu artwork.");
+      refreshMenuAssignLayers();
+      return true;
+    }
+    addMenuAssignRect(draft.screen, rect);
+    return true;
+  }
+
   function getAdminLogSnapshotText() {
+    const assignRectCount = Object.values(state.admin.assignRects || {}).reduce((sum, entries) => sum + (Array.isArray(entries) ? entries.length : 0), 0);
     const lines = [
       `Map Preset: ${getMapPresetDef(state.world.preset || state.mapPreset).label}`,
       `Armed Tool: ${state.admin.activeTool ? state.admin.activeTool.label : "None"}`,
       `Owner: ${state.admin.owner}`,
       `Point Count: ${state.admin.points.length}`,
+      `Assign Mode: ${state.admin.assignMode ? "On" : "Off"}`,
+      `Assign Rectangles: ${assignRectCount}`,
       "",
       "Points:",
     ];
@@ -1760,6 +1938,20 @@
       });
     } else {
       lines.push(`Admin panel ready on ${getMapPresetDef().label}. Type a command, arm it, then click the map.`);
+    }
+    lines.push("", "Menu Rectangles:");
+    if (assignRectCount) {
+      for (const screen of ["root", "multiplayer"]) {
+        const rects = getMenuAssignRects(screen);
+        if (!rects.length) continue;
+        lines.push(`${getMenuAssignScreenLabel(screen)}:`);
+        rects.forEach((rect, index) => {
+          lines.push(`${index + 1}. left=${formatMenuAssignPercent(rect.left)} top=${formatMenuAssignPercent(rect.top)} width=${formatMenuAssignPercent(rect.width)} height=${formatMenuAssignPercent(rect.height)}`);
+          lines.push(`   ${getMenuAssignCssSnippet(rect)}`);
+        });
+      }
+    } else {
+      lines.push("No menu rectangles logged yet. Use /assign in the menu and drag over the artwork.");
     }
     lines.push("", "Detailed Log:");
     if (state.admin.log.length) lines.push(...state.admin.log);
@@ -1781,6 +1973,7 @@
     if (adminOwnerSelect) adminOwnerSelect.value = state.admin.owner;
     setAdminStatus(state.admin.statusText);
     refreshAdminLogUi();
+    refreshMenuAssignLayers();
   }
 
   function addAdminLog(message, details = {}) {
@@ -1796,7 +1989,7 @@
   }
 
   function openSlashCommand(initialValue = "/admin") {
-    if (state.mode !== "playing") return;
+    if (state.mode !== "playing" && state.mode !== "menu") return;
     state.admin.slashOpen = true;
     syncAdminUi();
     if (slashCommandInput) {
@@ -1814,10 +2007,14 @@
   }
 
   function openAdminPanel(options = {}) {
-    if (state.mode !== "playing") return;
+    if (state.mode !== "playing" && state.mode !== "menu") return;
     state.admin.panelOpen = true;
     state.admin.slashOpen = false;
-    if (!state.admin.activeTool) setAdminStatus("Admin panel active. Type a command like <code>rock</code>, press Arm Tool, then click the map.");
+    if (state.admin.assignMode) {
+      setMenuAssignMode(true, state.menu.screen);
+    } else if (!state.admin.activeTool) {
+      setAdminStatus("Admin panel active. Type a command like <code>rock</code>, press Arm Tool, then click the map.");
+    }
     syncAdminUi();
     if (options.focus !== false && adminCommandInput) {
       window.setTimeout(() => {
@@ -1830,11 +2027,20 @@
   function closeAdminPanel() {
     state.admin.panelOpen = false;
     state.admin.slashOpen = false;
+    state.admin.assignDraft = null;
     syncAdminUi();
   }
 
   function clearAdminPoints() {
     state.admin.points = [];
+    if (state.admin.assignMode) {
+      for (const screen of Object.keys(state.admin.assignRects)) state.admin.assignRects[screen] = [];
+      state.admin.assignDraft = null;
+      setAdminStatus("Assign rectangles cleared.");
+      addAdminLog("Cleared menu assign rectangles.");
+      syncAdminUi();
+      return;
+    }
     setAdminStatus("Admin points cleared.");
     addAdminLog("Cleared admin point markers.");
     syncAdminUi();
@@ -1866,11 +2072,28 @@
       return;
     }
     if (normalized === "admin") {
+      state.admin.assignMode = false;
       openAdminPanel();
       addAdminLog("Opened admin panel from slash command.");
       return;
     }
+    if (normalized === "assign") {
+      state.admin.assignMode = true;
+      state.admin.commandText = "assign";
+      openAdminPanel({ focus: false });
+      setMenuAssignMode(true, state.menu.screen);
+      addAdminLog("Opened menu assign mode from slash command.", { extra: `screen=${state.menu.screen}` });
+      closeSlashCommand();
+      return;
+    }
+    if (normalized === "assign close") {
+      setMenuAssignMode(false, state.menu.screen);
+      closeAdminPanel();
+      addAdminLog("Closed menu assign mode from slash command.");
+      return;
+    }
     if (normalized === "admin close") {
+      state.admin.assignMode = false;
       closeAdminPanel();
       addAdminLog("Closed admin panel from slash command.");
       return;
@@ -1881,7 +2104,7 @@
       closeSlashCommand();
       return;
     }
-    setAdminStatus(`Unknown slash command <code>/${normalized}</code>. Use <code>/admin</code>.`);
+    setAdminStatus(`Unknown slash command <code>/${normalized}</code>. Use <code>/admin</code> or <code>/assign</code>.`);
     addAdminLog("Unknown slash command.", { extra: `/${normalized}` });
     closeSlashCommand();
   }
@@ -2140,6 +2363,7 @@
     if (menuMultiplayerScreen) menuMultiplayerScreen.classList.toggle("active", screen === "multiplayer");
     if (menuLevelScreen) menuLevelScreen.classList.toggle("active", screen === "levels");
     if (menuQuitScreen) menuQuitScreen.classList.toggle("active", screen === "quit");
+    refreshMenuAssignLayers();
   }
 
   function getPendingMenuLabel() {
@@ -4925,6 +5149,7 @@
       arrivalTask: null,
       resumeMoveTarget: null,
       resumeArrivalTask: null,
+      moveDisengage: false,
     };
     if (role === "repair") {
       unit.damage = 0;
@@ -5182,6 +5407,7 @@
       unit.arrivalTask = null;
       unit.resumeMoveTarget = null;
       unit.resumeArrivalTask = null;
+      unit.moveDisengage = false;
       clearUnitFormation(unit);
       resetUnitPathState(unit);
     }
@@ -5200,6 +5426,7 @@
       unit.order = "move";
       unit.orderStamp = state.time;
       resetUnitPathState(unit);
+      unit.moveDisengage = true;
       unit.formationMoveId = formationId;
       unit.formationSlot = { x: target.x, y: target.y };
       unit.formationIndex = index;
@@ -5229,6 +5456,7 @@
       unit.arrivalTask = null;
       unit.resumeMoveTarget = null;
       unit.resumeArrivalTask = null;
+      unit.moveDisengage = false;
       clearUnitFormation(unit);
       resetUnitPathState(unit);
     }
@@ -7406,6 +7634,7 @@
     unit.arrivalTask = unit.resumeArrivalTask ? { ...unit.resumeArrivalTask } : null;
     unit.resumeMoveTarget = null;
     unit.resumeArrivalTask = null;
+    unit.moveDisengage = true;
     clearInteractionOrder(unit);
     clearUnitFormation(unit);
     resetUnitPathState(unit);
@@ -7431,6 +7660,7 @@
     unit.order = interactionKind === "resource" ? "harvest" : "collect";
     unit.orderStamp = state.time;
     unit.arrivalTask = null;
+    unit.moveDisengage = options.preserveMove ? unit.moveDisengage : false;
     clearUnitFormation(unit);
     resetUnitPathState(unit);
     return true;
@@ -7452,6 +7682,7 @@
     unit.order = "attack";
     unit.orderStamp = state.time;
     unit.arrivalTask = null;
+    unit.moveDisengage = false;
     clearUnitFormation(unit);
     resetUnitPathState(unit);
     return true;
@@ -7832,7 +8063,7 @@
       }
     }
 
-    if (unit.focusMove && unit.moveTarget && !unit.targetId && !unit.interactTargetId && canUnitFight(unit)) {
+    if (unit.focusMove && unit.moveTarget && !unit.moveDisengage && !unit.targetId && !unit.interactTargetId && canUnitFight(unit)) {
       const encounterRange = Math.max(getAttackRange(unit) + 36, TILE_SIZE * 1.35);
       tryAssignPriorityTask(unit, { x: unit.x, y: unit.y }, encounterRange, {
         allowResources: false,
@@ -7864,6 +8095,7 @@
           unit.focusMove = false;
           clearUnitNavigation(unit);
           unit.arrivalTask = null;
+          unit.moveDisengage = false;
           if (!unit.targetId && !unit.interactTargetId && arrivalTask && tryAssignPriorityTask(unit, arrivalTask, arrivalTask.radius)) {
             unit.order = unit.interactKind === "resource" ? "harvest" : "attack";
           } else if (!unit.targetId && !unit.interactTargetId) {
@@ -12337,9 +12569,18 @@
       return;
     }
     if (state.mode === "menu") {
+      if (key === "/" && !state.admin.slashOpen) {
+        event.preventDefault();
+        openSlashCommand("/");
+        return;
+      }
       if (key === "escape") {
         event.preventDefault();
-        if (state.menu.screen === "levels") {
+        if (state.admin.slashOpen) {
+          closeSlashCommand();
+        } else if (state.admin.panelOpen) {
+          closeAdminPanel();
+        } else if (state.menu.screen === "levels") {
           state.menu.pendingLanAction = null;
           state.menu.lanArmed = false;
           if (state.menu.pendingMode === "single") showMenuScreen("root");
@@ -13116,6 +13357,32 @@
       closeAdminPanel();
     });
   }
+
+  menuArtboards.forEach((artboard) => {
+    artboard.addEventListener("pointerdown", (event) => {
+      if (!beginMenuAssignDrag(event, artboard)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      playUiSound("uiClick", { volume: 0.34, cooldown: 0.04 });
+    }, true);
+    artboard.addEventListener("click", (event) => {
+      if (!isMenuAssignActive()) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
+  });
+
+  window.addEventListener("pointermove", (event) => {
+    if (!updateMenuAssignDrag(event)) return;
+    event.preventDefault();
+  }, true);
+
+  const finishMenuAssignFromPointer = (event) => {
+    if (!finishMenuAssignDrag(event)) return;
+    event.preventDefault();
+  };
+  window.addEventListener("pointerup", finishMenuAssignFromPointer, true);
+  window.addEventListener("pointercancel", finishMenuAssignFromPointer, true);
 
   window.render_game_to_text = renderGameToText;
   window.advanceTime = advanceTime;
