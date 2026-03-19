@@ -4923,6 +4923,8 @@
       formationSlot: null,
       formationIndex: -1,
       arrivalTask: null,
+      resumeMoveTarget: null,
+      resumeArrivalTask: null,
     };
     if (role === "repair") {
       unit.damage = 0;
@@ -5178,6 +5180,8 @@
       unit.order = interactionKind === "resource" ? "harvest" : "collect";
       unit.orderStamp = state.time;
       unit.arrivalTask = null;
+      unit.resumeMoveTarget = null;
+      unit.resumeArrivalTask = null;
       clearUnitFormation(unit);
       resetUnitPathState(unit);
     }
@@ -5205,6 +5209,8 @@
         y: target.y,
         radius: AUTO_RESOURCE_SCAN_RADIUS,
       };
+      unit.resumeMoveTarget = null;
+      unit.resumeArrivalTask = null;
     });
   }
 
@@ -5221,6 +5227,8 @@
       unit.order = "attack";
       unit.orderStamp = state.time;
       unit.arrivalTask = null;
+      unit.resumeMoveTarget = null;
+      unit.resumeArrivalTask = null;
       clearUnitFormation(unit);
       resetUnitPathState(unit);
     }
@@ -7389,6 +7397,21 @@
     return !!unit && (((unit.damage || 0) > 0) || Boolean(unit.projectile));
   }
 
+  function resumeUnitMoveOrder(unit) {
+    if (!unit || !unit.resumeMoveTarget) return false;
+    unit.moveTarget = { x: unit.resumeMoveTarget.x, y: unit.resumeMoveTarget.y };
+    unit.focusMove = true;
+    unit.order = "move";
+    unit.orderStamp = state.time;
+    unit.arrivalTask = unit.resumeArrivalTask ? { ...unit.resumeArrivalTask } : null;
+    unit.resumeMoveTarget = null;
+    unit.resumeArrivalTask = null;
+    clearInteractionOrder(unit);
+    clearUnitFormation(unit);
+    resetUnitPathState(unit);
+    return true;
+  }
+
   function setUnitInteractionOrder(unit, targetEntity, interactionKind) {
     if (!unit || !targetEntity) return false;
     const standoff = (targetEntity.radius || 16) + unit.radius + 12;
@@ -7401,13 +7424,22 @@
     unit.order = interactionKind === "resource" ? "harvest" : "collect";
     unit.orderStamp = state.time;
     unit.arrivalTask = null;
+    unit.resumeMoveTarget = null;
+    unit.resumeArrivalTask = null;
     clearUnitFormation(unit);
     resetUnitPathState(unit);
     return true;
   }
 
-  function setUnitAttackOrder(unit, targetEntity) {
+  function setUnitAttackOrder(unit, targetEntity, options = {}) {
     if (!unit || !targetEntity) return false;
+    if (options.preserveMove && !unit.resumeMoveTarget && unit.moveTarget) {
+      unit.resumeMoveTarget = { x: unit.moveTarget.x, y: unit.moveTarget.y };
+      unit.resumeArrivalTask = unit.arrivalTask ? { ...unit.arrivalTask } : null;
+    } else if (!options.preserveMove) {
+      unit.resumeMoveTarget = null;
+      unit.resumeArrivalTask = null;
+    }
     unit.targetId = targetEntity.id;
     unit.moveTarget = { x: targetEntity.x, y: targetEntity.y };
     clearInteractionOrder(unit);
@@ -7426,24 +7458,25 @@
     const searchY = origin && Number.isFinite(origin.y) ? origin.y : unit.y;
     const searchRadius = Number.isFinite(radius) ? radius : AUTO_RESOURCE_SCAN_RADIUS;
     const allowResources = options.allowResources !== false;
+    const preserveMove = options.preserveMove === true;
     const inRange = (entity, padding = 0) => Math.hypot(entity.x - searchX, entity.y - searchY) <= searchRadius + (entity.radius || 0) + padding;
 
     if (canUnitFight(unit)) {
       const enemyUnit = findNearest(
-        state.world.units,
-        searchX,
-        searchY,
-        (entity) => entity.id !== unit.id && isAttackableTarget(unit, entity) && inRange(entity, 10),
-      );
-      if (enemyUnit) return setUnitAttackOrder(unit, enemyUnit);
+      state.world.units,
+      searchX,
+      searchY,
+      (entity) => entity.id !== unit.id && isAttackableTarget(unit, entity) && inRange(entity, 10),
+    );
+      if (enemyUnit) return setUnitAttackOrder(unit, enemyUnit, { preserveMove });
 
       const hostileBuilding = findNearest(
-        state.world.buildings,
-        searchX,
-        searchY,
-        (entity) => isEnemy(unit, entity) && inRange(entity, 12),
-      );
-      if (hostileBuilding) return setUnitAttackOrder(unit, hostileBuilding);
+      state.world.buildings,
+      searchX,
+      searchY,
+      (entity) => isEnemy(unit, entity) && inRange(entity, 12),
+    );
+      if (hostileBuilding) return setUnitAttackOrder(unit, hostileBuilding, { preserveMove });
     }
 
     if (allowResources && isAutoResourceWorker(unit)) {
@@ -7458,12 +7491,12 @@
 
     if (canUnitFight(unit)) {
       const animal = findNearest(
-        state.world.animals,
-        searchX,
-        searchY,
-        (entity) => inRange(entity, 18),
-      );
-      if (animal) return setUnitAttackOrder(unit, animal);
+      state.world.animals,
+      searchX,
+      searchY,
+      (entity) => inRange(entity, 18),
+    );
+      if (animal) return setUnitAttackOrder(unit, animal, { preserveMove });
     }
 
     return false;
@@ -7746,7 +7779,7 @@
       const target = getEntityById(unit.targetId);
       if (!target || !isAttackableTarget(unit, target) || (shouldEnemyStandDown(unit) && isHumanOwner(target.owner)) || (isEasyModeActive() && !isHumanOwner(unit.owner) && isHumanOwner(target.owner))) {
         unit.targetId = null;
-        unit.order = unit.moveTarget ? "move" : "idle";
+        if (!resumeUnitMoveOrder(unit)) unit.order = unit.moveTarget ? "move" : "idle";
       } else {
         const attackRange = getAttackRange(unit) * getTerrainAttackRangeBonus(unit);
         const d = Math.hypot(target.x - unit.x, target.y - unit.y);
@@ -7775,6 +7808,14 @@
           resetUnitPathState(unit);
         }
       }
+    }
+
+    if (unit.focusMove && unit.moveTarget && !unit.targetId && !unit.interactTargetId && canUnitFight(unit)) {
+      const encounterRange = Math.max(getAttackRange(unit) + 36, TILE_SIZE * 1.35);
+      tryAssignPriorityTask(unit, { x: unit.x, y: unit.y }, encounterRange, {
+        allowResources: false,
+        preserveMove: true,
+      });
     }
 
     if (unit.moveTarget) {
