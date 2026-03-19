@@ -450,6 +450,22 @@ h1 {
   cursor: default;
 }
 
+.live-pill.is-active {
+  color: #172311;
+  background: linear-gradient(180deg, #dcffb9 0%, #8fd97d 56%, #5f9f52 100%);
+  box-shadow:
+    0 0 0 1px rgba(201, 255, 163, 0.22),
+    0 12px 24px rgba(105, 168, 82, 0.22);
+}
+
+.live-pill.is-warning {
+  color: #fff7ef;
+  background: linear-gradient(180deg, #ffbe90 0%, #df7e54 58%, #a44f2e 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 193, 146, 0.2),
+    0 12px 24px rgba(168, 85, 53, 0.22);
+}
+
 .speed-strip {
   display: flex;
   align-items: center;
@@ -475,6 +491,10 @@ h1 {
     radial-gradient(circle at top, rgba(159, 216, 255, 0.12), transparent 28%),
     linear-gradient(180deg, rgba(4, 8, 12, 0.34), rgba(4, 8, 12, 0.78));
   backdrop-filter: blur(8px);
+}
+
+.settings-overlay.hidden {
+  display: none;
 }
 
 .settings-panel {

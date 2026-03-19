@@ -40,6 +40,7 @@
   const fontScaleInput = document.getElementById("font-scale-input");
   const fontScaleValue = document.getElementById("font-scale-value");
   const colorModeSelect = document.getElementById("color-mode-select");
+  const colorModeNote = document.getElementById("color-mode-note");
   const sfxVolumeInput = document.getElementById("sfx-volume-input");
   const sfxVolumeValue = document.getElementById("sfx-volume-value");
   const musicVolumeInput = document.getElementById("music-volume-input");
@@ -110,6 +111,7 @@
     help: "h",
     openSettings: "o",
     toggleDifficulty: "d",
+    ceasefire: "c",
     rotatePlacement: "r",
     moveBuilding: "m",
     demolishBuilding: "delete",
@@ -126,6 +128,7 @@
     help: "Help",
     openSettings: "Settings",
     toggleDifficulty: "Difficulty",
+    ceasefire: "Ceasefire",
     rotatePlacement: "Rotate Build",
     moveBuilding: "Move Building",
     demolishBuilding: "Demolish",
@@ -173,6 +176,11 @@
       neutral: "#f0f3f6",
       ally: "#8affc1",
     },
+  };
+  const COLOR_MODE_COPY = {
+    default: "Default faction colors with the standard battlefield palette.",
+    colorblind: "Blue / Gold separates player and enemy teams with a stronger blue-versus-amber contrast for color-vision accessibility.",
+    "high-contrast": "High Contrast boosts brightness and separation for clearer unit, building, and minimap ownership reads.",
   };
 
   function createHelpState() {
@@ -1393,6 +1401,12 @@
     if (audioState.sfxGain) audioState.sfxGain.gain.value = state.settings.sfxVolume;
   }
 
+  function setSettingsOverlayOpen(isOpen) {
+    if (!settingsOverlay) return;
+    settingsOverlay.classList.toggle("hidden", !isOpen);
+    settingsOverlay.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  }
+
   function isSettingsOverlayOpen() {
     return Boolean(settingsOverlay && !settingsOverlay.classList.contains("hidden"));
   }
@@ -1406,6 +1420,12 @@
     if (sfxVolumeValue) sfxVolumeValue.textContent = `${Math.round(state.settings.sfxVolume * 100)}%`;
     if (musicVolumeInput) musicVolumeInput.value = String(Math.round(state.settings.musicVolume * 100));
     if (musicVolumeValue) musicVolumeValue.textContent = `${Math.round(state.settings.musicVolume * 100)}%`;
+    if (colorModeSelect) colorModeSelect.title = COLOR_MODE_COPY[sanitizeColorMode(state.settings.colorMode)] || COLOR_MODE_COPY.default;
+    if (colorModeNote) colorModeNote.textContent = COLOR_MODE_COPY[sanitizeColorMode(state.settings.colorMode)] || COLOR_MODE_COPY.default;
+    if (graphicsQualitySelect) graphicsQualitySelect.title = "Graphics quality applies immediately during a live match and controls shadows, particle density, and heavy HUD detail.";
+    if (sfxVolumeInput) sfxVolumeInput.title = "Sound effects volume applies instantly in the current match.";
+    if (musicVolumeInput) musicVolumeInput.title = "Music volume applies instantly in the current match.";
+    if (settingsBtn) settingsBtn.title = `Open settings from the menu. During a match you can also press ${formatKeybindLabel(getKeybind("openSettings"))}.`;
     for (const button of keybindButtons) {
       const action = button.dataset.keybindAction;
       if (!action) continue;
@@ -1450,14 +1470,14 @@
     if (state.admin.slashOpen) closeSlashCommand();
     if (state.admin.panelOpen) closeAdminPanel();
     state.settingsUi.listeningAction = null;
-    settingsOverlay.classList.remove("hidden");
+    setSettingsOverlayOpen(true);
     syncSettingsUi();
   }
 
   function closeSettingsOverlay() {
     if (!settingsOverlay) return;
     state.settingsUi.listeningAction = null;
-    settingsOverlay.classList.add("hidden");
+    setSettingsOverlayOpen(false);
     syncSettingsUi();
   }
 
@@ -1928,11 +1948,6 @@
       startBtn.disabled = Boolean(state.lan.started);
       return;
     }
-    if (state.mode === "menu" && !state.lan.clientId && state.lan.linkRoomCode && !isLanBlockedOnCurrentOrigin()) {
-      startBtn.textContent = `Start Shared ${state.lan.linkMatchType === "lan-coop" ? "LAN Co-op" : "LAN Versus"}`;
-      startBtn.disabled = false;
-      return;
-    }
     startBtn.textContent = "Launch Campaign";
     startBtn.disabled = false;
   }
@@ -1990,15 +2005,28 @@
     const primaryHelp = getPlayerHelpState(primary);
     const difficultyLabel = state.difficulty.mode === "easy" ? "Easy" : state.difficulty.mode === "hard" ? "Hard" : "Normal";
     if (difficultyBtn) difficultyBtn.textContent = `Difficulty: ${difficultyLabel} (${formatKeybindLabel(getKeybind("toggleDifficulty"))})`;
-    if (ceasefireBtn) ceasefireBtn.textContent = isCeasefireActive() ? `Ceasefire ${Math.ceil(state.difficulty.ceasefireTimer)}s` : "Ceasefire (Esc)";
+    const ceasefireKeyLabel = formatKeybindLabel(getKeybind("ceasefire"));
+    if (ceasefireBtn) {
+      const ceasefireActive = isCeasefireActive();
+      ceasefireBtn.textContent = ceasefireActive
+        ? `Ceasefire Active ${Math.ceil(state.difficulty.ceasefireTimer)}s`
+        : `Ceasefire (${ceasefireKeyLabel}${ceasefireKeyLabel !== "Esc" ? " / Esc" : ""})`;
+      ceasefireBtn.classList.toggle("is-active", ceasefireActive);
+      ceasefireBtn.classList.toggle("is-warning", ceasefireActive);
+      ceasefireBtn.setAttribute("aria-pressed", ceasefireActive ? "true" : "false");
+    }
     if (helpBtn) {
       const completedCount = primaryHelp ? TUTORIAL_STEP_ORDER.filter((step) => primaryHelp.steps[step]).length : 0;
       const helpKey = formatKeybindLabel(getKeybind("help"));
       helpBtn.textContent = primaryHelp && primaryHelp.open
         ? `Hide Guide (${helpKey})`
         : `Help / Tutorial ${completedCount ? `(${completedCount}/${TUTORIAL_STEP_ORDER.length})` : `(${helpKey})`}`;
+      helpBtn.title = "Open the field guide for controls, tutorial steps, and hotkeys.";
     }
-    if (liveSettingsBtn) liveSettingsBtn.textContent = `Settings (${formatKeybindLabel(getKeybind("openSettings"))})`;
+    if (liveSettingsBtn) {
+      liveSettingsBtn.textContent = `Settings (${formatKeybindLabel(getKeybind("openSettings"))})`;
+      liveSettingsBtn.title = "Adjust graphics, audio, font size, and color assist without leaving the match.";
+    }
     const assistControlsDisabled = !hasLocalAssistAuthority();
     const speedDisabled = isLanMatch();
     if (difficultyBtn) difficultyBtn.disabled = assistControlsDisabled;
@@ -2007,10 +2035,20 @@
     if (speedNormalBtn) speedNormalBtn.textContent = `1x (${formatKeybindLabel(getKeybind("speedNormal"))})`;
     if (speedFastBtn) speedFastBtn.textContent = `2x (${formatKeybindLabel(getKeybind("speedFast"))})`;
     if (speedUltraBtn) speedUltraBtn.textContent = `5x (${formatKeybindLabel(getKeybind("speedUltra"))})`;
-    if (speedSlowBtn) speedSlowBtn.disabled = speedDisabled || state.speed.multiplier === 0.5;
-    if (speedNormalBtn) speedNormalBtn.disabled = speedDisabled || state.speed.multiplier === 1;
-    if (speedFastBtn) speedFastBtn.disabled = speedDisabled || state.speed.multiplier === 2;
-    if (speedUltraBtn) speedUltraBtn.disabled = speedDisabled || state.speed.multiplier === 5;
+    const speedButtons = [
+      [speedSlowBtn, 0.5],
+      [speedNormalBtn, 1],
+      [speedFastBtn, 2],
+      [speedUltraBtn, 5],
+    ];
+    speedButtons.forEach(([button, multiplier]) => {
+      if (!button) return;
+      const active = state.speed.multiplier === multiplier;
+      button.disabled = speedDisabled;
+      button.classList.toggle("is-active", active);
+      button.classList.toggle("is-warning", active && multiplier === 0.5);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
     if (assistStatus) {
       if (isLanMatch() && isPvEMatch()) {
         assistStatus.textContent = isLanHost()
@@ -2019,15 +2057,23 @@
       } else if (isLanMatch()) {
         assistStatus.textContent = `LAN versus active. Local speed changes are disabled while network sync is running.`;
       } else if (!isPvEMatch()) {
-        assistStatus.textContent = `Speed ${state.speed.multiplier}x. Difficulty assists are available in campaign and co-op PvE modes.`;
+        assistStatus.textContent = state.speed.multiplier === 0.5
+          ? `Slow motion is active at 0.5x. Difficulty assists are only available in campaign and co-op PvE modes.`
+          : `Speed ${state.speed.multiplier}x. Difficulty assists are available in campaign and co-op PvE modes.`;
       } else if (isCeasefireActive()) {
-        assistStatus.textContent = `${difficultyLabel} mode • ceasefire active for ${Math.ceil(state.difficulty.ceasefireTimer)}s • speed ${state.speed.multiplier}x.`;
+        assistStatus.textContent = `${difficultyLabel} mode | ceasefire active for ${Math.ceil(state.difficulty.ceasefireTimer)}s | speed ${state.speed.multiplier}x.`;
       } else if (state.difficulty.mode === "easy") {
-        assistStatus.textContent = `${getMatchLabel()} Easy mode active. Enemy factions stay defensive and waves come in softer at ${state.speed.multiplier}x speed.`;
+        assistStatus.textContent = state.speed.multiplier === 0.5
+          ? `${getMatchLabel()} Easy mode active. Slow motion is on at 0.5x and enemy factions stay defensive.`
+          : `${getMatchLabel()} Easy mode active. Enemy factions stay defensive and waves come in softer at ${state.speed.multiplier}x speed.`;
       } else if (state.difficulty.mode === "hard") {
-        assistStatus.textContent = `${getMatchLabel()} Hard mode active. Extra war camps are active and enemy pressure ramps harder at ${state.speed.multiplier}x speed.`;
+        assistStatus.textContent = state.speed.multiplier === 0.5
+          ? `${getMatchLabel()} Hard mode active. Slow motion is on at 0.5x while extra war camps and pressure remain active.`
+          : `${getMatchLabel()} Hard mode active. Extra war camps are active and enemy pressure ramps harder at ${state.speed.multiplier}x speed.`;
       } else {
-        assistStatus.textContent = `${getMatchLabel()} normal pressure at ${state.speed.multiplier}x speed.`;
+        assistStatus.textContent = state.speed.multiplier === 0.5
+          ? `${getMatchLabel()} slow motion is active at 0.5x.`
+          : `${getMatchLabel()} normal pressure at ${state.speed.multiplier}x speed.`;
       }
     }
   }
@@ -2039,7 +2085,7 @@
     }
     state.speed.multiplier = multiplier;
     syncLiveControls();
-    notify(`Game speed set to ${multiplier}x`, "#8fd4ff");
+    notify(multiplier === 0.5 ? "Slow motion engaged at 0.5x." : `Game speed set to ${multiplier}x.`, "#8fd4ff");
   }
 
   function toggleDifficultyMode() {
@@ -2069,7 +2115,7 @@
       unit.order = "idle";
     }
     syncLiveControls();
-    notify(`Ceasefire activated for ${Math.round(state.difficulty.ceasefireDuration / 60)} minutes.`, "#9fe0a4");
+    notify(`Ceasefire activated for ${Math.round(state.difficulty.ceasefireDuration / 60)} minutes. Countdown is shown in the top bar.`, "#9fe0a4");
   }
 
   function sanitizeRoomCode(value) {
@@ -2576,15 +2622,7 @@
       await requestLanRoomStart();
       return;
     }
-    if (state.mode === "menu" && !state.lan.clientId && state.lan.linkRoomCode && !isLanBlockedOnCurrentOrigin()) {
-      await joinLanMatch(state.lan.linkMatchType || "lan", {
-        roomCode: state.lan.linkRoomCode,
-        apiBase: state.lan.linkApiBase,
-        startAfterJoin: true,
-      });
-      return;
-    }
-    startMatch("single");
+    startMatch("single", 1);
   }
 
   function createPlayerState(owner, label, viewportIndex, camera, controllerLabel, options = {}) {
@@ -3774,7 +3812,7 @@
     return best;
   }
 
-  function getObstacleAvoidanceWaypoint(unit, target, preferredSide = 0) {
+  function getObstacleAvoidanceWaypoint(unit, target, preferredSide = 0, clearanceBias = 1) {
     const blocker = getPathObstacle(unit, target);
     if (!blocker) return null;
     const dir = normalize(target.x - unit.x, target.y - unit.y);
@@ -3782,9 +3820,10 @@
     const signs = preferredSide ? [preferredSide, -preferredSide] : [1, -1];
     let best = null;
     for (const side of signs) {
+      const detourDistance = blocker.clearance + 14 + (clearanceBias - 1) * 24;
       const candidate = nudgeMoveTargetFromObstacles(unit, {
-        x: blocker.segment.x + normal.x * side * (blocker.clearance + 14),
-        y: blocker.segment.y + normal.y * side * (blocker.clearance + 14),
+        x: blocker.segment.x + normal.x * side * detourDistance,
+        y: blocker.segment.y + normal.y * side * detourDistance,
       }, 8);
       const candidateBlocker = getPathObstacle(unit, candidate);
       const score = Math.hypot(candidate.x - target.x, candidate.y - target.y) + (candidateBlocker ? 180 : 0);
@@ -3799,6 +3838,7 @@
     unit.pathRepathTimer = 0;
     unit.pathStuckTimer = 0;
     unit.pathLastDistance = null;
+    unit.pathRecoveryCount = 0;
   }
 
   function clearUnitFormation(unit) {
@@ -3828,22 +3868,51 @@
       unit.pathWaypoint = null;
     }
     const stuck = (unit.pathStuckTimer || 0) > 0.55;
+    if (!stuck) unit.pathRecoveryCount = Math.max(0, (unit.pathRecoveryCount || 0) - dt * 2.2);
     if (unit.pathWaypoint && !stuck && !getPathObstacle(unit, unit.moveTarget)) {
       unit.pathWaypoint = null;
     }
     if (unit.pathRepathTimer <= 0 || stuck) {
       unit.pathRepathTimer = stuck ? 0.08 : 0.18;
+      if (stuck) unit.pathRecoveryCount = Math.min(4, (unit.pathRecoveryCount || 0) + 1);
       const preferredSide = stuck ? (unit.pathAvoidanceSide === 1 ? -1 : 1) : unit.pathAvoidanceSide || 0;
-      const waypoint = getObstacleAvoidanceWaypoint(unit, unit.moveTarget, preferredSide);
+      const waypoint = getObstacleAvoidanceWaypoint(unit, unit.moveTarget, preferredSide, 1 + (unit.pathRecoveryCount || 0) * 0.4);
       if (waypoint) {
         unit.pathWaypoint = { x: waypoint.x, y: waypoint.y };
         unit.pathAvoidanceSide = waypoint.side;
         if (stuck) unit.pathStuckTimer = 0;
       } else {
+        if (stuck) unit.moveTarget = nudgeMoveTargetFromObstacles(unit, unit.moveTarget, 18 + (unit.pathRecoveryCount || 0) * 6);
         unit.pathWaypoint = null;
       }
     }
     return unit.pathWaypoint || unit.moveTarget;
+  }
+
+  function getFormationCenter(selectedUnits) {
+    if (!selectedUnits.length) return null;
+    const center = selectedUnits.reduce((sum, unit) => ({
+      x: sum.x + unit.x,
+      y: sum.y + unit.y,
+      radius: Math.max(sum.radius, unit.radius || 12),
+    }), { x: 0, y: 0, radius: 0 });
+    center.x /= selectedUnits.length;
+    center.y /= selectedUnits.length;
+    return center;
+  }
+
+  function getFormationAvoidanceSide(selectedUnits, worldPos) {
+    const center = getFormationCenter(selectedUnits);
+    if (!center) return 0;
+    const pseudoUnit = {
+      x: center.x,
+      y: center.y,
+      radius: Math.max(center.radius, 16),
+      airborne: false,
+      hover: false,
+    };
+    const waypoint = getObstacleAvoidanceWaypoint(pseudoUnit, worldPos, 0, 1.2);
+    return waypoint ? waypoint.side : 0;
   }
 
   function getFormationMoveTargets(selectedUnits, worldPos) {
@@ -4248,6 +4317,7 @@
       pathRepathTimer: 0,
       pathStuckTimer: 0,
       pathLastDistance: null,
+      pathRecoveryCount: 0,
       pathAvoidanceSide: 0,
       formationMoveId: null,
       formationSlot: null,
@@ -4330,6 +4400,7 @@
     const quality = getGraphicsPreset();
     const damageTextCount = state.world.effects.filter((effect) => effect.type === "damageText").length;
     if (damageTextCount >= quality.damageTextLimit) return;
+    const text = typeof damage === "string" ? damage : String(Math.max(1, Math.round(damage || 0)));
     state.world.effects.push({
       id: createId("effect"),
       type: "damageText",
@@ -4339,7 +4410,7 @@
       ttl: 0.72,
       maxTtl: 0.72,
       tint,
-      text: String(Math.max(1, Math.round(damage || 0))),
+      text,
       rise: randomRange(x + y + state.time, 18, 34),
       driftX: randomRange(x * 0.3 + y + state.time, -10, 10),
       driftY: randomRange(y * 0.2 + x + state.time, -4, 4),
@@ -4514,6 +4585,7 @@
   function issueMoveOrder(selectedUnits, worldPos) {
     const formationId = createId("formation");
     const assignments = getFormationMoveTargets(selectedUnits, worldPos);
+    const groupAvoidanceSide = getFormationAvoidanceSide(selectedUnits, worldPos);
     assignments.forEach(({ unit, target, index }) => {
       unit.moveTarget = target;
       unit.targetId = null;
@@ -4525,7 +4597,7 @@
       unit.formationMoveId = formationId;
       unit.formationSlot = { x: target.x, y: target.y };
       unit.formationIndex = index;
-      unit.pathAvoidanceSide = index % 2 === 0 ? 1 : -1;
+      unit.pathAvoidanceSide = groupAvoidanceSide;
     });
   }
 
@@ -5754,9 +5826,25 @@
     if (player) player.quickSlots[slot.side][slot.index] = itemId;
   }
 
-  function normalizePlacementAngle(angle = 0) {
-    const snapped = Math.round((Number(angle) || 0) / (Math.PI / 4)) * (Math.PI / 4);
+  function getPlacementRotationStep(item = null) {
+    if (!item) return Math.PI / 4;
+    return item.style === "wall" || item.style === "capital-wall" || item.style === "gate" || item.style === "bridge"
+      ? Math.PI / 4
+      : Math.PI / 2;
+  }
+
+  function normalizePlacementAngle(angle = 0, item = null) {
+    const step = getPlacementRotationStep(item);
+    const snapped = Math.round((Number(angle) || 0) / step) * step;
     return ((snapped % TAU) + TAU) % TAU;
+  }
+
+  function getPlacementAngleInfo(angle = 0, item = null) {
+    const step = getPlacementRotationStep(item);
+    return {
+      degrees: Math.round((((angle % TAU) + TAU) % TAU) * 180 / Math.PI),
+      stepDegrees: Math.round(step * 180 / Math.PI),
+    };
   }
 
   function getSelectedOwnedBuilding(player = getActivePlayerState()) {
@@ -5786,7 +5874,7 @@
         owner: player.owner,
         item: relocatingBuilding.def || itemIndex.get(relocatingBuilding.itemId),
         building: relocatingBuilding,
-        angle: normalizePlacementAngle(player.ui.placementAngle ?? relocatingBuilding.angle ?? 0),
+        angle: normalizePlacementAngle(player.ui.placementAngle ?? relocatingBuilding.angle ?? 0, relocatingBuilding.def || itemIndex.get(relocatingBuilding.itemId)),
       };
     }
     const item = player.ui.activePlacementId ? itemIndex.get(player.ui.activePlacementId) : null;
@@ -5796,7 +5884,7 @@
       owner: player.owner,
       item,
       building: null,
-      angle: normalizePlacementAngle(player.ui.placementAngle || 0),
+      angle: normalizePlacementAngle(player.ui.placementAngle || 0, item),
     };
   }
 
@@ -5815,7 +5903,7 @@
     setPlayerOpenPanel(player, null);
     player.ui.activePlacementId = building.itemId;
     player.ui.relocatingBuildingId = building.id;
-    player.ui.placementAngle = normalizePlacementAngle(building.angle || 0);
+    player.ui.placementAngle = normalizePlacementAngle(building.angle || 0, building.def || itemIndex.get(building.itemId));
     notify(`${building.def.name} ready to move. Rotate with ${formatKeybindLabel(getKeybind("rotatePlacement"))}. Click a new position to confirm.`, "#8fd8ff");
     return true;
   }
@@ -5823,9 +5911,11 @@
   function rotatePlacement(player = getActivePlayerState(), direction = 1) {
     const action = getPlacementAction(player);
     if (!action || !assetCatalog.includes(action.item)) return false;
-    player.ui.placementAngle = normalizePlacementAngle((player.ui.placementAngle || 0) + direction * Math.PI / 4);
+    const step = getPlacementRotationStep(action.item);
+    player.ui.placementAngle = normalizePlacementAngle((player.ui.placementAngle || 0) + direction * step, action.item);
+    const angleInfo = getPlacementAngleInfo(player.ui.placementAngle, action.item);
     const label = action.mode === "relocate" ? `Moving ${action.item.name}` : `${action.item.name} preview`;
-    notify(`${label}: facing ${Math.round((player.ui.placementAngle / Math.PI) * 180)} deg`, "#8fd8ff");
+    notify(`${label}: facing ${angleInfo.degrees} deg | snap ${angleInfo.stepDegrees} deg`, "#8fd8ff");
     playUiSound("uiClick", { volume: 0.38, cooldown: 0.03 });
     return true;
   }
@@ -5833,7 +5923,7 @@
   function getDemolitionRefund(building) {
     if (!building || !building.def || !building.def.cost) return 0;
     const integrity = clamp(building.hp / Math.max(1, building.maxHp || building.hp || 1), 0.35, 1);
-    return Math.max(0, Math.round(building.def.cost * 0.6 * integrity));
+    return Math.max(0, Math.round(building.def.cost * 0.65 * integrity));
   }
 
   function demolishSelectedBuilding(player = getActivePlayerState(), explicitBuilding = null) {
@@ -5845,6 +5935,7 @@
     }
     const refund = getDemolitionRefund(building);
     addCoins(player.owner, refund);
+    if (refund > 0) spawnDamageText(building.x, building.y - building.radius * 0.6, `+${refund}`, "#ffd889");
     notify(`${building.def.name} demolished. Refund: +${refund} coins.`, "#ffd889");
     spawnEffect("debris", building.x, building.y, building.radius * 1.1, ownerColors[building.owner] || "#d5d5d5", 0.7);
     spawnEffect("smoke", building.x, building.y, building.radius * 1.3, "rgba(45,50,58,0.56)", 1);
@@ -6341,6 +6432,8 @@
         x: unit.moveTarget.x + (dx / d) * Math.min(42, push + 10),
         y: unit.moveTarget.y + (dy / d) * Math.min(42, push + 10),
       };
+      unit.pathWaypoint = null;
+      unit.pathRepathTimer = 0;
     }
   }
 
@@ -6433,7 +6526,7 @@
   function deployPlacement(item, x, y, owner = "player", options = {}) {
     const relocationBuilding = options.relocateBuilding || null;
     const isRelocation = Boolean(relocationBuilding);
-    const angle = normalizePlacementAngle(options.angle || 0);
+    const angle = normalizePlacementAngle(options.angle || 0, item);
     if (!item || (!isRelocation && !canAfford(item.id, owner))) {
       notify("Not enough coins for that deployment.", "#ff8e85");
       playUiSound("error", { volume: 0.72, cooldown: 0.08 });
@@ -9003,7 +9096,9 @@
     const item = action && action.item;
     if (!item) return;
     const viewport = state.activeViewport || getViewportForPlayer();
-    if (state.input.mouseScreenY > viewport.y + viewport.h - 180) return;
+    const uiScale = getUiScale();
+    const bottomBar = getBottomBarLayout();
+    if (state.input.mouseScreenY > bottomBar.y - 12 * uiScale) return;
     const owner = action.owner;
     const blockReason = item.type === "ability"
       ? null
@@ -9065,6 +9160,22 @@
       ctx.stroke();
     }
     ctx.restore();
+    if (assetCatalog.includes(item)) {
+      const angleInfo = getPlacementAngleInfo(action.angle || 0, item);
+      const screenPoint = worldToScreen(state.input.mouseWorldX, state.input.mouseWorldY);
+      const panelW = 220 * uiScale;
+      const panelH = 38 * uiScale;
+      const panelX = clamp(screenPoint.x - panelW * 0.5, viewport.x + 10 * uiScale, viewport.x + viewport.w - panelW - 10 * uiScale);
+      const panelY = clamp(screenPoint.y - radius * state.camera.zoom - 44 * uiScale, viewport.y + 10 * uiScale, bottomBar.y - panelH - 10 * uiScale);
+      roundRect(ctx, panelX, panelY, panelW, panelH, 12 * uiScale, "rgba(7,14,20,0.82)", blocked ? "rgba(255,138,128,0.28)" : "rgba(125,242,171,0.24)");
+      ctx.fillStyle = blocked ? "#ffd0cc" : "#f2f6f8";
+      ctx.font = `700 ${Math.round(11 * uiScale)}px Cambria`;
+      ctx.fillText(truncateTextToWidth(item.name, panelW - 20 * uiScale), panelX + 10 * uiScale, panelY + 14 * uiScale);
+      ctx.fillStyle = blocked ? "#ffb3aa" : "#9fe8ff";
+      ctx.font = `${Math.round(10 * uiScale)}px Cambria`;
+      const previewLine = `Facing ${angleInfo.degrees} deg | Snap ${angleInfo.stepDegrees} deg | ${formatKeybindLabel(getKeybind("rotatePlacement"))} rotate`;
+      ctx.fillText(truncateTextToWidth(previewLine, panelW - 20 * uiScale), panelX + 10 * uiScale, panelY + 28 * uiScale);
+    }
   }
 
   function drawSelectionWorld() {
@@ -9432,7 +9543,7 @@
     const help = getPlayerHelpState(player);
     const open = Boolean(help && help.open);
     const w = Math.min(viewport.w - 20 * scale, (open ? (profile.tight ? 244 : 324) : (profile.tight ? 218 : 292)) * scale);
-    const h = (open ? (profile.tight ? 112 : profile.compact ? 136 : 158) : (profile.tight ? 34 : 40)) * scale;
+    const h = (open ? (profile.tight ? 128 : profile.compact ? 156 : 188) : (profile.tight ? 34 : 40)) * scale;
     const x = viewport.x + viewport.w - w - 18 * scale;
     const startY = (objective ? objective.y + objective.h : getTopHudLayout().y + getTopHudLayout().h) + 12 * scale;
     const maxY = Math.max(viewport.y + 72 * scale, bottomBar.y - h - 10 * scale);
@@ -9454,8 +9565,8 @@
     roundRect(ctx, layout.x, layout.y, layout.w, layout.h, 18 * layout.scale, "rgba(7,14,20,0.82)", withAlpha(accent, 0.2));
     if (!layout.open) {
       const collapsedText = nextCopy
-        ? `Tutorial ${completedCount}/${TUTORIAL_STEP_ORDER.length} • Next: ${nextInstruction}`
-        : `${player.inputMode === "controller" ? "RS camera • X/B catalogs" : `RMB pan • MMB rotate • ${formatKeybindLabel(getKeybind("openWeapons"))}/${formatKeybindLabel(getKeybind("openAssets"))} catalogs`} • ${formatKeybindLabel(getKeybind("help"))} guide`;
+        ? `Tutorial ${completedCount}/${TUTORIAL_STEP_ORDER.length} | Next: ${nextInstruction} | ${formatKeybindLabel(getKeybind("help"))} guide | ${formatKeybindLabel(getKeybind("openSettings"))} settings`
+        : `${player.inputMode === "controller" ? "RS camera | X/B catalogs" : `RMB pan | MMB rotate | ${formatKeybindLabel(getKeybind("openWeapons"))}/${formatKeybindLabel(getKeybind("openAssets"))} catalogs`} | ${formatKeybindLabel(getKeybind("help"))} guide | ${formatKeybindLabel(getKeybind("openSettings"))} settings`;
       ctx.fillStyle = accent;
       ctx.font = `700 ${Math.round((layout.profile.tight ? 10 : 11) * layout.scale)}px Cambria`;
       ctx.fillText(truncateTextToWidth(collapsedText, layout.w - 22 * layout.scale), layout.x + 12 * layout.scale, layout.y + 23 * layout.scale);
@@ -9468,8 +9579,8 @@
     ctx.fillStyle = "#f3eee2";
     ctx.font = `${Math.round((layout.profile.tight ? 10 : 11) * layout.scale)}px Cambria`;
     const summary = nextCopy
-      ? `Next: ${nextInstruction}`
-      : `Tutorial complete. Press ${formatKeybindLabel(getKeybind("help"))} to hide or reopen this guide.`;
+      ? `Next: ${nextInstruction} Press ${formatKeybindLabel(getKeybind("openSettings"))} for live settings.`
+      : `Tutorial complete. Press ${formatKeybindLabel(getKeybind("help"))} to reopen this guide or ${formatKeybindLabel(getKeybind("openSettings"))} for live settings.`;
     ctx.fillText(truncateTextToWidth(summary, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + 37 * layout.scale);
     const nextIndex = Math.max(0, TUTORIAL_STEP_ORDER.indexOf(nextStep));
     const steps = layout.profile.tight
@@ -9490,9 +9601,13 @@
     ctx.fillStyle = "#9bb0bc";
     ctx.font = `${Math.round((layout.profile.tight ? 9 : 10) * layout.scale)}px Cambria`;
     const footer = player.inputMode === "controller"
-      ? "A select • X assets • B weapons • Y clear • H guide"
-      : `${formatKeybindLabel(getKeybind("openAssets"))} assets • ${formatKeybindLabel(getKeybind("openWeapons"))} weapons • ${formatKeybindLabel(getKeybind("rotatePlacement"))} rotate • ${formatKeybindLabel(getKeybind("moveBuilding"))} move • ${formatKeybindLabel(getKeybind("help"))} guide`;
-    ctx.fillText(truncateTextToWidth(footer, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + layout.h - 10 * layout.scale);
+      ? `A select | X assets | B weapons | Y clear | ${formatKeybindLabel(getKeybind("openSettings"))} settings | ${formatKeybindLabel(getKeybind("help"))} guide`
+      : `${formatKeybindLabel(getKeybind("openAssets"))} assets | ${formatKeybindLabel(getKeybind("openWeapons"))} weapons | ${formatKeybindLabel(getKeybind("rotatePlacement"))} rotate | ${formatKeybindLabel(getKeybind("moveBuilding"))} move | ${formatKeybindLabel(getKeybind("openSettings"))} settings`;
+    const supportLine = `${formatKeybindLabel(getKeybind("toggleDifficulty"))} difficulty | ${formatKeybindLabel(getKeybind("ceasefire"))} ceasefire | ${formatKeybindLabel(getKeybind("speedSlow"))}/${formatKeybindLabel(getKeybind("speedNormal"))}/${formatKeybindLabel(getKeybind("speedFast"))}/${formatKeybindLabel(getKeybind("speedUltra"))} speeds | ${formatKeybindLabel(getKeybind("demolishBuilding"))} demolish`;
+    ctx.fillText(truncateTextToWidth(footer, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + layout.h - 24 * layout.scale);
+    ctx.fillStyle = "#8297a4";
+    ctx.font = `${Math.round((layout.profile.tight ? 8 : 9) * layout.scale)}px Cambria`;
+    ctx.fillText(truncateTextToWidth(supportLine, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + layout.h - 10 * layout.scale);
   }
 
   function getHelpOverlayHitAt(x, y, player = getActivePlayerState()) {
@@ -10529,7 +10644,7 @@
       ctx.fillStyle = "#9fb2bc";
       ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
       const hintText = focusEntity.kind === "building" && focusEntity.owner === (getActivePlayerState() && getActivePlayerState().owner)
-        ? `Move ${formatKeybindLabel(getKeybind("moveBuilding"))} • Rotate ${formatKeybindLabel(getKeybind("rotatePlacement"))} • Demolish ${formatKeybindLabel(getKeybind("demolishBuilding"))}`
+        ? `Move ${formatKeybindLabel(getKeybind("moveBuilding"))} | Rotate ${formatKeybindLabel(getKeybind("rotatePlacement"))} | Demolish ${formatKeybindLabel(getKeybind("demolishBuilding"))} (+${getDemolitionRefund(focusEntity)}c)`
         : layout.overflowCount
           ? `Showing ${layout.entities.length} of ${layout.totalEntities}. Click icon to remove.`
           : "Click icon to remove. Eye enters first-person.";
@@ -11124,6 +11239,11 @@
       else openSettingsOverlay();
       return;
     }
+    if (eventMatchesAction(event, "ceasefire") && normalizedKey !== "escape") {
+      event.preventDefault();
+      activateCeasefire();
+      return;
+    }
     if (key === "escape") {
       if (fpPlayer) {
         event.preventDefault();
@@ -11172,7 +11292,7 @@
       playUiSound("clear", { volume: 0.46, cooldown: 0.05 });
     } else if (eventMatchesAction(event, "rotatePlacement")) {
       event.preventDefault();
-      rotatePlacement(primary);
+      rotatePlacement(primary, event.shiftKey ? -1 : 1);
       return;
     } else if (eventMatchesAction(event, "moveBuilding")) {
       event.preventDefault();
@@ -11249,6 +11369,11 @@
       const help = getPlayerHelpState(player);
       if (help) help.open = state.matchType === "single" && player.viewportIndex === 0;
       player.ui.panelSearchFocus = null;
+      if (state.matchType === "single" && player.viewportIndex === 0) {
+        player.ui.recentMessage = hasCompletedTutorial(player)
+          ? `Press ${formatKeybindLabel(getKeybind("help"))} for the field guide or ${formatKeybindLabel(getKeybind("openSettings"))} for live settings at any time.`
+          : `Field guide open on the right. Follow the next step, press ${formatKeybindLabel(getKeybind("help"))} to reopen it, and press ${formatKeybindLabel(getKeybind("openSettings"))} for live settings.`;
+      }
     }
     overlay.classList.add("hidden");
     syncLiveControls();
@@ -11716,6 +11841,7 @@
   resize();
   applySettingsToRuntime();
   syncSettingsUi();
+  setSettingsOverlayOpen(false);
   syncMapPresetUi();
   resetLanSessionState();
   syncAdminUi();

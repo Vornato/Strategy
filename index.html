@@ -106,7 +106,7 @@
     </div>
     <div id="live-controls" class="live-controls hidden" aria-label="Live game controls">
       <button id="difficulty-btn" type="button" class="live-pill">Difficulty: Normal</button>
-      <button id="ceasefire-btn" type="button" class="live-pill secondary-live">Ceasefire (Esc)</button>
+      <button id="ceasefire-btn" type="button" class="live-pill secondary-live">Ceasefire (C / Esc)</button>
       <button id="help-btn" type="button" class="live-pill secondary-live">Help / Tutorial (H)</button>
       <button id="live-settings-btn" type="button" class="live-pill secondary-live">Settings</button>
       <div class="speed-strip" role="group" aria-label="Game speed">
@@ -122,7 +122,7 @@
         <div class="settings-panel-head">
           <div>
             <p class="controller-title">Settings</p>
-            <p class="settings-copy">Tune readability, graphics, audio, and your main keyboard shortcuts.</p>
+            <p class="settings-copy">Tune readability, graphics, audio, and your main keyboard shortcuts. These changes apply instantly during a live match and can be reopened with <code>O</code>.</p>
           </div>
           <button id="settings-close-btn" type="button" class="secondary-btn admin-close-btn">Close</button>
         </div>
@@ -144,6 +144,7 @@
                 <option value="high-contrast">High Contrast</option>
               </select>
             </label>
+            <p id="color-mode-note" class="settings-note">Default faction colors with the standard battlefield palette.</p>
           </section>
           <section class="settings-section">
             <p class="settings-section-title">Performance</p>
@@ -184,6 +185,7 @@
               <button type="button" class="secondary-btn keybind-btn" data-keybind-action="openSettings">Settings</button>
               <button type="button" class="secondary-btn keybind-btn" data-keybind-action="fullscreen">Fullscreen</button>
               <button type="button" class="secondary-btn keybind-btn" data-keybind-action="toggleDifficulty">Difficulty</button>
+              <button type="button" class="secondary-btn keybind-btn" data-keybind-action="ceasefire">Ceasefire</button>
               <button type="button" class="secondary-btn keybind-btn" data-keybind-action="rotatePlacement">Rotate Build</button>
               <button type="button" class="secondary-btn keybind-btn" data-keybind-action="moveBuilding">Move Building</button>
               <button type="button" class="secondary-btn keybind-btn" data-keybind-action="demolishBuilding">Demolish</button>
