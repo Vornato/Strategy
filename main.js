@@ -7412,9 +7412,16 @@
     return true;
   }
 
-  function setUnitInteractionOrder(unit, targetEntity, interactionKind) {
+  function setUnitInteractionOrder(unit, targetEntity, interactionKind, options = {}) {
     if (!unit || !targetEntity) return false;
     const standoff = (targetEntity.radius || 16) + unit.radius + 12;
+    if (options.preserveMove && !unit.resumeMoveTarget && unit.moveTarget) {
+      unit.resumeMoveTarget = { x: unit.moveTarget.x, y: unit.moveTarget.y };
+      unit.resumeArrivalTask = unit.arrivalTask ? { ...unit.arrivalTask } : null;
+    } else if (!options.preserveMove) {
+      unit.resumeMoveTarget = null;
+      unit.resumeArrivalTask = null;
+    }
     unit.moveTarget = nudgeMoveTargetFromObstacles(unit, { x: targetEntity.x, y: targetEntity.y }, Math.max(8, standoff * 0.2));
     unit.targetId = null;
     unit.focusMove = true;
@@ -7424,8 +7431,6 @@
     unit.order = interactionKind === "resource" ? "harvest" : "collect";
     unit.orderStamp = state.time;
     unit.arrivalTask = null;
-    unit.resumeMoveTarget = null;
-    unit.resumeArrivalTask = null;
     clearUnitFormation(unit);
     resetUnitPathState(unit);
     return true;
@@ -7450,6 +7455,17 @@
     clearUnitFormation(unit);
     resetUnitPathState(unit);
     return true;
+  }
+
+  function getBlockingResourceForMove(unit) {
+    if (!unit || !unit.moveTarget || !unit.focusMove || unit.interactTargetId || unit.targetId) return null;
+    const blocker = getPathObstacle(unit, unit.moveTarget);
+    if (!blocker || !isResourceNode(blocker.obstacle)) return null;
+    const resource = blocker.obstacle;
+    const distanceToResource = Math.hypot(resource.x - unit.x, resource.y - unit.y);
+    const engageDistance = Math.max(TILE_SIZE * 1.05, unit.radius + (resource.radius || 0) + 34);
+    if (distanceToResource > engageDistance) return null;
+    return resource;
   }
 
   function tryAssignPriorityTask(unit, origin = null, radius = AUTO_RESOURCE_SCAN_RADIUS, options = {}) {
@@ -7744,7 +7760,7 @@
       const interactionTarget = getInteractionTargetById(unit.interactTargetId, unit.interactKind);
       if (!interactionTarget) {
         clearInteractionOrder(unit);
-        if (!unit.targetId && !unit.moveTarget) unit.order = "idle";
+        if (!resumeUnitMoveOrder(unit) && !unit.targetId && !unit.moveTarget) unit.order = "idle";
       } else {
         const interactionRange = (interactionTarget.radius || 12) + unit.radius + (unit.interactKind === "tax" ? 12 : 16);
         const distanceToTarget = Math.hypot(interactionTarget.x - unit.x, interactionTarget.y - unit.y);
@@ -7759,13 +7775,19 @@
             if (unit.interactKind === "resource") {
               const result = harvestResourceNode(unit.owner, interactionTarget, getResourceWorkRate(unit), { showMessage: true });
               spawnEffect("slash", interactionTarget.x, interactionTarget.y, interactionTarget.radius * 0.56, ownerColors[unit.owner] || "#8de7b8", 0.18);
-              if (result.depleted) clearInteractionOrder(unit);
+              if (result.depleted) {
+                clearInteractionOrder(unit);
+                if (!resumeUnitMoveOrder(unit) && !unit.targetId && !unit.moveTarget) unit.order = "idle";
+              }
             } else {
               const payout = applyTaxCollection(unit.owner, interactionTarget, { showMessage: true });
-              if (!payout || getTaxReserve(interactionTarget) < 1) clearInteractionOrder(unit);
+              if (!payout || getTaxReserve(interactionTarget) < 1) {
+                clearInteractionOrder(unit);
+                if (!resumeUnitMoveOrder(unit) && !unit.targetId && !unit.moveTarget) unit.order = "idle";
+              }
             }
           }
-          unit.order = unit.interactKind === "resource" ? "harvest" : "collect";
+          if (unit.interactTargetId) unit.order = unit.interactKind === "resource" ? "harvest" : "collect";
         } else {
           unit.moveTarget = { x: interactionTarget.x, y: interactionTarget.y };
           unit.focusMove = true;
@@ -7816,6 +7838,13 @@
         allowResources: false,
         preserveMove: true,
       });
+    }
+
+    if (unit.focusMove && unit.moveTarget && !unit.targetId && !unit.interactTargetId) {
+      const blockingResource = getBlockingResourceForMove(unit);
+      if (blockingResource) {
+        setUnitInteractionOrder(unit, blockingResource, "resource", { preserveMove: true });
+      }
     }
 
     if (unit.moveTarget) {
@@ -7904,7 +7933,7 @@
 
     if (isHumanOwner(unit.owner) && !unit.targetId && !unit.focusMove && !unit.interactTargetId) {
       const autoRange = getAttackRange(unit) + 120;
-      tryAssignPriorityTask(unit, { x: unit.x, y: unit.y }, autoRange, { allowResources: false });
+      tryAssignPriorityTask(unit, { x: unit.x, y: unit.y }, Math.max(autoRange, AUTO_RESOURCE_SCAN_RADIUS), { allowResources: true });
     }
   }
 

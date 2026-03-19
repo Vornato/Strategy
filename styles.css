@@ -1021,25 +1021,50 @@ h1 {
 .menu-art-hitbox {
   position: absolute;
   z-index: 1;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: rgba(255, 210, 138, 0.01);
+  border: 1px solid rgba(222, 168, 84, 0.38);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 226, 160, 0.04), rgba(255, 183, 72, 0.02)),
+    rgba(10, 14, 20, 0.1);
   color: transparent;
   cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(84, 53, 18, 0.88) inset,
+    0 0 0 3px rgba(247, 194, 102, 0.12) inset,
+    0 0 18px rgba(255, 176, 64, 0.08);
   transition:
     transform 140ms ease,
     box-shadow 140ms ease,
-    background 140ms ease;
+    background 140ms ease,
+    border-color 140ms ease;
 }
 
 .menu-art-hitbox:hover,
 .menu-art-hitbox:focus-visible {
   transform: translateY(-1px);
-  background: rgba(255, 214, 145, 0.08);
+  border-color: rgba(255, 219, 144, 0.82);
+  background:
+    linear-gradient(180deg, rgba(255, 236, 184, 0.12), rgba(255, 188, 84, 0.06)),
+    rgba(18, 22, 30, 0.16);
   box-shadow:
-    0 0 0 2px rgba(255, 212, 132, 0.5),
-    0 0 28px rgba(255, 181, 80, 0.18);
+    0 0 0 1px rgba(102, 66, 24, 0.95) inset,
+    0 0 0 3px rgba(255, 218, 140, 0.3) inset,
+    0 0 0 5px rgba(255, 194, 92, 0.18) inset,
+    0 0 30px rgba(255, 184, 86, 0.24);
   outline: none;
+}
+
+.menu-art-hitbox:active {
+  transform: translateY(0);
+  border-color: rgba(255, 227, 167, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 239, 196, 0.14), rgba(255, 197, 98, 0.08)),
+    rgba(21, 26, 35, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(112, 72, 24, 0.98) inset,
+    0 0 0 3px rgba(255, 225, 155, 0.34) inset,
+    0 0 0 6px rgba(255, 196, 88, 0.2) inset,
+    0 0 18px rgba(255, 184, 86, 0.2);
 }
 
 .menu-art-hitbox:disabled {
@@ -1644,20 +1669,13 @@ h1 {
 
 #start-btn.menu-art-hitbox {
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   color: transparent;
-  background: rgba(255, 210, 138, 0.01);
-  box-shadow: none;
 }
 
 #start-btn.menu-art-hitbox:hover,
 #start-btn.menu-art-hitbox:focus-visible {
   filter: none;
-  background: rgba(255, 214, 145, 0.08);
-  box-shadow:
-    0 0 0 2px rgba(255, 212, 132, 0.5),
-    0 0 28px rgba(255, 181, 80, 0.18);
 }
 
 @media (max-width: 700px) {
