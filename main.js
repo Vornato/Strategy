@@ -4606,6 +4606,80 @@
     return Math.max(0.64, Math.min(1.04, Math.min(viewport.w / 760, viewport.h / 560)));
   }
 
+  function getViewportUiProfile(viewport = state.activeViewport || getViewportForPlayer()) {
+    const split = isSplitScreenMatch();
+    const playerCount = split ? getHumanPlayers().length : 1;
+    const scale = Math.max(0.64, Math.min(1.04, Math.min(viewport.w / 760, viewport.h / 560)));
+    const compact = split || viewport.w < 820 || viewport.h < 620;
+    const tight = playerCount >= 3 || viewport.w < 620 || viewport.h < 430;
+    const ultra = playerCount >= 4 || viewport.w < 540 || viewport.h < 360;
+    return {
+      viewport,
+      split,
+      playerCount,
+      scale,
+      compact,
+      tight,
+      ultra,
+      showMinimap: !tight && viewport.h >= 480,
+      showFullObjectivePanel: !compact && viewport.w >= 900 && viewport.h >= 500,
+      notificationLimit: ultra ? 1 : tight ? 2 : compact ? 3 : 4,
+      showSelectionHint: !tight,
+    };
+  }
+
+  function getTopHudLayout() {
+    const viewport = state.activeViewport || getViewportForPlayer();
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const compactObjectiveW = profile.showFullObjectivePanel ? 0 : Math.min(viewport.w * (profile.tight ? 0.3 : 0.34), (profile.tight ? 164 : 196) * scale);
+    const reservedRight = compactObjectiveW ? compactObjectiveW + 18 * scale : 0;
+    const availableW = viewport.w - 44 * scale - reservedRight;
+    const targetW = (profile.tight ? 360 : profile.compact ? 410 : 452) * scale;
+    const minW = Math.min(220 * scale, availableW);
+    const panelW = Math.max(minW, Math.min(targetW, availableW));
+    const panelH = (profile.tight ? 80 : profile.compact ? 92 : 104) * scale;
+    return {
+      viewport,
+      x: viewport.x + 22 * scale,
+      y: viewport.y + 18 * scale,
+      w: panelW,
+      h: panelH,
+      scale,
+      profile,
+      showLanLabelBelow: isLanMatch() && !profile.compact,
+    };
+  }
+
+  function getObjectivePanelLayout() {
+    const viewport = state.activeViewport || getViewportForPlayer();
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    if (profile.showFullObjectivePanel) {
+      const w = Math.min(360 * scale, viewport.w * 0.32);
+      return {
+        x: viewport.x + viewport.w - w - 24 * scale,
+        y: viewport.y + 20 * scale,
+        w,
+        h: 188 * scale,
+        scale,
+        compact: false,
+        profile,
+      };
+    }
+    const w = Math.min(viewport.w * (profile.tight ? 0.3 : 0.34), (profile.tight ? 164 : 196) * scale);
+    const h = (profile.tight ? 54 : 70) * scale;
+    return {
+      x: viewport.x + viewport.w - w - 18 * scale,
+      y: viewport.y + 18 * scale,
+      w,
+      h,
+      scale,
+      compact: true,
+      profile,
+    };
+  }
+
   function getAllEntities() {
     return [...state.world.units, ...state.world.buildings, ...state.world.animals, ...state.world.civilians];
   }
@@ -7923,21 +7997,36 @@
     }
   }
 
-  function drawHudStat(x, y, label, value, tint) {
+  function drawHudStat(x, y, label, value, tint, options = {}) {
+    const {
+      labelSize = 12,
+      valueSize = 20,
+      lineGap = 22,
+      maxWidth = null,
+      align = "left",
+    } = options;
+    ctx.save();
+    ctx.textAlign = align;
     ctx.fillStyle = "rgba(255,255,255,0.76)";
-    ctx.font = "12px Cambria";
-    ctx.fillText(label, x, y);
+    ctx.font = `${Math.round(labelSize)}px Cambria`;
+    const safeLabel = maxWidth ? truncateTextToWidth(label, maxWidth) : String(label || "");
+    if (maxWidth) ctx.fillText(safeLabel, x, y, maxWidth);
+    else ctx.fillText(safeLabel, x, y);
     ctx.fillStyle = tint;
-    ctx.font = "700 20px Cambria";
-    ctx.fillText(value, x, y + 22);
+    ctx.font = `700 ${Math.round(valueSize)}px Cambria`;
+    const safeValue = maxWidth ? truncateTextToWidth(value, maxWidth) : String(value || "");
+    if (maxWidth) ctx.fillText(safeValue, x, y + lineGap, maxWidth);
+    else ctx.fillText(safeValue, x, y + lineGap);
+    ctx.restore();
   }
 
   function getMinimapLayout() {
-    const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
-    const mapSize = Math.min(viewport.w * 0.23, 146 * scale);
+    const topHud = getTopHudLayout();
+    const { viewport, scale, profile } = topHud;
+    if (!profile.showMinimap) return null;
+    const mapSize = Math.min(viewport.w * (profile.compact ? 0.18 : 0.23), (profile.compact ? 118 : 146) * scale);
     const x = viewport.x + 22 * scale;
-    const y = viewport.y + 18 * scale + 104 * scale + (isLanMatch() ? 30 : 16) * scale;
+    const y = topHud.y + topHud.h + (topHud.showLanLabelBelow ? 24 : 14) * scale;
     return {
       panelX: x,
       panelY: y,
@@ -7948,6 +8037,7 @@
       mapW: mapSize,
       mapH: mapSize,
       scale,
+      profile,
     };
   }
 
@@ -7955,9 +8045,10 @@
     const player = getActivePlayerState();
     if (!player || !player.fog) return;
     const layout = getMinimapLayout();
+    if (!layout) return;
     roundRect(ctx, layout.panelX, layout.panelY, layout.panelW, layout.panelH, 20 * layout.scale, "rgba(8,16,23,0.76)", "rgba(104,215,255,0.18)");
     ctx.fillStyle = "rgba(235,241,244,0.86)";
-    ctx.font = "700 13px Cambria";
+    ctx.font = `700 ${Math.round((layout.profile.compact ? 11 : 13) * layout.scale)}px Cambria`;
     ctx.fillText("Minimap", layout.panelX + 14 * layout.scale, layout.panelY + 15 * layout.scale);
     ctx.save();
     ctx.beginPath();
@@ -7992,47 +8083,68 @@
     ctx.stroke();
     ctx.restore();
     ctx.fillStyle = "rgba(163,182,195,0.84)";
-    ctx.font = "12px Cambria";
+    ctx.font = `700 ${Math.round((layout.profile.compact ? 10 : 12) * layout.scale)}px Cambria`;
     ctx.fillText(`${getPlayerFogCoverage(player).toFixed(1)}% explored`, layout.panelX + 14 * layout.scale, layout.panelY + layout.panelH - 8 * layout.scale);
   }
 
   function drawTopHud() {
-    const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
-    const panelW = 452 * scale;
-    const panelH = 104 * scale;
     const player = getActivePlayerState();
+    if (!player) return;
+    const layout = getTopHudLayout();
+    const { x, y, w: panelW, h: panelH, scale, profile } = layout;
     const coop = isCoopMatch();
     const campaign = state.matchType === "single";
     const competitiveTotals = !campaign && !coop ? getCompetitiveTotals(player.owner) : null;
-    const x = viewport.x + 22 * scale;
-    const y = viewport.y + 18 * scale;
     roundRect(ctx, x, y, panelW, panelH, 24 * scale, "rgba(10,18,25,0.72)", "rgba(214,174,99,0.22)");
     if (isImageReady(uiImages.coin)) {
+      const coinSize = (profile.tight ? 18 : 24) * scale;
       ctx.save();
       ctx.globalAlpha = 0.96;
-      ctx.drawImage(uiImages.coin, x + 4 * scale, y + 12 * scale, 24 * scale, 24 * scale);
+      ctx.drawImage(uiImages.coin, x + 6 * scale, y + 12 * scale, coinSize, coinSize);
       ctx.restore();
     }
-    drawHudStat(x + 22 * scale, y + 20 * scale, "Coins", `${Math.floor(state.coins)}`, "#ffd889");
-    drawHudStat(x + 120 * scale, y + 20 * scale, "Wood", `${Math.floor(state.wood)}`, "#9de291");
-    drawHudStat(x + 212 * scale, y + 20 * scale, "Stone", `${Math.floor(state.stone)}`, "#b8c4cc");
     const waveLabel = campaign ? "Wave" : coop ? "Threat" : "Pressure";
     const waveValue = campaign
       ? `${state.waves.index + 1} / ${Math.ceil(state.waves.timer)}s`
       : coop ? `${countHostileUnits()} foe` : `${competitiveTotals.enemyUnits} foe`;
-    drawHudStat(x + 322 * scale, y + 20 * scale, waveLabel, waveValue, campaign && state.waves.flash > 0 ? "#ffbf8d" : "#8fd4ff");
-    drawHudStat(x + 22 * scale, y + 62 * scale, "Army", `${ownerUnitCount(player.owner)}`, "#7fd8ff");
-    drawHudStat(x + 120 * scale, y + 62 * scale, "Build", `${ownerBuildingCount(player.owner)}`, "#ffd889");
-    drawHudStat(
-      x + 212 * scale,
-      y + 62 * scale,
-      campaign ? "Nations" : coop ? "Keeps" : competitiveTotals.opponents.length > 1 ? "Rivals" : "Enemy",
-      `${campaign ? state.world.buildings.filter((b) => b.owner !== "player" && b.itemId === "royal_keep").length : coop ? countEnemyStrongholds() : competitiveTotals.opponents.length > 1 ? competitiveTotals.aliveOpponents.length : competitiveTotals.enemyBuildings}`,
-      "#ff8a80",
-    );
-    drawHudStat(x + 322 * scale, y + 62 * scale, "Income", `+${getPassiveIncomeForOwner(player.owner)}`, "#9be7c5");
-    if (isLanMatch()) {
+    const stats = [
+      { label: "Coins", value: `${Math.floor(state.coins)}`, tint: "#ffd889" },
+      { label: "Wood", value: `${Math.floor(state.wood)}`, tint: "#9de291" },
+      { label: "Stone", value: `${Math.floor(state.stone)}`, tint: "#b8c4cc" },
+      { label: waveLabel, value: waveValue, tint: campaign && state.waves.flash > 0 ? "#ffbf8d" : "#8fd4ff" },
+      { label: "Army", value: `${ownerUnitCount(player.owner)}`, tint: "#7fd8ff" },
+      { label: "Build", value: `${ownerBuildingCount(player.owner)}`, tint: "#ffd889" },
+      {
+        label: campaign ? "Nations" : coop ? "Keeps" : competitiveTotals.opponents.length > 1 ? "Rivals" : "Enemy",
+        value: `${campaign ? state.world.buildings.filter((b) => b.owner !== "player" && b.itemId === "royal_keep").length : coop ? countEnemyStrongholds() : competitiveTotals.opponents.length > 1 ? competitiveTotals.aliveOpponents.length : competitiveTotals.enemyBuildings}`,
+        tint: "#ff8a80",
+      },
+      { label: "Income", value: `+${getPassiveIncomeForOwner(player.owner)}`, tint: "#9be7c5" },
+    ];
+    const contentX = x + 18 * scale;
+    const contentY = y + 18 * scale;
+    const rowGap = (profile.tight ? 34 : 42) * scale;
+    const colW = (panelW - 34 * scale) / 4;
+    const labelSize = (profile.tight ? 10 : profile.compact ? 11 : 12) * scale;
+    const valueSize = (profile.tight ? 14 : profile.compact ? 16 : 20) * scale;
+    const lineGap = (profile.tight ? 16 : 22) * scale;
+    stats.slice(0, 4).forEach((stat, index) => {
+      drawHudStat(contentX + colW * index, contentY, stat.label, stat.value, stat.tint, {
+        labelSize,
+        valueSize,
+        lineGap,
+        maxWidth: colW - 10 * scale,
+      });
+    });
+    stats.slice(4).forEach((stat, index) => {
+      drawHudStat(contentX + colW * index, contentY + rowGap, stat.label, stat.value, stat.tint, {
+        labelSize,
+        valueSize,
+        lineGap,
+        maxWidth: colW - 10 * scale,
+      });
+    });
+    if (layout.showLanLabelBelow) {
       ctx.fillStyle = "rgba(255,255,255,0.88)";
       ctx.font = "600 12px Cambria";
       ctx.fillText(`LAN ${state.lan.role === "host" ? "HOST" : "JOINED"} • ${state.lan.roomCode || "-----"}`, x + 20 * scale, y + panelH + 18 * scale);
@@ -8040,13 +8152,48 @@
   }
 
   function drawQuestPanel(w) {
-    const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
-    const panelW = 360 * scale;
     const player = getActivePlayerState();
-    const x = viewport.x + w - panelW - 24 * scale;
-    const y = viewport.y + 20 * scale;
-    const h = 188 * scale;
+    if (!player) return;
+    const layout = getObjectivePanelLayout();
+    const { x, y, w: panelW, h, scale, compact, profile } = layout;
+    if (compact) {
+      const title = isCompetitiveMatch()
+        ? (isLanMatch() ? "LAN Warfront" : "Warfront")
+        : isCoopMatch()
+          ? (isLanMatch() ? "LAN Co-op" : "Co-op Front")
+          : "Objectives";
+      let line1 = "";
+      let line2 = "";
+      let tint = "#ffd889";
+      if (isCompetitiveMatch()) {
+        const competitiveTotals = getCompetitiveTotals(player.owner);
+        line1 = competitiveTotals.opponents.length <= 1
+          ? `Enemy ${competitiveTotals.enemyBuildings} str / ${competitiveTotals.enemyUnits} units`
+          : `Rivals ${competitiveTotals.aliveOpponents.length}/${competitiveTotals.opponents.length} alive`;
+        line2 = `You ${ownerBuildingCount(player.owner)} str / ${ownerUnitCount(player.owner)} units`;
+      } else if (isCoopMatch()) {
+        line1 = `Keeps ${countEnemyStrongholds()} | Hostiles ${countHostileBuildings() + countHostileUnits()}`;
+        line2 = `${state.difficulty.mode === "easy" ? "Easy" : state.difficulty.mode === "hard" ? "Hard" : "Normal"}${isCeasefireActive() ? ` | CF ${Math.ceil(state.difficulty.ceasefireTimer)}s` : ""}`;
+        tint = "#9fe0a4";
+      } else {
+        const quest = state.world.quests.find((entry) => !entry.done) || state.world.quests[0];
+        line1 = quest
+          ? `${quest.title} ${Math.floor(quest.progress)}/${quest.target}`
+          : `Wave ${state.waves.index + 1} | ${Math.ceil(state.waves.timer)}s`;
+        line2 = quest ? `Reward +${quest.reward} coins` : `Income +${getPassiveIncomeForOwner(player.owner)}`;
+      }
+      roundRect(ctx, x, y, panelW, h, 18 * scale, "rgba(8,16,23,0.72)", "rgba(125,242,171,0.2)");
+      ctx.fillStyle = tint;
+      ctx.font = `700 ${Math.round((profile.tight ? 12 : 14) * scale)}px Cambria`;
+      ctx.fillText(truncateTextToWidth(title, panelW - 24 * scale), x + 12 * scale, y + 16 * scale);
+      ctx.fillStyle = "#f3eee2";
+      ctx.font = `600 ${Math.round((profile.tight ? 10 : 11) * scale)}px Cambria`;
+      ctx.fillText(truncateTextToWidth(line1, panelW - 24 * scale), x + 12 * scale, y + (profile.tight ? 32 : 38) * scale);
+      ctx.fillStyle = "#aab8c0";
+      ctx.font = `${Math.round((profile.tight ? 9 : 10) * scale)}px Cambria`;
+      ctx.fillText(truncateTextToWidth(line2, panelW - 24 * scale), x + 12 * scale, y + (profile.tight ? 45 : 54) * scale);
+      return;
+    }
     roundRect(ctx, x, y, panelW, h, 24 * scale, "rgba(8,16,23,0.72)", "rgba(125,242,171,0.2)");
     if (isCompetitiveMatch()) {
       const competitiveTotals = getCompetitiveTotals(player.owner);
@@ -8143,6 +8290,14 @@
     lines.forEach((line, index) => {
       ctx.fillText(line, x, y + index * lineHeight);
     });
+  }
+
+  function truncateTextToWidth(text, maxWidth) {
+    const value = String(text || "");
+    if (!value || !Number.isFinite(maxWidth) || maxWidth <= 0 || ctx.measureText(value).width <= maxWidth) return value;
+    let output = value;
+    while (output.length > 1 && ctx.measureText(`${output}...`).width > maxWidth) output = output.slice(0, -1);
+    return `${output}...`;
   }
 
   function getItemVisualTheme(item) {
@@ -8650,38 +8805,70 @@
 
   function drawNotifications() {
     const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const topHud = getTopHudLayout();
+    const objective = getObjectivePanelLayout();
     const minimap = getMinimapLayout();
-    const startY = Math.max(viewport.y + 230 * scale, minimap.panelY + minimap.panelH + 18 * scale);
-    state.world.notifications
+    const selectionLayout = getSelectionHudLayout();
+    const bottomBar = getBottomBarLayout();
+    const startY = Math.max(
+      topHud.y + topHud.h + 14 * scale,
+      minimap ? minimap.panelY + minimap.panelH + 14 * scale : 0,
+      objective && objective.compact ? objective.y + objective.h + 12 * scale : 0,
+    );
+    const maxY = Math.min(
+      bottomBar.y - 14 * scale,
+      selectionLayout ? selectionLayout.y - 12 * scale : Infinity,
+    );
+    if (maxY <= startY) return;
+    const notes = state.world.notifications
       .filter((note) => !note.owner || note.owner === getActivePlayerState().owner)
-      .slice(-4)
-      .forEach((note, index) => {
-      const y = startY + index * 28 * scale;
+      .slice(-profile.notificationLimit);
+    if (!notes.length) return;
+    ctx.save();
+    ctx.textAlign = profile.tight ? "right" : "left";
+    ctx.font = `600 ${Math.round((profile.tight ? 12 : profile.compact ? 13 : 15) * scale)}px Cambria`;
+    const maxWidth = profile.tight ? viewport.w * 0.42 : viewport.w * 0.52;
+    const x = profile.tight ? viewport.x + viewport.w - 24 * scale : viewport.x + 26 * scale;
+    const lineH = (profile.tight ? 20 : 24) * scale;
+    let y = startY;
+    notes.forEach((note) => {
+      if (y > maxY) return;
       ctx.fillStyle = note.tint;
-      ctx.font = "600 15px Cambria";
-      ctx.fillText(note.text, viewport.x + 26 * scale, y);
+      ctx.fillText(truncateTextToWidth(note.text, maxWidth), x, y);
+      y += lineH;
     });
+    ctx.restore();
   }
 
   function drawRecentMessage(w, h) {
-    const text = state.ui.hoverMessage || state.ui.recentMessage;
-    if (!text) return;
     const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
-    const centerX = viewport.x + w / 2;
+    const profile = getViewportUiProfile(viewport);
+    const text = state.ui.hoverMessage || (profile.split ? "" : state.ui.recentMessage);
+    if (!text) return;
+    const scale = profile.scale;
+    const bottomBar = getBottomBarLayout();
     ctx.save();
-    ctx.font = `600 ${Math.round(14 * scale)}px Cambria`;
-    const lines = getWrappedTextLines(text, 448 * scale);
-    const panelW = 480 * scale;
+    ctx.font = `600 ${Math.round((profile.tight ? 11 : 14) * scale)}px Cambria`;
+    const maxWidth = Math.min(profile.tight ? viewport.w * 0.34 : profile.compact ? viewport.w * 0.38 : 448 * scale, viewport.w - 28 * scale);
+    const rawLines = getWrappedTextLines(text, maxWidth);
+    const lines = profile.tight && rawLines.length > 2
+      ? [rawLines[0], truncateTextToWidth(rawLines.slice(1).join(" "), maxWidth)]
+      : rawLines;
+    const panelW = Math.min(maxWidth + 32 * scale, viewport.w - 20 * scale);
     const panelH = Math.max(34 * scale, 20 * scale + lines.length * 16 * scale);
-    const panelY = viewport.y + h - 136 * scale - panelH;
-    roundRect(ctx, centerX - panelW * 0.5, panelY, panelW, panelH, 18, "rgba(7,14,20,0.78)", state.ui.hoverMessage ? "rgba(255,226,154,0.18)" : "rgba(255,255,255,0.08)");
+    const panelX = profile.split || profile.compact
+      ? viewport.x + viewport.w - panelW - 12 * scale
+      : viewport.x + (w - panelW) * 0.5;
+    const panelY = bottomBar.y - 12 * scale - panelH;
+    roundRect(ctx, panelX, panelY, panelW, panelH, 18, "rgba(7,14,20,0.78)", state.ui.hoverMessage ? "rgba(255,226,154,0.18)" : "rgba(255,255,255,0.08)");
     ctx.fillStyle = "#dbe3e8";
-    ctx.font = `600 ${Math.round(14 * scale)}px Cambria`;
-    ctx.textAlign = "center";
+    ctx.font = `600 ${Math.round((profile.tight ? 11 : 14) * scale)}px Cambria`;
+    ctx.textAlign = profile.split || profile.compact ? "left" : "center";
     lines.forEach((line, index) => {
-      ctx.fillText(line, centerX, panelY + 20 * scale + index * 16 * scale);
+      const tx = profile.split || profile.compact ? panelX + 14 * scale : viewport.x + w / 2;
+      ctx.fillText(line, tx, panelY + 20 * scale + index * 16 * scale);
     });
     ctx.textAlign = "left";
     ctx.restore();
@@ -8746,11 +8933,11 @@
     const selectionLayout = getSelectionHudLayout();
     if (selectionLayout && isInsideRect(x, y, selectionLayout)) return true;
     const minimap = getMinimapLayout();
-    if (isInsideRect(x, y, { x: minimap.panelX, y: minimap.panelY, w: minimap.panelW, h: minimap.panelH })) return true;
-    const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
-    if (isInsideRect(x, y, { x: viewport.x + 22 * scale, y: viewport.y + 18 * scale, w: 452 * scale, h: 104 * scale })) return true;
-    if (isInsideRect(x, y, { x: viewport.x + viewport.w - 360 * scale - 24 * scale, y: viewport.y + 20 * scale, w: 360 * scale, h: 188 * scale })) return true;
+    if (minimap && isInsideRect(x, y, { x: minimap.panelX, y: minimap.panelY, w: minimap.panelW, h: minimap.panelH })) return true;
+    const topHud = getTopHudLayout();
+    if (isInsideRect(x, y, topHud)) return true;
+    const objective = getObjectivePanelLayout();
+    if (objective && isInsideRect(x, y, objective)) return true;
     return false;
   }
 
@@ -8795,22 +8982,25 @@
   function getSelectionHudLayout(entities = getSelectedEntities()) {
     if (!entities.length) return null;
     const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
     const bottomBar = getBottomBarLayout();
-    const padding = 14 * scale;
-    const headerH = 62 * scale;
-    const iconSize = 46 * scale;
-    const gap = 8 * scale;
-    const cols = Math.max(1, Math.min(viewport.w < 900 ? 4 : 6, entities.length));
-    const rows = Math.ceil(entities.length / cols);
-    const panelW = Math.max(220 * scale, padding * 2 + cols * iconSize + Math.max(0, cols - 1) * gap);
+    const padding = (profile.tight ? 10 : 14) * scale;
+    const headerH = (profile.tight ? 46 : profile.compact ? 54 : 62) * scale;
+    const iconSize = (profile.tight ? 38 : profile.compact ? 42 : 46) * scale;
+    const gap = (profile.tight ? 6 : 8) * scale;
+    const maxVisible = profile.tight ? 6 : profile.compact ? 8 : 12;
+    const visibleEntities = entities.slice(0, maxVisible);
+    const cols = Math.max(1, Math.min(profile.tight ? 3 : viewport.w < 900 ? 4 : 6, visibleEntities.length));
+    const rows = Math.ceil(visibleEntities.length / cols);
+    const panelW = Math.min(viewport.w - 24 * scale, Math.max(220 * scale, padding * 2 + cols * iconSize + Math.max(0, cols - 1) * gap));
     const panelH = padding * 2 + headerH + rows * iconSize + Math.max(0, rows - 1) * gap;
-    const x = viewport.x + 20 * scale;
-    const y = Math.max(viewport.y + 84 * scale, bottomBar.y - 16 * scale - panelH);
+    const x = viewport.x + 18 * scale;
+    const y = Math.max(viewport.y + (profile.tight ? 72 : 84) * scale, bottomBar.y - 12 * scale - panelH);
     const contentX = x + padding;
     const contentY = y + padding + headerH;
     const player = getActivePlayerState();
-    const slots = entities.map((entity, index) => {
+    const slots = visibleEntities.map((entity, index) => {
       const slotX = contentX + (index % cols) * (iconSize + gap);
       const slotY = contentY + Math.floor(index / cols) * (iconSize + gap);
       return {
@@ -8841,8 +9031,11 @@
       cols,
       rows,
       slots,
-      entities,
+      entities: visibleEntities,
+      totalEntities: entities.length,
+      overflowCount: Math.max(0, entities.length - visibleEntities.length),
       scale,
+      profile,
     };
   }
 
@@ -8954,6 +9147,7 @@
     const entities = getSelectedEntities();
     if (!entities.length) return;
     const layout = getSelectionHudLayout(entities);
+    const profile = layout.profile;
     const hoverHit = getSelectionHudHitAt(state.input.mouseScreenX, state.input.mouseScreenY);
     const hoverSlot = hoverHit ? hoverHit.slot : null;
     const focusEntity = hoverSlot ? hoverSlot.entity : entities[entities.length - 1];
@@ -8971,22 +9165,35 @@
     ctx.fillStyle = "#ffe29a";
     ctx.font = `700 ${Math.round(15 * layout.scale)}px Cambria`;
     ctx.fillText("Selection", layout.x + layout.padding, layout.y + layout.padding + 14 * layout.scale);
-    drawLabelPill(`${entities.length} selected`, layout.x + layout.w - 86 * layout.scale, layout.y + 16 * layout.scale, focusTheme.chipFill, withAlpha(focusTheme.edge, 0.24), "#f5efe3", layout.scale, 72 * layout.scale);
+    drawLabelPill(`${layout.totalEntities} selected`, layout.x + layout.w - 86 * layout.scale, layout.y + 16 * layout.scale, focusTheme.chipFill, withAlpha(focusTheme.edge, 0.24), "#f5efe3", layout.scale, 72 * layout.scale);
     ctx.fillStyle = ownerColors[focusEntity.owner] || "#dbe6ec";
     ctx.font = `700 ${Math.round(12 * layout.scale)}px Cambria`;
-    ctx.fillText(getSelectionEntityName(focusEntity), layout.x + layout.padding, layout.y + layout.padding + 30 * layout.scale);
+    ctx.fillText(
+      truncateTextToWidth(getSelectionEntityName(focusEntity), layout.w - layout.padding * 2 - 92 * layout.scale),
+      layout.x + layout.padding,
+      layout.y + layout.padding + 30 * layout.scale,
+    );
     ctx.fillStyle = boostedCount ? "#9be7c5" : "#94a9b5";
     ctx.font = `${Math.round(11 * layout.scale)}px Cambria`;
+    const summaryText = [
+      getItemBadgeText(focusItem),
+      `HP ${Math.round(focusHpRatio * 100)}%`,
+      boostedCount ? `${boostedCount} boosted` : "",
+      layout.overflowCount ? `+${layout.overflowCount} more` : "",
+    ].filter(Boolean).join(" | ");
     ctx.fillText(
-      boostedCount
-        ? `${getItemBadgeText(focusItem)} | HP ${Math.round(focusHpRatio * 100)}% | ${boostedCount} boosted`
-        : `${getItemBadgeText(focusItem)} | HP ${Math.round(focusHpRatio * 100)}%`,
+      truncateTextToWidth(summaryText, layout.w - layout.padding * 2),
       layout.x + layout.padding,
       layout.y + layout.padding + 44 * layout.scale,
     );
-    ctx.fillStyle = "#9fb2bc";
-    ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
-    ctx.fillText("Click icon to remove. Eye enters first-person.", layout.x + layout.padding, layout.y + layout.padding + 57 * layout.scale);
+    if (profile.showSelectionHint) {
+      ctx.fillStyle = "#9fb2bc";
+      ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
+      const hintText = layout.overflowCount
+        ? `Showing ${layout.entities.length} of ${layout.totalEntities}. Click icon to remove.`
+        : "Click icon to remove. Eye enters first-person.";
+      ctx.fillText(truncateTextToWidth(hintText, layout.w - layout.padding * 2), layout.x + layout.padding, layout.y + layout.padding + 57 * layout.scale);
+    }
     layout.slots.forEach((slot) => drawSelectionEntityIcon(
       slot,
       hoverSlot && hoverSlot.entity.id === slot.entity.id,
@@ -9265,6 +9472,13 @@
     }
     const pointer = clientToCanvasPoint(event.clientX, event.clientY);
     const player = getPlayerForScreenPoint(pointer.x, pointer.y);
+    for (const other of getHumanPlayers()) {
+      if (other.owner !== player.owner) {
+        other.ui.hoverMessage = "";
+        other.ui.hoveredSlot = null;
+        other.ui.hoveredEnemyIds = [];
+      }
+    }
     markMouseInput(player);
     updatePlayerPointer(player, pointer.x, pointer.y);
   }
