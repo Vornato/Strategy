@@ -648,6 +648,8 @@
   const rareDropIndex = new Map(rareDropCatalog.map((drop) => [drop.id, drop]));
   const neutralEconomyBuildingIds = new Set(["village_house", "market", "granary", "farm", "dock"]);
   const ownedEconomyBuildingIds = new Set(["market", "granary", "farm", "command_hall", "dock", "refinery", "power_plant", "lumber_camp", "quarry", "village_house", "supply_depot", "imperial_mint", "storm_generator", "war_foundry"]);
+  const reclaimableDefeatBuildingIds = new Set(["village_house", "army_house", "archer_house", "guard_barracks", "ranger_lodge"]);
+  const aiEnemyOwners = ["enemy1", "enemy2"];
 
   const state = {
     mode: "menu",
@@ -2204,7 +2206,7 @@
   }
 
   function syncLiveControls() {
-    if (liveControls) liveControls.classList.toggle("hidden", state.mode !== "playing");
+    if (liveControls) liveControls.classList.toggle("hidden", state.mode !== "playing" || !overlay.classList.contains("hidden"));
     const primary = getPrimaryPlayer();
     const primaryHelp = getPlayerHelpState(primary);
     const difficultyLabel = state.difficulty.mode === "easy" ? "Easy" : state.difficulty.mode === "hard" ? "Hard" : "Normal";
@@ -2707,16 +2709,18 @@
         : "All allied empires were destroyed before the enemy nations fell. Launch another co-op war from the command menu.";
     } else if (isCompetitiveMatch()) {
       if (getHumanPlayers().length > 2) {
-        title.textContent = state.winnerOwner ? `${getPlayerState(state.winnerOwner).label} Wins` : "Mutual Defeat";
+        title.textContent = state.winnerOwner ? `${getOwnerDisplayLabel(state.winnerOwner)} Wins` : "Mutual Defeat";
         intro.textContent = state.winnerOwner
-          ? `${getPlayerState(state.winnerOwner).label} outlasted every rival empire in the local split-screen war. Start another battle from the command menu.`
+          ? `${getOwnerDisplayLabel(state.winnerOwner)} outlasted every rival empire in the local split-screen war. Start another battle from the command menu.`
           : "Every empire was wiped out in the same battle. Start another war from the command menu.";
       } else {
         const localOwner = getPrimaryPlayer() && getPrimaryPlayer().owner;
         const localWon = Boolean(state.winnerOwner && localOwner === state.winnerOwner);
         title.textContent = !state.winnerOwner ? "Mutual Defeat" : localWon ? "Victory" : "Defeat";
         intro.textContent = state.winnerOwner
-          ? `${getPlayerState(state.winnerOwner).label} destroyed ${getPlayerState(state.loserOwner).label}. Start another war from the command menu.`
+          ? state.loserOwner
+            ? `${getOwnerDisplayLabel(state.winnerOwner)} destroyed ${getOwnerDisplayLabel(state.loserOwner)}. Start another war from the command menu.`
+            : `${getOwnerDisplayLabel(state.winnerOwner)} outlasted every rival empire. Start another war from the command menu.`
           : "Both empires were destroyed. Start another war from the command menu.";
       }
     } else if (state.mode === "victory") {
@@ -3179,6 +3183,15 @@
 
   function getPlayerState(owner) {
     return state.players[owner] || null;
+  }
+
+  function getOwnerDisplayLabel(owner) {
+    const player = getPlayerState(owner);
+    if (player && player.label) return player.label;
+    if (owner === "enemy1") return "Enemy 1";
+    if (owner === "enemy2") return "Enemy 2";
+    if (owner === "player") return "Commander";
+    return owner || "Unknown";
   }
 
   function getHumanPlayers() {
@@ -5193,6 +5206,50 @@
     }
   }
 
+  function pickRandomEnemyAnchors(count = 2) {
+    const occupiedAnchors = Object.values(state.players)
+      .map((player) => player.startBase)
+      .filter(Boolean);
+    const pool = homelandAnchorZones
+      .map((anchor) => ({ x: anchor.x, y: anchor.y, radius: anchor.radius || 320 }))
+      .filter((anchor) => occupiedAnchors.every((base) => Math.hypot(base.x - anchor.x, base.y - anchor.y) > 220))
+      .sort(() => Math.random() - 0.5);
+    const picks = [];
+    for (const anchor of pool) {
+      if (picks.some((pick) => Math.hypot(pick.x - anchor.x, pick.y - anchor.y) < 320)) continue;
+      picks.push(anchor);
+      if (picks.length >= count) break;
+    }
+    return picks;
+  }
+
+  function spawnEnemyEmpire(owner, startBase) {
+    if (!startBase) return;
+    const facing = Math.atan2(-startBase.y, -startBase.x);
+    spawnStarterEmpire(owner, startBase, facing);
+    const supportBuildings = [
+      { itemId: Math.random() > 0.5 ? "watch_tower" : "stone_tower", x: 260, y: -60 },
+      { itemId: Math.random() > 0.5 ? "market" : "farm", x: -250, y: -120 },
+      { itemId: Math.random() > 0.5 ? "stable" : "outpost", x: 110, y: 250 },
+      { itemId: Math.random() > 0.5 ? "academy" : "watch_tower", x: -180, y: 210 },
+    ];
+    supportBuildings.forEach((entry) => {
+      const offset = rotateLayoutPoint(entry.x, entry.y, facing);
+      spawnBuilding(owner, entry.itemId, startBase.x + offset.x, startBase.y + offset.y, facing);
+    });
+    const unitRoles = ["warrior", "archer", "warrior", "knight", "captain", Math.random() > 0.5 ? "engineer" : "warrior"];
+    unitRoles.forEach((role, index) => {
+      const offset = rotateLayoutPoint(120 + index * 26, -140 + index * 34, facing);
+      const unit = spawnUnit(
+        owner,
+        role,
+        startBase.x + offset.x + randomRange(startBase.x + index * 18, -34, 34),
+        startBase.y + offset.y + randomRange(startBase.y - index * 21, -34, 34),
+      );
+      unit.angle = facing;
+    });
+  }
+
   function getCivilianCentersForPreset(preset = state.world.preset) {
     if (preset === "ocean") {
       return [
@@ -5446,54 +5503,24 @@
       });
     }
 
+    const randomEnemyAnchors = pickRandomEnemyAnchors(isCompetitiveMatch() ? Math.max(1, Math.min(2, 5 - getHumanPlayers().length)) : aiEnemyOwners.length);
+
     if (isCompetitiveMatch()) {
       for (const player of getHumanPlayers()) {
         spawnStarterEmpire(player.owner, player.startBase, player.startFacing);
       }
+      randomEnemyAnchors.forEach((anchor, index) => {
+        if (!aiEnemyOwners[index]) return;
+        spawnEnemyEmpire(aiEnemyOwners[index], anchor);
+      });
     } else if (isCoopMatch()) {
       for (const player of getHumanPlayers()) {
         spawnStarterEmpire(player.owner, player.startBase, player.startFacing);
       }
-
-      spawnBuilding("enemy1", "royal_keep", 1320, -1160);
-      spawnBuilding("enemy1", "army_house", 1140, -1240);
-      spawnBuilding("enemy1", "archer_house", 1340, -1370);
-      spawnBuilding("enemy1", "watch_tower", 1480, -980);
-      spawnBuilding("enemy1", "stone_tower", 1520, -1240);
-      spawnBuilding("enemy1", "cannon_nest", 1280, -960);
-      spawnBuilding("enemy1", "stable", 1120, -980);
-      spawnBuilding("enemy1", "academy", 980, -1180);
-      spawnBuilding("enemy1", "siege_workshop", 1220, -1450);
-      spawnBuilding("enemy1", "outpost", 1580, -1140);
-
-      spawnBuilding("enemy2", "royal_keep", 1440, 1180);
-      spawnBuilding("enemy2", "stable", 1210, 1230);
-      spawnBuilding("enemy2", "archer_house", 1430, 1380);
-      spawnBuilding("enemy2", "stone_tower", 1280, 980);
-      spawnBuilding("enemy2", "mortar_pit", 1520, 980);
-      spawnBuilding("enemy2", "cannon_nest", 1600, 1180);
-      spawnBuilding("enemy2", "watch_tower", 1250, 1320);
-      spawnBuilding("enemy2", "academy", 1160, 1110);
-      spawnBuilding("enemy2", "siege_workshop", 1500, 1450);
-      spawnBuilding("enemy2", "outpost", 1680, 1290);
-
-      spawnUnit("enemy1", "warrior", 1120, -1120);
-      spawnUnit("enemy1", "warrior", 1040, -1180);
-      spawnUnit("enemy1", "archer", 1220, -1060);
-      spawnUnit("enemy1", "archer", 1310, -1160);
-      spawnUnit("enemy1", "knight", 1360, -1290);
-      spawnUnit("enemy1", "captain", 1180, -1340);
-      spawnUnit("enemy1", "engineer", 980, -1280);
-      spawnUnit("enemy1", "lightTank", 1470, -1350);
-      spawnUnit("enemy2", "knight", 1320, 1120);
-      spawnUnit("enemy2", "knight", 1390, 1220);
-      spawnUnit("enemy2", "warrior", 1240, 1210);
-      spawnUnit("enemy2", "warrior", 1320, 1280);
-      spawnUnit("enemy2", "archer", 1500, 1300);
-      spawnUnit("enemy2", "archer", 1410, 1110);
-      spawnUnit("enemy2", "captain", 1200, 1330);
-      spawnUnit("enemy2", "engineer", 1540, 1350);
-      spawnUnit("enemy2", "hovercraft", 1660, 1200);
+      randomEnemyAnchors.forEach((anchor, index) => {
+        if (!aiEnemyOwners[index]) return;
+        spawnEnemyEmpire(aiEnemyOwners[index], anchor);
+      });
     } else {
       spawnBuilding("player", "royal_keep", -1180, 980);
       spawnBuilding("player", "army_house", -1000, 980);
@@ -5504,23 +5531,14 @@
       spawnBuilding("player", "lumber_camp", -1330, 1120);
       spawnBuilding("player", "quarry", -1110, 790);
 
-      spawnBuilding("enemy1", "royal_keep", 1320, -1160);
-      spawnBuilding("enemy1", "army_house", 1140, -1240);
-      spawnBuilding("enemy1", "watch_tower", 1480, -980);
-      spawnBuilding("enemy1", "cannon_nest", 1280, -960);
-      spawnBuilding("enemy2", "royal_keep", 1440, 1180);
-      spawnBuilding("enemy2", "stable", 1210, 1230);
-      spawnBuilding("enemy2", "stone_tower", 1280, 980);
-      spawnBuilding("enemy2", "mortar_pit", 1520, 980);
-
       spawnUnit("player", "warrior", -980, 1100);
       spawnUnit("player", "warrior", -1040, 1140);
       spawnUnit("player", "archer", -1180, 1260);
       spawnUnit("player", "knight", -1260, 1000);
-      spawnUnit("enemy1", "warrior", 1120, -1120);
-      spawnUnit("enemy1", "archer", 1220, -1060);
-      spawnUnit("enemy2", "knight", 1320, 1120);
-      spawnUnit("enemy2", "warrior", 1240, 1210);
+      randomEnemyAnchors.forEach((anchor, index) => {
+        if (!aiEnemyOwners[index]) return;
+        spawnEnemyEmpire(aiEnemyOwners[index], anchor);
+      });
 
       addQuest({ title: "Raise the Crownlands", desc: "Build 4 new structures.", kind: "build", target: 4, reward: 220 });
       addQuest({ title: "Timber and Stone", desc: "Harvest 9 resource nodes.", kind: "harvest", target: 9, reward: 260 });
@@ -5967,6 +5985,14 @@
 
   function getCompetitiveAliveOpponents(owner) {
     return getCompetitiveOpponents(owner).filter((candidate) => ownerHasForces(candidate));
+  }
+
+  function getActiveCombatOwners() {
+    return [...new Set(
+      [...state.world.buildings, ...state.world.units]
+        .map((entity) => entity.owner)
+        .filter((owner) => owner && owner !== "neutral"),
+    )];
   }
 
   function getCompetitiveTotals(owner) {
@@ -7118,6 +7144,23 @@
     return true;
   }
 
+  function reclaimDefeatedHousing(defeatedOwner, claimantOwner) {
+    if (!defeatedOwner || !claimantOwner || defeatedOwner === claimantOwner) return 0;
+    let captured = 0;
+    for (const building of state.world.buildings) {
+      if (building.owner !== defeatedOwner) continue;
+      if (!reclaimableDefeatBuildingIds.has(building.itemId)) continue;
+      building.owner = claimantOwner;
+      building.lastHitTimer = Math.max(building.lastHitTimer || 0, 0.2);
+      building.spawnCooldown = Math.min(building.spawnCooldown || 0, 4);
+      captured += 1;
+    }
+    if (captured && isHumanOwner(claimantOwner)) {
+      notify(`Reclaimed ${captured} enemy house${captured === 1 ? "" : "s"} for ${getOwnerDisplayLabel(claimantOwner)}.`, "#7df2ab");
+    }
+    return captured;
+  }
+
   function applyDamage(entity, rawDamage, projectileType, owner, armorPierce = 1) {
     const modifier = getArmorModifier(entity.armor || "flesh", projectileType || "melee");
     const damage = rawDamage * modifier * armorPierce;
@@ -7132,6 +7175,7 @@
   }
 
   function killEntity(entity, owner) {
+    const defeatedOwner = entity.owner;
     if (entity.kind === "animal") {
       addCoins(owner, 20);
       incrementQuest("harvest", 1);
@@ -7150,6 +7194,9 @@
     spawnEffect("smoke", entity.x, entity.y, (entity.radius || 16) * 1.8, "rgba(45,50,58,0.7)", 1.3);
     playWorldSound("impactBlast", entity.x, entity.y, { cooldown: 0.09, volume: entity.kind === "building" ? 1 : 0.82 });
     removeEntity(entity);
+    if (entity.kind === "building" && entity.itemId === "royal_keep" && owner && defeatedOwner && defeatedOwner !== owner) {
+      reclaimDefeatedHousing(defeatedOwner, owner);
+    }
   }
 
   function findNearest(collection, x, y, predicate = () => true) {
@@ -7248,7 +7295,7 @@
       building.taxReserve = Math.min(building.maxTaxReserve, building.taxReserve + dt * reserveRate);
     }
     const canProduce = isCompetitiveMatch()
-      ? isHumanOwner(building.owner)
+      ? building.owner !== "neutral"
       : isCoopMatch()
         ? building.owner !== "neutral"
         : isHardModeActive()
@@ -7748,12 +7795,18 @@
     }
 
     if (isCompetitiveMatch()) {
-      const aliveOwners = getHumanOwners().filter((owner) => ownerHasForces(owner));
-      if (aliveOwners.length <= 1) {
-        state.mode = aliveOwners.length === 1 ? "victory" : "defeat";
-        state.winnerOwner = aliveOwners[0] || null;
-        if (getHumanPlayers().length === 2 && aliveOwners.length === 1) {
-          state.loserOwner = getHumanOwners().find((owner) => owner !== aliveOwners[0]) || null;
+      const aliveHumanOwners = getHumanOwners().filter((owner) => ownerHasForces(owner));
+      const aliveCombatOwners = getActiveCombatOwners().filter((owner) => ownerHasForces(owner));
+      if (!aliveHumanOwners.length) {
+        state.mode = "defeat";
+        state.winnerOwner = aliveCombatOwners[0] || null;
+        state.loserOwner = null;
+        showMatchResultOverlay();
+      } else if (aliveCombatOwners.length === 1) {
+        state.winnerOwner = aliveCombatOwners[0] || null;
+        state.mode = isHumanOwner(state.winnerOwner) ? "victory" : "defeat";
+        if (getHumanPlayers().length === 2 && state.winnerOwner && isHumanOwner(state.winnerOwner)) {
+          state.loserOwner = getHumanOwners().find((owner) => owner !== state.winnerOwner) || null;
         } else {
           state.loserOwner = null;
         }
@@ -11760,6 +11813,27 @@
         event.preventDefault();
         if (state.admin.slashOpen) closeSlashCommand();
         else if (state.admin.panelOpen) closeAdminPanel();
+        return;
+      }
+      return;
+    }
+    if (state.mode === "menu") {
+      if (key === "escape") {
+        event.preventDefault();
+        if (state.menu.screen === "levels") {
+          state.menu.pendingLanAction = null;
+          state.menu.lanArmed = false;
+          if (state.menu.pendingMode === "single") showMenuScreen("root");
+          else showMenuScreen("multiplayer");
+          syncMenuFlowUi();
+        } else if (state.menu.screen === "multiplayer" || state.menu.screen === "quit") {
+          state.menu.pendingMode = "single";
+          state.menu.pendingPlayerCount = 1;
+          state.menu.pendingLanAction = null;
+          state.menu.lanArmed = false;
+          showMenuScreen("root");
+          syncMenuFlowUi();
+        }
         return;
       }
       return;
