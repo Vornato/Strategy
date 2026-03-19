@@ -46,9 +46,13 @@
   const lanPanel = document.getElementById("lan-panel");
   const lanInputs = document.getElementById("lan-inputs");
   const lanCodeInput = document.getElementById("lan-code-input");
+  const lanHostIpInput = document.getElementById("lan-host-ip-input");
   const lanLinkInput = document.getElementById("lan-link-input");
   const lanHint = document.getElementById("lan-hint");
   const lanStatus = document.getElementById("lan-status");
+  const lanPlayerIndicator = document.getElementById("lan-player-indicator");
+  const lanPlayerDots = lanPlayerIndicator ? lanPlayerIndicator.querySelectorAll(".lan-player-dot") : [];
+  const lanStartBtn = document.getElementById("lan-start-btn");
   const controllerStatus = document.getElementById("controller-status");
   const liveControls = document.getElementById("live-controls");
   const difficultyBtn = document.getElementById("difficulty-btn");
@@ -58,6 +62,7 @@
   const speedFastBtn = document.getElementById("speed-fast-btn");
   const speedUltraBtn = document.getElementById("speed-ultra-btn");
   const helpBtn = document.getElementById("help-btn");
+  const techTreeBtn = document.getElementById("tech-tree-btn");
   const liveSettingsBtn = document.getElementById("live-settings-btn");
   const saveMatchBtn = document.getElementById("save-match-btn");
   const assistStatus = document.getElementById("assist-status");
@@ -145,7 +150,9 @@
   const DEFAULT_KEYBINDS = {
     openWeapons: "q",
     openAssets: "e",
+    openTechTree: "t",
     clearSelection: "x",
+    heroAbility: "space",
     fullscreen: "f",
     help: "h",
     openSettings: "o",
@@ -162,7 +169,9 @@
   const KEYBIND_LABELS = {
     openWeapons: "Weapons",
     openAssets: "Assets",
+    openTechTree: "Tech Tree",
     clearSelection: "Clear",
+    heroAbility: "Hero Ability",
     fullscreen: "Fullscreen",
     help: "Help",
     openSettings: "Settings",
@@ -227,6 +236,35 @@
       open: true,
       steps: Object.fromEntries(TUTORIAL_STEP_ORDER.map((step) => [step, false])),
       lastCompletedStep: null,
+      lastCompletedAt: -999,
+    };
+  }
+
+  function createHeroState(owner = null) {
+    return {
+      owner,
+      archetypeId: null,
+      unitId: null,
+      level: 1,
+      xp: 0,
+      nextXp: 120,
+      deaths: 0,
+      respawnTimer: 0,
+      abilityCooldown: 0,
+      activeBuffTimer: 0,
+      lastAbilityAt: -999,
+      lastLevelUpAt: -999,
+      rewardFlash: 0,
+    };
+  }
+
+  function createTechState() {
+    return {
+      researched: {},
+      currentId: null,
+      progress: 0,
+      lastCompletedId: null,
+      lastStartedAt: -999,
       lastCompletedAt: -999,
     };
   }
@@ -598,6 +636,332 @@
   const airborneRoles = new Set(["copter", "drone", "gunship", "stealthDrone"]);
   const hoverRoles = new Set(["hovercraft", "assaultSkiff"]);
   const healerRoles = new Set(["repair", "medic"]);
+  const humanCommanderArchetypeOrder = ["warden_knight", "iron_marshal", "shadow_seer", "raider_khan"];
+  const factionDoctrinePresetMap = {
+    green: ["fortress_kingdom", "raider_horde"],
+    canyon: ["fortress_kingdom", "iron_legion"],
+    desert: ["raider_horde", "shadow_order"],
+    ocean: ["iron_legion", "shadow_order"],
+  };
+  const HERO_ARCHETYPE_DEFS = {
+    warden_knight: {
+      id: "warden_knight",
+      name: "Warden Knight",
+      subtitle: "Fortress commander",
+      baseRole: "captain",
+      displayRole: "captain",
+      passiveAura: { radius: 210, attackMult: 1.08, defenseMult: 1.12, visionMult: 1.06, desc: "Nearby allies hold the line harder." },
+      active: {
+        id: "royal_rally",
+        name: "Royal Rally",
+        cooldown: 28,
+        radius: 200,
+        duration: 10,
+        desc: "Heals nearby allies and amplifies the command aura.",
+      },
+      baseStats: { hp: 250, damage: 30, range: 52, speed: 82, cooldown: 0.76, armor: "plate", radius: 15 },
+      growth: { hp: 28, damage: 4, range: 6, speed: 1.8 },
+      firstPerson: { sprint: 1.48, aim: 0.54, zoom: 1.42, desc: "Steadier shield-wall aim and heavier sprint." },
+      respawn: 18,
+    },
+    raider_khan: {
+      id: "raider_khan",
+      name: "Raider Khan",
+      subtitle: "Shock vanguard",
+      baseRole: "paladin",
+      displayRole: "paladin",
+      passiveAura: { radius: 220, speedMult: 1.14, captureMult: 1.3, attackMult: 1.06, desc: "Rushes and captures swing faster." },
+      active: {
+        id: "blood_onslaught",
+        name: "Blood Onslaught",
+        cooldown: 24,
+        radius: 180,
+        duration: 8,
+        desc: "Bursts through nearby enemies and whips allies into a fast charge.",
+      },
+      baseStats: { hp: 280, damage: 34, range: 52, speed: 94, cooldown: 0.68, armor: "plate", radius: 16 },
+      growth: { hp: 24, damage: 5, range: 4, speed: 2.4 },
+      firstPerson: { sprint: 1.56, aim: 0.58, zoom: 1.38, desc: "Aggressive hero sprint and tighter melee lunge." },
+      respawn: 16,
+    },
+    iron_marshal: {
+      id: "iron_marshal",
+      name: "Iron Marshal",
+      subtitle: "Siege coordinator",
+      baseRole: "sniper",
+      displayRole: "sniper",
+      passiveAura: { radius: 230, attackRateMult: 1.12, rangeMult: 1.08, defenseMult: 1.06, desc: "Nearby gunlines and batteries fire cleaner." },
+      active: {
+        id: "shock_barrage",
+        name: "Shock Barrage",
+        cooldown: 30,
+        radius: 210,
+        duration: 8,
+        desc: "Drops an explosive command barrage and overclocks nearby units.",
+      },
+      baseStats: { hp: 230, damage: 42, range: 320, speed: 74, cooldown: 1.12, armor: "steel", radius: 14, projectile: "bullet" },
+      growth: { hp: 22, damage: 6, range: 10, speed: 1.2 },
+      firstPerson: { sprint: 1.38, aim: 0.46, zoom: 1.48, desc: "Sharper zoom and tighter recoil discipline." },
+      respawn: 20,
+    },
+    shadow_seer: {
+      id: "shadow_seer",
+      name: "Shadow Seer",
+      subtitle: "Signal saboteur",
+      baseRole: "crossbowman",
+      displayRole: "crossbowman",
+      passiveAura: { radius: 225, rangeMult: 1.12, visionMult: 1.16, attackMult: 1.05, desc: "Extends allied sightlines and precision." },
+      active: {
+        id: "veil_pulse",
+        name: "Veil Pulse",
+        cooldown: 26,
+        radius: 210,
+        duration: 10,
+        desc: "EMP shock, reveal burst, and shadow aura surge.",
+      },
+      baseStats: { hp: 210, damage: 32, range: 270, speed: 86, cooldown: 1.02, armor: "flesh", radius: 13, projectile: "pulse" },
+      growth: { hp: 20, damage: 5, range: 10, speed: 1.9 },
+      firstPerson: { sprint: 1.44, aim: 0.42, zoom: 1.52, desc: "Fast recon footing with the cleanest hero ADS." },
+      respawn: 17,
+    },
+  };
+  const FACTION_DOCTRINE_DEFS = {
+    fortress_kingdom: {
+      id: "fortress_kingdom",
+      name: "Fortress Kingdom",
+      shortName: "Fortress",
+      desc: "Disciplined tower lines, heavier keeps, slower pushes, and patient counter-attacks.",
+      heroArchetypeId: "warden_knight",
+      supportBuildings: ["stone_tower", "chapel", "market", "shield_bastion"],
+      unitRoles: ["pikeman", "crossbowman", "warrior", "captain", "knight"],
+      waveTable: [
+        ["warrior", "archer"],
+        ["pikeman", "crossbowman", "knight"],
+        ["pikeman", "crossbowman", "captain", "catapult"],
+        ["paladin", "crossbowman", "cannon", "shieldCarrier"],
+        ["paladin", "crossbowman", "siegeMech", "railgunTank"],
+      ],
+      aggroRange: 360,
+      productionMult: 1.04,
+      waveCooldownMult: 1.12,
+      captureBias: 0.74,
+      preferredCaptureTypes: ["watchtower", "radar_point"],
+    },
+    raider_horde: {
+      id: "raider_horde",
+      name: "Raider Horde",
+      shortName: "Raiders",
+      desc: "Fast infantry waves, earlier assaults, wider flanks, and stronger territory snatches.",
+      heroArchetypeId: "raider_khan",
+      supportBuildings: ["watch_tower", "farm", "stable", "outpost"],
+      unitRoles: ["warrior", "warrior", "knight", "scout", "captain"],
+      waveTable: [
+        ["warrior", "warrior", "archer"],
+        ["warrior", "knight", "scout", "archer"],
+        ["knight", "paladin", "warrior", "fireCart"],
+        ["paladin", "warWagon", "warrior", "sapper"],
+        ["paladin", "siegeMech", "warWagon", "flameTank"],
+      ],
+      aggroRange: 560,
+      productionMult: 1.16,
+      waveCooldownMult: 0.82,
+      captureBias: 1.34,
+      preferredCaptureTypes: ["treasury_post", "supply_depot", "shrine_beacon"],
+    },
+    iron_legion: {
+      id: "iron_legion",
+      name: "Iron Legion",
+      shortName: "Iron Legion",
+      desc: "Armor-heavy formations, artillery escorts, and slower but denser industrial pressure.",
+      heroArchetypeId: "iron_marshal",
+      supportBuildings: ["tesla_spire", "refinery", "war_foundry", "rail_fort"],
+      unitRoles: ["sapper", "sniper", "lightTank", "captain", "flameTank"],
+      waveTable: [
+        ["musketeer", "sapper", "lightTank"],
+        ["sniper", "lightTank", "mediumTank"],
+        ["flameTank", "rocketTruck", "captain", "cannon"],
+        ["mediumTank", "flameTank", "aaHalftrack", "rocketTruck"],
+        ["heavyTank", "railgunTank", "siegeMech", "missileCarrier"],
+      ],
+      aggroRange: 460,
+      productionMult: 1.1,
+      waveCooldownMult: 0.94,
+      captureBias: 1.02,
+      preferredCaptureTypes: ["mine_quarry", "radar_point", "supply_depot"],
+    },
+    shadow_order: {
+      id: "shadow_order",
+      name: "Shadow Order",
+      shortName: "Shadow",
+      desc: "Recon-driven pressure, drones, stealth volleys, and disruptive signal warfare.",
+      heroArchetypeId: "shadow_seer",
+      supportBuildings: ["signal_beacon", "observatory", "drone_lab", "outpost"],
+      unitRoles: ["scout", "archer", "sniper", "stealthDrone", "captain"],
+      waveTable: [
+        ["archer", "scout", "sniper"],
+        ["crossbowman", "sniper", "stealthDrone"],
+        ["sniper", "gunship", "stealthDrone", "captain"],
+        ["stealthDrone", "gunship", "shieldCarrier", "sniper"],
+        ["gunship", "stealthDrone", "railgunTank", "shieldCarrier"],
+      ],
+      aggroRange: 520,
+      productionMult: 1.08,
+      waveCooldownMult: 0.9,
+      captureBias: 1.18,
+      preferredCaptureTypes: ["shrine_beacon", "radar_point", "watchtower"],
+    },
+  };
+  const CONTROL_POINT_DEFS = {
+    watchtower: {
+      id: "watchtower",
+      name: "Watchtower",
+      itemId: "watch_tower",
+      desc: "Extends sightlines and grants a wider reveal ring.",
+      bonusText: "Vision +8%",
+      visionRadius: 380,
+      bonuses: { visionMult: 1.08 },
+    },
+    treasury_post: {
+      id: "treasury_post",
+      name: "Treasury Post",
+      itemId: "market",
+      desc: "Converts territory into steady coin income.",
+      bonusText: "+14 Income",
+      bonuses: { incomeFlat: 14 },
+    },
+    supply_depot: {
+      id: "supply_depot",
+      name: "Supply Depot",
+      itemId: "supply_depot",
+      desc: "Keeps nearby lines stocked and faster to produce.",
+      bonusText: "Prod +10%",
+      bonuses: { productionMult: 1.1 },
+    },
+    shrine_beacon: {
+      id: "shrine_beacon",
+      name: "Shrine Beacon",
+      itemId: "signal_beacon",
+      desc: "Feeds commanders extra experience and faster recovery.",
+      bonusText: "Hero XP +25%",
+      bonuses: { heroXpMult: 1.25, heroRespawnMult: 0.84 },
+    },
+    mine_quarry: {
+      id: "mine_quarry",
+      name: "Mine Quarry",
+      itemId: "quarry",
+      desc: "Drips extra coin, wood, and stone over time.",
+      bonusText: "+9 resources",
+      bonuses: { resourceTick: { coins: 5, wood: 2, stone: 2 }, resourceTickInterval: 12 },
+    },
+    radar_point: {
+      id: "radar_point",
+      name: "Radar Point",
+      itemId: "radar_hub",
+      desc: "Improves defense range and makes the minimap read farther.",
+      bonusText: "Range +10%",
+      visionRadius: 420,
+      bonuses: { defenseRangeMult: 1.1, visionMult: 1.1 },
+    },
+  };
+  const TECH_BRANCH_ORDER = ["economy", "warfare", "advanced"];
+  const TECH_TREE_DEFS = [
+    { id: "ledger_network", branch: "economy", name: "Ledger Network", cost: 180, time: 22, desc: "Train a tighter tax and harvest ledger.", effects: { incomeMult: 1.12, heroXpMult: 1.08 }, unlocks: [] },
+    { id: "merchant_compacts", branch: "economy", name: "Merchant Compacts", cost: 260, time: 30, requires: ["ledger_network"], exclusiveGroup: "civic_focus", desc: "Open the wealth branch with mint and command logistics.", effects: { incomeMult: 1.16, incomeFlat: 10, researchRate: 1.08 }, unlocks: ["supply_depot", "command_hall", "imperial_mint"] },
+    { id: "tribute_forges", branch: "economy", name: "Tribute Forges", cost: 280, time: 32, requires: ["ledger_network"], exclusiveGroup: "civic_focus", desc: "Redirect the economy into heavy industry and output.", effects: { productionMult: 1.1, resourceTickMult: 1.2, unitHpMult: 1.05 }, unlocks: ["refinery", "power_plant"] },
+    { id: "steel_drill", branch: "warfare", name: "Steel Drill", cost: 220, time: 24, desc: "Harden the core line infantry and training routines.", effects: { attackMult: 1.08, captureMult: 1.1 }, unlocks: ["guard_barracks", "ranger_lodge", "pikemen", "crossbow_volley"] },
+    { id: "cavalry_code", branch: "warfare", name: "Cavalry Code", cost: 300, time: 34, requires: ["steel_drill"], exclusiveGroup: "war_path", desc: "Commit the army to mounted breakouts and frontier raids.", effects: { speedMult: 1.08, heroAuraMult: 1.08, captureMult: 1.1 }, unlocks: ["lancer_stable", "paladin_charge", "war_wagon"] },
+    { id: "siege_mastery", branch: "warfare", name: "Siege Mastery", cost: 320, time: 36, requires: ["steel_drill"], exclusiveGroup: "war_path", desc: "Commit the army to guns, workshops, and breach craft.", effects: { attackMult: 1.06, defenseRangeMult: 1.06, siegeDamageMult: 1.16 }, unlocks: ["siege_workshop", "cannon_nest", "mortar_pit", "siege_foundry", "siege_mech", "fire_cart"] },
+    { id: "signal_intelligence", branch: "advanced", name: "Signal Intelligence", cost: 340, time: 38, requires: ["ledger_network", "steel_drill"], desc: "Open up beacon, radar, drone, and air command layers.", effects: { visionMult: 1.12, rangeMult: 1.06, heroCooldownMult: 1.08 }, unlocks: ["signal_beacon", "radar_hub", "observatory", "drone_lab", "airstrip", "gunship", "stealth_drone", "sniper_team"] },
+    { id: "industrial_mobilization", branch: "advanced", name: "Industrial Mobilization", cost: 360, time: 40, requires: ["steel_drill"], desc: "Scale the war machine into mechanized columns and field repair.", effects: { productionMult: 1.14, unitHpMult: 1.08, attackRateMult: 1.04 }, unlocks: ["repair_bay", "war_foundry", "flame_tank", "aa_halftrack", "rocket_truck", "sappers", "missile_carrier"] },
+    { id: "future_arsenal", branch: "advanced", name: "Future Arsenal", cost: 460, time: 46, requires: ["signal_intelligence", "industrial_mobilization"], desc: "Field the late-war fortress breakers and orbital package.", effects: { attackMult: 1.12, rangeMult: 1.08, heroAbilityPower: 1.18 }, unlocks: ["storm_generator", "rail_fort", "missile_silo", "hover_port", "railgun_tank", "shield_carrier", "orbital_laser", "gravity_bomb", "nano_swarm", "repair_drone"] },
+  ];
+  const techTreeIndex = new Map(TECH_TREE_DEFS.map((tech) => [tech.id, tech]));
+  const ITEM_TECH_REQUIREMENTS = Object.fromEntries(
+    TECH_TREE_DEFS.flatMap((tech) => (tech.unlocks || []).map((itemId) => [itemId, tech.id])),
+  );
+  const BOSS_WAVE_SEQUENCE = [
+    { wave: 3, bossId: "iron_behemoth" },
+    { wave: 6, bossId: "necro_bell_tower" },
+    { wave: 9, bossId: "storm_engine" },
+    { wave: 12, bossId: "sand_worm" },
+  ];
+  const BOSS_ENCOUNTER_DEFS = {
+    iron_behemoth: {
+      id: "iron_behemoth",
+      name: "Iron Behemoth",
+      type: "unit",
+      role: "heavyTank",
+      tint: "#ffd18a",
+      reward: { coins: 240, heroXp: 160, researchBoost: 0.28 },
+      desc: "Siege super-heavy that crushes walls and frontlines with layered shells.",
+      hp: 2200,
+      damage: 110,
+      splash: 110,
+      range: 340,
+      speed: 42,
+      cooldown: 1.25,
+      armor: "steel",
+      radius: 26,
+      ability: { interval: 8, radius: 150, damage: 160 },
+    },
+    necro_bell_tower: {
+      id: "necro_bell_tower",
+      name: "Necro Bell Tower",
+      type: "building",
+      itemId: "stone_tower",
+      tint: "#d8c7ff",
+      reward: { coins: 260, heroXp: 180, researchBoost: 0.3 },
+      desc: "Anchored dread tower that tolls out reinforcements and dark pulses.",
+      hp: 2600,
+      damage: 48,
+      range: 360,
+      cooldown: 1.35,
+      armor: "stone",
+      radius: 34,
+      ability: { interval: 10, summonRoles: ["warrior", "archer", "captain"], pulseDamage: 85, radius: 180 },
+    },
+    storm_engine: {
+      id: "storm_engine",
+      name: "Storm Engine",
+      type: "unit",
+      role: "shieldCarrier",
+      tint: "#8feaff",
+      reward: { coins: 300, heroXp: 200, researchBoost: 0.34 },
+      desc: "Hovering storm battery that bursts EMP arcs through whole formations.",
+      hp: 2000,
+      damage: 80,
+      splash: 56,
+      range: 290,
+      speed: 76,
+      cooldown: 0.62,
+      armor: "steel",
+      radius: 24,
+      hover: true,
+      ability: { interval: 9, radius: 210, damage: 95, emp: 5.5 },
+    },
+    sand_worm: {
+      id: "sand_worm",
+      name: "Sand Worm",
+      type: "unit",
+      role: "siegeMech",
+      tint: "#f4c78a",
+      reward: { coins: 320, heroXp: 220, researchBoost: 0.38 },
+      desc: "Burrowing predator that disappears under the field before erupting into the line.",
+      hp: 2400,
+      damage: 125,
+      splash: 120,
+      range: 86,
+      speed: 96,
+      cooldown: 0.92,
+      armor: "plate",
+      radius: 28,
+      ability: { interval: 8.5, radius: 190, damage: 170, burrowDuration: 2.4 },
+    },
+  };
+  allItems.forEach((item) => {
+    const techRequirement = ITEM_TECH_REQUIREMENTS[item.id];
+    if (techRequirement) item.techRequirement = techRequirement;
+  });
 
   const terrainPalette = {
     meadow: ["#617f49", "#769a57", "#4b683b"],
@@ -723,9 +1087,11 @@
       drops: [],
       notifications: [],
       quests: [],
+      controlPoints: [],
     },
     ui: {
       openPanel: null,
+      techTreeOpen: false,
       activePlacementId: null,
       placementAngle: 0,
       relocatingBuildingId: null,
@@ -743,6 +1109,10 @@
       recentMessage: "Build, tax, and conquer the rival nations.",
       help: createHelpState(),
     },
+    hero: createHeroState(),
+    tech: createTechState(),
+    factions: {},
+    boss: createBossState(),
     settings: loadStoredSettings(),
     settingsUi: {
       listeningAction: null,
@@ -2396,6 +2766,19 @@
     if (lanInputs) lanInputs.classList.toggle("hidden", !isLanPending || !state.menu.lanArmed);
   }
 
+  function syncLanPlayerIndicator() {
+    const isLanLobby = isLanLobbyActive();
+    const isHost = state.lan && state.lan.role === "host";
+    const guestJoined = state.lan && state.lan.guestJoined;
+    if (lanPlayerIndicator) lanPlayerIndicator.classList.toggle("hidden", !isLanLobby);
+    if (lanPlayerDots.length >= 2) {
+      lanPlayerDots[1].classList.toggle("hidden", !guestJoined);
+    }
+    if (lanStartBtn) {
+      lanStartBtn.classList.toggle("hidden", !isHost || !guestJoined);
+    }
+  }
+
   function syncMenuFlowUi() {
     const pendingMode = state.menu.pendingMode;
     const pendingLabel = getPendingMenuLabel();
@@ -2494,6 +2877,7 @@
           ? "LAN room ready. Host can start when everyone is set."
           : "Joined LAN room. Waiting for host to start.");
       syncMenuFlowUi();
+      syncLanPlayerIndicator();
       return;
     }
     startBtn.disabled = false;
@@ -2501,6 +2885,7 @@
     if (settingsBtn) settingsBtn.disabled = false;
     if (exitBtn) exitBtn.disabled = false;
     syncMenuFlowUi();
+    syncLanPlayerIndicator();
   }
 
   function resetLanSessionState() {
@@ -2520,6 +2905,7 @@
     state.lan.started = false;
     state.lan.startedAt = 0;
     if (lanCodeInput) lanCodeInput.value = "";
+    if (lanHostIpInput) lanHostIpInput.value = "";
     setLanLink("");
     const sharedRoom = getSharedRoomConfigFromUrl();
     state.lan.linkRoomCode = sharedRoom ? sharedRoom.roomCode : "";
@@ -2574,6 +2960,13 @@
         : `Help / Tutorial ${completedCount ? `(${completedCount}/${TUTORIAL_STEP_ORDER.length})` : `(${helpKey})`}`;
       helpBtn.title = "Open the field guide for controls, tutorial steps, and hotkeys.";
     }
+    if (techTreeBtn && primary) {
+      techTreeBtn.textContent = primary.ui && primary.ui.techTreeOpen
+        ? `Close Tech Tree (${formatKeybindLabel(getKeybind("openTechTree"))})`
+        : `Tech Tree (${formatKeybindLabel(getKeybind("openTechTree"))})`;
+      techTreeBtn.setAttribute("aria-pressed", primary.ui && primary.ui.techTreeOpen ? "true" : "false");
+      techTreeBtn.title = "Open the branching research panel to unlock new options and commit to exclusive paths.";
+    }
     if (liveSettingsBtn) {
       liveSettingsBtn.textContent = `Settings (${formatKeybindLabel(getKeybind("openSettings"))})`;
       liveSettingsBtn.title = "Adjust graphics, audio, font size, and color assist without leaving the match.";
@@ -2589,6 +2982,7 @@
     const speedDisabled = isLanMatch();
     if (difficultyBtn) difficultyBtn.disabled = assistControlsDisabled;
     if (ceasefireBtn) ceasefireBtn.disabled = assistControlsDisabled;
+    if (techTreeBtn) techTreeBtn.disabled = state.mode !== "playing" || !primary;
     if (speedSlowBtn) speedSlowBtn.textContent = `0.5x (${formatKeybindLabel(getKeybind("speedSlow"))})`;
     if (speedNormalBtn) speedNormalBtn.textContent = `1x (${formatKeybindLabel(getKeybind("speedNormal"))})`;
     if (speedFastBtn) speedFastBtn.textContent = `2x (${formatKeybindLabel(getKeybind("speedFast"))})`;
@@ -2731,6 +3125,7 @@
       }
     }
     let lastError = null;
+    let lastAttemptUrl = null;
     for (const attempt of [...new Set(attempts)]) {
       const controller = typeof AbortController === "function" ? new AbortController() : null;
       const timeoutId = controller ? window.setTimeout(() => controller.abort(), isLanApi ? getLanApiTimeout(url) : 5000) : 0;
@@ -2755,10 +3150,14 @@
       } catch (error) {
         if (timeoutId) window.clearTimeout(timeoutId);
         lastError = coerceRequestError(error, "Request failed.");
+        lastAttemptUrl = attempt;
+        if (isLanApi) {
+          console.debug(`[LAN] request attempt failed: ${attempt} -> ${lastError.message}`);
+        }
         if (!isLanApi) break;
       }
     }
-    throw lastError || new Error("Request failed.");
+    throw new Error(`${(lastError && lastError.message) || "Request failed."}${lastAttemptUrl ? ` (tried: ${lastAttemptUrl})` : ""}`);
   }
 
   function serializeLanSnapshot() {
@@ -2772,6 +3171,17 @@
       ids: state.ids,
       waves: { ...state.waves },
       difficulty: { ...state.difficulty },
+      factions: Object.fromEntries(
+        Object.entries(state.factions || {}).map(([owner, faction]) => [
+          owner,
+          {
+            ...faction,
+            hero: faction.hero ? cloneHeroState(faction.hero) : null,
+            tech: faction.tech ? cloneTechState(faction.tech) : null,
+          },
+        ]),
+      ),
+      boss: { ...createBossState(), ...(state.boss || {}) },
       players: Object.fromEntries(
         Object.entries(state.players).map(([owner, player]) => [
           owner,
@@ -2779,6 +3189,8 @@
             owner: player.owner,
             label: player.label,
             resources: { ...player.resources },
+            hero: cloneHeroState(player.hero),
+            tech: cloneTechState(player.tech),
             quickSlots: {
               assets: [...player.quickSlots.assets],
               weapons: [...player.quickSlots.weapons],
@@ -2801,6 +3213,7 @@
         drops: state.world.drops.map(({ def, ...drop }) => ({ ...drop, defId: def.id })),
         notifications: state.world.notifications.slice(-8).map((note) => ({ ...note })),
         quests: state.world.quests.map((quest) => ({ ...quest })),
+        controlPoints: (state.world.controlPoints || []).map((point) => ({ ...point })),
       },
     };
   }
@@ -2826,6 +3239,18 @@
     }));
     state.world.notifications = (world.notifications || []).map((note) => ({ ...note }));
     state.world.quests = (world.quests || []).map((quest) => ({ ...quest }));
+    state.world.controlPoints = (world.controlPoints || []).map((point) => ({ ...point }));
+    state.factions = Object.fromEntries(
+      Object.entries(snapshot.factions || {}).map(([owner, faction]) => [
+        owner,
+        {
+          ...faction,
+          hero: faction && faction.hero ? cloneHeroState(faction.hero) : null,
+          tech: faction && faction.tech ? cloneTechState(faction.tech) : null,
+        },
+      ]),
+    );
+    state.boss = { ...createBossState(), ...(snapshot.boss || {}) };
     if (state.world.tiles.length) renderTerrainCache();
   }
 
@@ -2843,6 +3268,7 @@
     const ui = player && player.ui ? player.ui : state.ui;
     return {
       openPanel: ui.openPanel || null,
+      techTreeOpen: Boolean(ui.techTreeOpen),
       activePlacementId: ui.activePlacementId || null,
       placementAngle: Number.isFinite(ui.placementAngle) ? ui.placementAngle : 0,
       relocatingBuildingId: ui.relocatingBuildingId || null,
@@ -2903,6 +3329,7 @@
     }
     if (data.ui) {
       player.ui.openPanel = data.ui.openPanel || null;
+      player.ui.techTreeOpen = Boolean(data.ui.techTreeOpen);
       player.ui.activePlacementId = data.ui.activePlacementId || null;
       player.ui.placementAngle = Number.isFinite(data.ui.placementAngle) ? data.ui.placementAngle : 0;
       player.ui.relocatingBuildingId = data.ui.relocatingBuildingId || null;
@@ -2914,6 +3341,8 @@
       player.ui.recentMessage = data.ui.recentMessage || player.ui.recentMessage;
       player.ui.help = snapshotHelpState(data.ui.help);
     }
+    if (data.hero) player.hero = cloneHeroState(data.hero);
+    if (data.tech) player.tech = cloneTechState(data.tech);
     player.selectedIds = new Set(Array.isArray(data.selectedIds) ? data.selectedIds : []);
     if (data.fog && Array.isArray(data.fog.explored)) {
       player.fog.explored = Uint8Array.from(data.fog.explored.map((value) => (value ? 1 : 0)));
@@ -3112,12 +3541,15 @@
     state.ids = snapshot.ids || state.ids;
     state.waves = { ...state.waves, ...(snapshot.waves || {}) };
     state.difficulty = { ...state.difficulty, ...(snapshot.difficulty || {}) };
+    state.boss = { ...createBossState(), ...(snapshot.boss || {}) };
     for (const [owner, data] of Object.entries(snapshot.players || {})) {
       const player = state.players[owner];
       if (!player || !data) continue;
       player.resources.coins = data.resources && Number.isFinite(data.resources.coins) ? data.resources.coins : player.resources.coins;
       player.resources.wood = data.resources && Number.isFinite(data.resources.wood) ? data.resources.wood : player.resources.wood;
       player.resources.stone = data.resources && Number.isFinite(data.resources.stone) ? data.resources.stone : player.resources.stone;
+      if (data.hero) player.hero = cloneHeroState(data.hero);
+      if (data.tech) player.tech = cloneTechState(data.tech);
       if (data.quickSlots) {
         player.quickSlots.assets = [...(data.quickSlots.assets || player.quickSlots.assets)];
         player.quickSlots.weapons = [...(data.quickSlots.weapons || player.quickSlots.weapons)];
@@ -3198,6 +3630,14 @@
     if (command.type === "demolishBuilding") {
       const building = state.world.buildings.find((entry) => entry.id === command.buildingId && entry.owner === command.owner);
       if (building) demolishSelectedBuilding(remotePlayer, building);
+      return;
+    }
+    if (command.type === "startResearch") {
+      startResearch(command.owner, command.techId);
+      return;
+    }
+    if (command.type === "heroAbility") {
+      tryUseHeroAbility(command.owner, { target: command.target || null });
     }
   }
 
@@ -3359,7 +3799,12 @@
       setLanStatus("Enter the host room code first.");
       return;
     }
-    const preferredApiBase = normalizeLanApiBase(options.apiBase || state.lan.linkApiBase || state.lan.apiBase);
+    let preferredApiBase = normalizeLanApiBase(options.apiBase || state.lan.linkApiBase || state.lan.apiBase);
+    const manualHostIp = lanHostIpInput && lanHostIpInput.value.trim();
+    if (manualHostIp && !preferredApiBase) {
+      const ipToTry = manualHostIp.replace(/^https?:\/\//, "").split(":")[0];
+      preferredApiBase = `http://${ipToTry}:${DEFAULT_LAN_SERVER_PORT}`;
+    }
     if (preferredApiBase) state.lan.apiBase = preferredApiBase;
     if (lanCodeInput) lanCodeInput.value = roomCode;
     setLanStatus(`Joining ${getMatchLabel(normalizeLanMatchType(matchType))} room ${roomCode}...`);
@@ -3439,6 +3884,7 @@
       },
       ui: {
         openPanel: null,
+        techTreeOpen: false,
         activePlacementId: null,
         placementAngle: 0,
         relocatingBuildingId: null,
@@ -3456,6 +3902,8 @@
         recentMessage: "Build, tax, and conquer the rival nations.",
         help: createHelpState(),
       },
+      hero: createHeroState(owner),
+      tech: createTechState(),
       selectedIds: new Set(),
       quickSlots: cloneQuickSlots(),
       gamepadButtons: {},
@@ -3592,6 +4040,12 @@
     return Boolean(unit && (unit.projectile || getAttackRange(unit) >= 120));
   }
 
+  function getHeroFirstPersonProfile(unit) {
+    if (!unit || !unit.isHero) return null;
+    const archetype = getHeroArchetypeDef(unit.owner);
+    return archetype && archetype.firstPerson ? archetype.firstPerson : null;
+  }
+
   function getFirstPersonUnit(player = getActivePlayerState(), suppressCleanup = false) {
     const fp = getFirstPersonState(player);
     if (!fp || !fp.active || !fp.unitId) return null;
@@ -3605,21 +4059,24 @@
     if (!player || !unit) return;
     const fp = getFirstPersonState(player);
     if (!fp || !fp.active) return;
+    const heroFp = getHeroFirstPersonProfile(unit);
     const forwardX = Math.cos(fp.yaw);
     const forwardY = Math.sin(fp.yaw);
     player.camera.x = clamp(unit.x + forwardX * 18, -CAMERA_LIMIT, CAMERA_LIMIT);
     player.camera.y = clamp(unit.y + forwardY * 18, -CAMERA_LIMIT, CAMERA_LIMIT);
     player.camera.rotation = fp.yaw;
-    player.camera.zoom = fp.aiming ? 1.32 : 1.08;
+    player.camera.zoom = fp.aiming ? (heroFp && heroFp.zoom ? heroFp.zoom : 1.32) : 1.08;
   }
 
   function updateFirstPersonLook(player, movementX = 0, movementY = 0) {
     const fp = getFirstPersonState(player);
     if (!fp || !fp.active) return;
-    const sensitivity = fp.aiming ? 0.0014 : 0.0019;
+    const unit = getFirstPersonUnit(player, true);
+    const heroFp = getHeroFirstPersonProfile(unit);
+    const sensitivityBase = fp.aiming ? 0.0014 : 0.0019;
+    const sensitivity = sensitivityBase / Math.max(0.8, heroFp && heroFp.zoom ? heroFp.zoom / 1.32 : 1);
     fp.yaw += movementX * sensitivity;
     fp.pitch = clamp(fp.pitch - movementY * sensitivity * 0.92, -0.64, 0.36);
-    const unit = getFirstPersonUnit(player, true);
     if (unit) syncFirstPersonCamera(player, unit);
   }
 
@@ -3745,6 +4202,889 @@
   function getOwnerResources(owner) {
     const player = getPlayerState(owner);
     return player ? player.resources : null;
+  }
+
+  function cloneHeroState(source = createHeroState()) {
+    const owner = source && Object.prototype.hasOwnProperty.call(source, "owner") ? source.owner : null;
+    return {
+      ...createHeroState(owner),
+      ...(source || {}),
+    };
+  }
+
+  function cloneTechState(source = createTechState()) {
+    return {
+      ...createTechState(),
+      ...(source || {}),
+      researched: { ...((source && source.researched) || {}) },
+    };
+  }
+
+  function createStrategicBonuses() {
+    return {
+      attackMult: 1,
+      attackRateMult: 1,
+      captureMult: 1,
+      defenseMult: 1,
+      defenseRangeMult: 1,
+      heroAbilityPower: 1,
+      heroAuraMult: 1,
+      heroCooldownMult: 1,
+      heroRespawnMult: 1,
+      heroXpMult: 1,
+      incomeFlat: 0,
+      incomeMult: 1,
+      productionMult: 1,
+      rangeMult: 1,
+      researchRate: 1,
+      resourceTick: { coins: 0, wood: 0, stone: 0 },
+      resourceTickInterval: Infinity,
+      resourceTickMult: 1,
+      siegeDamageMult: 1,
+      speedMult: 1,
+      unitHpMult: 1,
+      visionMult: 1,
+    };
+  }
+
+  function applyStrategicEffects(target, effects = {}) {
+    if (!target || !effects) return target;
+    const additiveKeys = ["incomeFlat"];
+    const multiplicativeKeys = [
+      "attackMult",
+      "attackRateMult",
+      "captureMult",
+      "defenseMult",
+      "defenseRangeMult",
+      "heroAbilityPower",
+      "heroAuraMult",
+      "heroCooldownMult",
+      "heroRespawnMult",
+      "heroXpMult",
+      "incomeMult",
+      "productionMult",
+      "rangeMult",
+      "researchRate",
+      "resourceTickMult",
+      "siegeDamageMult",
+      "speedMult",
+      "unitHpMult",
+      "visionMult",
+    ];
+    additiveKeys.forEach((key) => {
+      if (Number.isFinite(effects[key])) target[key] += effects[key];
+    });
+    multiplicativeKeys.forEach((key) => {
+      if (Number.isFinite(effects[key])) target[key] *= effects[key];
+    });
+    if (effects.resourceTick) {
+      target.resourceTick.coins += Number(effects.resourceTick.coins || 0);
+      target.resourceTick.wood += Number(effects.resourceTick.wood || 0);
+      target.resourceTick.stone += Number(effects.resourceTick.stone || 0);
+    }
+    if (Number.isFinite(effects.resourceTickInterval)) {
+      target.resourceTickInterval = Math.min(target.resourceTickInterval, effects.resourceTickInterval);
+    }
+    return target;
+  }
+
+  function getOwnerFactionEntry(owner) {
+    return owner ? state.factions[owner] || null : null;
+  }
+
+  function getHeroState(ownerOrPlayer = getActivePlayerState()) {
+    if (!ownerOrPlayer) return state.hero || null;
+    if (typeof ownerOrPlayer === "string") {
+      const player = getPlayerState(ownerOrPlayer);
+      if (player && player.hero) return player.hero;
+      const faction = getOwnerFactionEntry(ownerOrPlayer);
+      return faction && faction.hero ? faction.hero : null;
+    }
+    if (ownerOrPlayer.hero) return ownerOrPlayer.hero;
+    if (ownerOrPlayer.owner) return getHeroState(ownerOrPlayer.owner);
+    return state.hero || null;
+  }
+
+  function getTechState(ownerOrPlayer = getActivePlayerState()) {
+    if (!ownerOrPlayer) return state.tech || null;
+    if (typeof ownerOrPlayer === "string") {
+      const player = getPlayerState(ownerOrPlayer);
+      if (player && player.tech) return player.tech;
+      const faction = getOwnerFactionEntry(ownerOrPlayer);
+      return faction && faction.tech ? faction.tech : null;
+    }
+    if (ownerOrPlayer.tech) return ownerOrPlayer.tech;
+    if (ownerOrPlayer.owner) return getTechState(ownerOrPlayer.owner);
+    return state.tech || null;
+  }
+
+  function getOwnerDoctrine(owner) {
+    const faction = getOwnerFactionEntry(owner);
+    return faction && faction.doctrineId ? FACTION_DOCTRINE_DEFS[faction.doctrineId] || null : null;
+  }
+
+  function getCommanderArchetypeForOwner(owner) {
+    const heroState = getHeroState(owner);
+    if (heroState && heroState.archetypeId && HERO_ARCHETYPE_DEFS[heroState.archetypeId]) return heroState.archetypeId;
+    const faction = getOwnerFactionEntry(owner);
+    if (faction && faction.archetypeId && HERO_ARCHETYPE_DEFS[faction.archetypeId]) return faction.archetypeId;
+    if (!isHumanOwner(owner)) {
+      const doctrine = getOwnerDoctrine(owner);
+      if (doctrine && doctrine.heroArchetypeId) return doctrine.heroArchetypeId;
+      return humanCommanderArchetypeOrder[0];
+    }
+    const humans = getHumanPlayers().slice().sort((a, b) => (a.viewportIndex || 0) - (b.viewportIndex || 0));
+    const playerIndex = Math.max(0, humans.findIndex((player) => player.owner === owner));
+    return humanCommanderArchetypeOrder[playerIndex % humanCommanderArchetypeOrder.length] || humanCommanderArchetypeOrder[0];
+  }
+
+  function assignFactionDoctrines(preset = state.mapPreset) {
+    const mapPreset = sanitizeMapPreset(preset);
+    const presetDoctrines = factionDoctrinePresetMap[mapPreset] || factionDoctrinePresetMap.green || ["fortress_kingdom", "raider_horde"];
+    const previousFactions = state.factions || {};
+    state.factions = {};
+    const doctrineKeys = Object.keys(FACTION_DOCTRINE_DEFS);
+    const getDoctrineIdForArchetype = (archetypeId) => (
+      doctrineKeys.find((key) => FACTION_DOCTRINE_DEFS[key].heroArchetypeId === archetypeId) || presetDoctrines[0] || doctrineKeys[0]
+    );
+
+    const humans = getHumanPlayers().slice().sort((a, b) => (a.viewportIndex || 0) - (b.viewportIndex || 0));
+    humans.forEach((player, index) => {
+      player.hero = cloneHeroState(player.hero || createHeroState(player.owner));
+      player.tech = cloneTechState(player.tech || createTechState());
+      const archetypeId = getCommanderArchetypeForOwner(player.owner);
+      player.hero.owner = player.owner;
+      player.hero.archetypeId = archetypeId;
+      state.factions[player.owner] = {
+        owner: player.owner,
+        doctrineId: getDoctrineIdForArchetype(archetypeId),
+        archetypeId,
+        label: player.label,
+        sideIndex: index,
+      };
+    });
+
+    aiEnemyOwners.forEach((owner, index) => {
+      const doctrineId = presetDoctrines[index % presetDoctrines.length] || doctrineKeys[index % doctrineKeys.length];
+      const doctrine = FACTION_DOCTRINE_DEFS[doctrineId] || FACTION_DOCTRINE_DEFS[doctrineKeys[0]];
+      const previous = previousFactions[owner] || {};
+      const hero = cloneHeroState(previous.hero || createHeroState(owner));
+      hero.owner = owner;
+      hero.archetypeId = doctrine.heroArchetypeId;
+      state.factions[owner] = {
+        owner,
+        doctrineId,
+        archetypeId: doctrine.heroArchetypeId,
+        label: getOwnerDisplayLabel(owner),
+        hero,
+        tech: cloneTechState(previous.tech || createTechState()),
+        sideIndex: humans.length + index,
+      };
+    });
+  }
+
+  function getHeroArchetypeDef(ownerOrHero = getActivePlayerState()) {
+    const heroState = typeof ownerOrHero === "string" || (ownerOrHero && ownerOrHero.owner)
+      ? getHeroState(typeof ownerOrHero === "string" ? ownerOrHero : ownerOrHero.owner)
+      : ownerOrHero;
+    const archetypeId = heroState && heroState.archetypeId ? heroState.archetypeId : humanCommanderArchetypeOrder[0];
+    return HERO_ARCHETYPE_DEFS[archetypeId] || HERO_ARCHETYPE_DEFS.warden_knight;
+  }
+
+  function getHeroLevelTarget(level = 1) {
+    return Math.round(110 + Math.max(0, level - 1) * 84 + Math.max(0, level - 1) * Math.max(0, level - 2) * 12);
+  }
+
+  function getOwnerTechBonuses(owner) {
+    const bonuses = createStrategicBonuses();
+    const techState = getTechState(owner);
+    if (!techState) return bonuses;
+    Object.keys(techState.researched || {}).forEach((techId) => {
+      if (!techState.researched[techId]) return;
+      const def = techTreeIndex.get(techId);
+      if (def && def.effects) applyStrategicEffects(bonuses, def.effects);
+    });
+    return bonuses;
+  }
+
+  function getOwnerTerritoryBonuses(owner) {
+    const bonuses = createStrategicBonuses();
+    for (const point of state.world.controlPoints || []) {
+      if (!point || point.owner !== owner) continue;
+      const def = CONTROL_POINT_DEFS[point.typeId];
+      if (def && def.bonuses) applyStrategicEffects(bonuses, def.bonuses);
+    }
+    return bonuses;
+  }
+
+  function getHeroAuraModifiers(entity) {
+    const bonuses = createStrategicBonuses();
+    if (!entity || !entity.owner || entity.owner === "neutral") return bonuses;
+    for (const owner of [...Object.keys(state.players), ...aiEnemyOwners]) {
+      const heroState = getHeroState(owner);
+      const heroUnit = heroState && heroState.unitId ? getEntityById(heroState.unitId) : null;
+      if (!heroState || !heroUnit || heroUnit.kind !== "unit") continue;
+      if (!areOwnersAllied(heroUnit.owner, entity.owner)) continue;
+      if (heroUnit.id === entity.id) continue;
+      const archetype = getHeroArchetypeDef(heroState);
+      const aura = archetype.passiveAura || {};
+      const techBonuses = getOwnerTechBonuses(heroUnit.owner);
+      const auraRadius = (aura.radius || 0) * (techBonuses.heroAuraMult || 1);
+      if (!auraRadius || Math.hypot(heroUnit.x - entity.x, heroUnit.y - entity.y) > auraRadius) continue;
+      const activeBoost = heroState.activeBuffTimer > 0 ? 1.22 : 1;
+      const auraEffects = {};
+      if (Number.isFinite(aura.attackMult)) auraEffects.attackMult = 1 + (aura.attackMult - 1) * activeBoost;
+      if (Number.isFinite(aura.attackRateMult)) auraEffects.attackRateMult = 1 + (aura.attackRateMult - 1) * activeBoost;
+      if (Number.isFinite(aura.captureMult)) auraEffects.captureMult = 1 + (aura.captureMult - 1) * activeBoost;
+      if (Number.isFinite(aura.defenseMult)) auraEffects.defenseMult = 1 + (aura.defenseMult - 1) * activeBoost;
+      if (Number.isFinite(aura.rangeMult)) auraEffects.rangeMult = 1 + (aura.rangeMult - 1) * activeBoost;
+      if (Number.isFinite(aura.speedMult)) auraEffects.speedMult = 1 + (aura.speedMult - 1) * activeBoost;
+      if (Number.isFinite(aura.visionMult)) auraEffects.visionMult = 1 + (aura.visionMult - 1) * activeBoost;
+      applyStrategicEffects(bonuses, auraEffects);
+    }
+    return bonuses;
+  }
+
+  function getEntityStrategicModifiers(entity) {
+    const bonuses = createStrategicBonuses();
+    if (!entity || !entity.owner || entity.owner === "neutral") return bonuses;
+    applyStrategicEffects(bonuses, getOwnerTechBonuses(entity.owner));
+    applyStrategicEffects(bonuses, getOwnerTerritoryBonuses(entity.owner));
+    applyStrategicEffects(bonuses, getHeroAuraModifiers(entity));
+    return bonuses;
+  }
+
+  function getHeroOwners() {
+    const owners = new Set([...Object.keys(state.players), ...Object.keys(state.factions || {})]);
+    aiEnemyOwners.forEach((owner) => owners.add(owner));
+    return [...owners].filter(Boolean);
+  }
+
+  function spawnCombatRole(owner, role, x, y, extras = {}) {
+    const item = roleIndex.get(role) || weaponCatalog.find((entry) => entry.role === role);
+    const unit = item ? spawnWeaponUnit(owner, item, x, y) : spawnUnit(owner, role, x, y, extras);
+    if (!unit) return null;
+    if (Number.isFinite(extras.angle)) unit.angle = extras.angle;
+    if (Number.isFinite(extras.value)) unit.value = extras.value;
+    if (extras.moveTarget) unit.moveTarget = { ...extras.moveTarget };
+    if (extras.order) unit.order = extras.order;
+    if (typeof extras.focusMove === "boolean") unit.focusMove = extras.focusMove;
+    return unit;
+  }
+
+  function getHeroSpawnAnchor(owner) {
+    const home = getHomeBuilding(owner);
+    if (home) {
+      return {
+        x: home.x + Math.cos(home.angle || 0) * (home.radius + 42),
+        y: home.y + Math.sin(home.angle || 0) * (home.radius + 42),
+        angle: home.angle || 0,
+      };
+    }
+    const player = getPlayerState(owner);
+    if (player && player.startBase) {
+      return {
+        x: player.startBase.x + Math.cos(player.startFacing || 0) * 54,
+        y: player.startBase.y + Math.sin(player.startFacing || 0) * 54,
+        angle: player.startFacing || 0,
+      };
+    }
+    const faction = getOwnerFactionEntry(owner);
+    if (faction && faction.startBase) return { x: faction.startBase.x, y: faction.startBase.y, angle: faction.startFacing || 0 };
+    return { x: 0, y: 0, angle: 0 };
+  }
+
+  function syncHeroUnitStats(unit, heroState = getHeroState(unit && unit.owner)) {
+    if (!unit || !heroState) return unit;
+    const archetype = getHeroArchetypeDef(heroState);
+    const level = Math.max(1, heroState.level || 1);
+    const growthLevel = level - 1;
+    const techBonuses = getOwnerTechBonuses(unit.owner);
+    const hpMult = techBonuses.unitHpMult || 1;
+    const ratio = unit.maxHp > 0 ? clamp(unit.hp / unit.maxHp, 0.05, 1) : 1;
+    unit.isHero = true;
+    unit.heroOwner = unit.owner;
+    unit.heroArchetypeId = archetype.id;
+    unit.displayName = archetype.name;
+    unit.heroLevel = level;
+    unit.armor = archetype.baseStats.armor || unit.armor;
+    unit.radius = archetype.baseStats.radius || unit.radius;
+    unit.damage = (archetype.baseStats.damage || unit.damage) + (archetype.growth.damage || 0) * growthLevel;
+    unit.range = (archetype.baseStats.range || unit.range) + (archetype.growth.range || 0) * growthLevel;
+    unit.speed = (archetype.baseStats.speed || unit.speed) + (archetype.growth.speed || 0) * growthLevel;
+    unit.cooldown = archetype.baseStats.cooldown || unit.cooldown;
+    unit.projectile = Object.prototype.hasOwnProperty.call(archetype.baseStats, "projectile")
+      ? archetype.baseStats.projectile
+      : unit.projectile;
+    unit.hover = Boolean(archetype.baseStats.hover || unit.hover);
+    unit.airborne = Boolean(archetype.baseStats.airborne || unit.airborne);
+    unit.maxHp = Math.round(((archetype.baseStats.hp || unit.maxHp) + (archetype.growth.hp || 0) * growthLevel) * hpMult);
+    unit.hp = clamp(Math.round(unit.maxHp * ratio), 1, unit.maxHp);
+    unit.value = Math.max(unit.value || 0, 360 + level * 110);
+    return unit;
+  }
+
+  function getHeroUnit(owner) {
+    const heroState = getHeroState(owner);
+    const heroUnit = heroState && heroState.unitId ? getEntityById(heroState.unitId) : null;
+    return heroUnit && heroUnit.kind === "unit" ? heroUnit : null;
+  }
+
+  function spawnCommanderForOwner(owner, options = {}) {
+    const heroState = getHeroState(owner);
+    if (!heroState) return null;
+    const existing = getHeroUnit(owner);
+    if (existing) return existing;
+    heroState.owner = owner;
+    heroState.archetypeId = heroState.archetypeId || getCommanderArchetypeForOwner(owner);
+    heroState.nextXp = Number.isFinite(heroState.nextXp) && heroState.nextXp > 0 ? heroState.nextXp : getHeroLevelTarget(heroState.level || 1);
+    const archetype = getHeroArchetypeDef(heroState);
+    const anchor = options.anchor || getHeroSpawnAnchor(owner);
+    const spawnAngle = Number.isFinite(options.angle) ? options.angle : anchor.angle || 0;
+    const spawnX = options.x != null ? options.x : anchor.x + Math.cos(spawnAngle) * 18;
+    const spawnY = options.y != null ? options.y : anchor.y + Math.sin(spawnAngle) * 18;
+    const unit = spawnCombatRole(owner, archetype.baseRole, spawnX, spawnY, {
+      angle: spawnAngle,
+      value: 440 + (heroState.level || 1) * 90,
+    });
+    if (!unit) return null;
+    syncHeroUnitStats(unit, heroState);
+    heroState.unitId = unit.id;
+    heroState.respawnTimer = 0;
+    unit.lastCombatTimer = 0;
+    if (!isHumanOwner(owner)) {
+      const enemyBase = getNearestHostileBase(owner, unit.x, unit.y);
+      if (enemyBase) {
+        unit.moveTarget = { x: enemyBase.x + randomRange(unit.x + state.time, -90, 90), y: enemyBase.y + randomRange(unit.y + state.time, -90, 90) };
+        unit.order = "move";
+        unit.focusMove = true;
+      }
+    }
+    return unit;
+  }
+
+  function grantHeroXp(owner, amount, reason = "") {
+    const heroState = getHeroState(owner);
+    if (!heroState || amount <= 0) return 0;
+    const territoryBonuses = getOwnerTerritoryBonuses(owner);
+    const techBonuses = getOwnerTechBonuses(owner);
+    const granted = Math.round(amount * (territoryBonuses.heroXpMult || 1) * (techBonuses.heroXpMult || 1));
+    if (granted <= 0) return 0;
+    heroState.xp += granted;
+    heroState.rewardFlash = Math.max(heroState.rewardFlash || 0, 0.8);
+    while (heroState.xp >= heroState.nextXp && heroState.level < 8) {
+      heroState.xp -= heroState.nextXp;
+      heroState.level += 1;
+      heroState.nextXp = getHeroLevelTarget(heroState.level);
+      heroState.lastLevelUpAt = state.time;
+      const unit = getHeroUnit(owner);
+      if (unit) {
+        syncHeroUnitStats(unit, heroState);
+        unit.lastHitTimer = Math.max(unit.lastHitTimer || 0, 0.24);
+      }
+      notify(`${getHeroArchetypeDef(heroState).name} reached level ${heroState.level}.`, "#ffe29a", { owner });
+      playUiSound("quest", { volume: 0.76, cooldown: 0.18 });
+    }
+    if (reason && isHumanOwner(owner)) {
+      notify(`${getHeroArchetypeDef(heroState).name} gained ${granted} XP from ${reason}.`, "#9fe8ff", { owner, lowPriority: true, ttl: 2.8 });
+    }
+    return granted;
+  }
+
+  function getHeroAbilityTarget(owner) {
+    const player = getPlayerState(owner);
+    if (player && Number.isFinite(player.input.mouseWorldX) && Number.isFinite(player.input.mouseWorldY)) {
+      return { x: player.input.mouseWorldX, y: player.input.mouseWorldY };
+    }
+    const heroUnit = getHeroUnit(owner);
+    const enemyBase = heroUnit ? getNearestHostileBase(owner, heroUnit.x, heroUnit.y) : null;
+    if (enemyBase) return { x: enemyBase.x, y: enemyBase.y };
+    return heroUnit ? { x: heroUnit.x, y: heroUnit.y } : { x: 0, y: 0 };
+  }
+
+  function tryUseHeroAbility(owner, options = {}) {
+    const heroState = getHeroState(owner);
+    const heroUnit = getHeroUnit(owner);
+    if (!heroState || !heroUnit) return false;
+    const archetype = getHeroArchetypeDef(heroState);
+    const active = archetype.active || null;
+    if (!active || heroState.abilityCooldown > 0) return false;
+    const techBonuses = getOwnerTechBonuses(owner);
+    const territoryBonuses = getOwnerTerritoryBonuses(owner);
+    const power = (techBonuses.heroAbilityPower || 1) * (territoryBonuses.heroAbilityPower || 1);
+    const target = options.target || getHeroAbilityTarget(owner);
+    heroState.abilityCooldown = active.cooldown || 24;
+    heroState.activeBuffTimer = Math.max(heroState.activeBuffTimer || 0, active.duration || 6);
+    heroState.lastAbilityAt = state.time;
+    heroState.rewardFlash = Math.max(heroState.rewardFlash || 0, 1);
+
+    if (active.id === "royal_rally") {
+      const healed = healCircle(heroUnit.x, heroUnit.y, active.radius || 180, 72 * power, owner);
+      spawnEffect("repair", heroUnit.x, heroUnit.y, (active.radius || 180) * 0.65, "#8affd9", 0.95);
+      notify(healed ? `${archetype.name} triggered Royal Rally.` : `${archetype.name} rallied the line.`, "#8affd9", { owner });
+    } else if (active.id === "blood_onslaught") {
+      damageCircle(heroUnit.x, heroUnit.y, active.radius || 180, 82 * power, owner, "melee", 1.08);
+      spawnEffect("blast", heroUnit.x, heroUnit.y, (active.radius || 180) * 0.52, "#ffb469", 0.8);
+      notify(`${archetype.name} unleashed Blood Onslaught.`, "#ffbf8d", { owner });
+    } else if (active.id === "shock_barrage") {
+      for (let i = 0; i < 4; i += 1) {
+        const ox = target.x + randomRange(target.x + i * 17 + state.time, -70, 70);
+        const oy = target.y + randomRange(target.y - i * 23 + state.time, -70, 70);
+        damageCircle(ox, oy, active.radius * 0.34, 92 * power, owner, "shell", 1.08);
+        spawnEffect("blast", ox, oy, active.radius * 0.24, "#ffc48a", 0.8);
+      }
+      notify(`${archetype.name} called a Shock Barrage.`, "#ffc48a", { owner });
+    } else if (active.id === "veil_pulse") {
+      damageCircle(target.x, target.y, active.radius || 200, 74 * power, owner, "pulse", 1.06);
+      for (const unit of state.world.units) {
+        if (!unit.owner || areOwnersAllied(unit.owner, owner)) continue;
+        if (Math.hypot(unit.x - target.x, unit.y - target.y) > (active.radius || 200)) continue;
+        unit.empTimer = Math.max(unit.empTimer || 0, 4.8);
+      }
+      getHumanPlayers().filter((player) => areOwnersAllied(player.owner, owner)).forEach((player) => {
+        revealFogCircle(player, target.x, target.y, (active.radius || 200) * 1.2);
+      });
+      spawnEffect("emp", target.x, target.y, active.radius || 200, "#8feaff", 1.0);
+      notify(`${archetype.name} released Veil Pulse.`, "#8feaff", { owner });
+    }
+    playWorldSound(active.id === "veil_pulse" ? "impactPulse" : "impactBlast", target.x, target.y, { cooldown: 0.18, volume: 0.88 });
+    return true;
+  }
+
+  function requestHeroAbility(owner, target = getHeroAbilityTarget(owner)) {
+    if (!owner) return false;
+    if (isLanClient()) {
+      queueLanCommand({
+        type: "heroAbility",
+        owner,
+        target: target ? { x: target.x, y: target.y } : null,
+      });
+      return true;
+    }
+    return tryUseHeroAbility(owner, { target });
+  }
+
+  function ownerHasExclusiveTech(owner, techDef) {
+    if (!techDef || !techDef.exclusiveGroup) return false;
+    const techState = getTechState(owner);
+    return TECH_TREE_DEFS.some((entry) => (
+      entry.id !== techDef.id
+      && entry.exclusiveGroup === techDef.exclusiveGroup
+      && techState
+      && techState.researched
+      && techState.researched[entry.id]
+    ));
+  }
+
+  function isTechResearched(owner, techId) {
+    const techState = getTechState(owner);
+    return Boolean(techState && techState.researched && techState.researched[techId]);
+  }
+
+  function canResearchTech(owner, techId) {
+    const techDef = techTreeIndex.get(techId);
+    const techState = getTechState(owner);
+    if (!techDef || !techState) return false;
+    if (techState.currentId && techState.currentId !== techId) return false;
+    if (techState.researched[techId]) return false;
+    if ((techDef.requires || []).some((requirement) => !isTechResearched(owner, requirement))) return false;
+    if (ownerHasExclusiveTech(owner, techDef)) return false;
+    return canAfford(techId, owner, true);
+  }
+
+  function startResearch(owner, techId) {
+    const techDef = techTreeIndex.get(techId);
+    const techState = getTechState(owner);
+    if (!techDef || !techState) return false;
+    if (!canResearchTech(owner, techId)) {
+      if (isHumanOwner(owner)) notify(`Cannot start ${techDef ? techDef.name : "that research"} yet.`, "#ffb484", { owner });
+      return false;
+    }
+    spendCoins(techDef.cost, owner);
+    techState.currentId = techId;
+    techState.progress = 0;
+    techState.lastStartedAt = state.time;
+    notify(`Research started: ${techDef.name}.`, "#9fe8ff", { owner });
+    playUiSound("panelOpen", { volume: 0.42, cooldown: 0.06 });
+    return true;
+  }
+
+  function completeResearch(owner, techId) {
+    const techDef = techTreeIndex.get(techId);
+    const techState = getTechState(owner);
+    if (!techDef || !techState) return false;
+    techState.researched[techId] = true;
+    techState.currentId = null;
+    techState.progress = 0;
+    techState.lastCompletedId = techId;
+    techState.lastCompletedAt = state.time;
+    notify(`Research complete: ${techDef.name}.`, "#7df2ab", { owner });
+    playUiSound("quest", { volume: 0.72, cooldown: 0.14 });
+    const heroUnit = getHeroUnit(owner);
+    if (heroUnit) syncHeroUnitStats(heroUnit, getHeroState(owner));
+    return true;
+  }
+
+  function updateResearchState(dt) {
+    const owners = new Set([...Object.keys(state.players || {}), ...Object.keys(state.factions || {})]);
+    owners.forEach((owner) => {
+      const techState = getTechState(owner);
+      if (!techState || !techState.currentId) return;
+      const techDef = techTreeIndex.get(techState.currentId);
+      if (!techDef) {
+        techState.currentId = null;
+        techState.progress = 0;
+        return;
+      }
+      const bonuses = getOwnerTechBonuses(owner);
+      const territory = getOwnerTerritoryBonuses(owner);
+      techState.progress += dt * (bonuses.researchRate || 1) * (territory.researchRate || 1);
+      if (techState.progress >= techDef.time) completeResearch(owner, techDef.id);
+    });
+  }
+
+  function requestResearchStart(owner, techId) {
+    if (!owner || !techId) return false;
+    if (isLanClient()) {
+      queueLanCommand({ type: "startResearch", owner, techId });
+      return true;
+    }
+    return startResearch(owner, techId);
+  }
+
+  function isItemUnlocked(owner, itemOrId) {
+    const item = typeof itemOrId === "string" ? itemIndex.get(itemOrId) || techTreeIndex.get(itemOrId) : itemOrId;
+    if (!item) return false;
+    const requirement = item.techRequirement || (item.unlocks ? null : ITEM_TECH_REQUIREMENTS[item.id]);
+    if (!requirement) return true;
+    return isTechResearched(owner, requirement);
+  }
+
+  function getControlPointCaptureStrength(unit, point) {
+    if (!unit || !point || !unit.owner || unit.owner === "neutral") return 0;
+    let strength = unit.isHero ? 2.5 : unit.type === "vehicle" ? 1.35 : unit.role === "scout" ? 1.2 : 1;
+    strength *= getEntityStrategicModifiers(unit).captureMult || 1;
+    const doctrine = getOwnerDoctrine(unit.owner);
+    if (doctrine) {
+      strength *= doctrine.captureBias || 1;
+      if ((doctrine.preferredCaptureTypes || []).includes(point.typeId)) strength *= 1.08;
+    }
+    return strength;
+  }
+
+  function createControlPoint(typeId, x, y, owner = "neutral") {
+    const def = CONTROL_POINT_DEFS[typeId];
+    if (!def) return null;
+    return {
+      id: createId("point"),
+      kind: "controlPoint",
+      typeId,
+      x,
+      y,
+      radius: 124,
+      owner,
+      captureOwner: owner,
+      captureProgress: 1,
+      rewardTimer: 0,
+      lastContestAt: -999,
+      pulse: randomRange(x + y + state.ids, 0, Math.PI),
+    };
+  }
+
+  function getControlPointLayoutsForPreset(preset = state.world.preset) {
+    if (preset === "canyon") {
+      return [
+        { typeId: "watchtower", x: -260, y: 160 },
+        { typeId: "treasury_post", x: -920, y: -160 },
+        { typeId: "supply_depot", x: 520, y: 520 },
+        { typeId: "shrine_beacon", x: 120, y: -980 },
+        { typeId: "mine_quarry", x: 980, y: -880 },
+        { typeId: "radar_point", x: 760, y: 860 },
+      ];
+    }
+    if (preset === "desert") {
+      return [
+        { typeId: "watchtower", x: -180, y: 120 },
+        { typeId: "treasury_post", x: -820, y: -120 },
+        { typeId: "supply_depot", x: 480, y: 660 },
+        { typeId: "shrine_beacon", x: 220, y: -880 },
+        { typeId: "mine_quarry", x: 1080, y: -980 },
+        { typeId: "radar_point", x: 940, y: 760 },
+      ];
+    }
+    if (preset === "ocean") {
+      return [
+        { typeId: "watchtower", x: -140, y: 40 },
+        { typeId: "treasury_post", x: -860, y: -80 },
+        { typeId: "supply_depot", x: 360, y: 760 },
+        { typeId: "shrine_beacon", x: 80, y: -760 },
+        { typeId: "mine_quarry", x: 980, y: -760 },
+        { typeId: "radar_point", x: 700, y: 620 },
+      ];
+    }
+    return [
+      { typeId: "watchtower", x: -220, y: 120 },
+      { typeId: "treasury_post", x: -940, y: -180 },
+      { typeId: "supply_depot", x: 480, y: 700 },
+      { typeId: "shrine_beacon", x: 80, y: -900 },
+      { typeId: "mine_quarry", x: 1120, y: -980 },
+      { typeId: "radar_point", x: 760, y: 880 },
+    ];
+  }
+
+  function spawnControlPointSet(preset = state.world.preset) {
+    state.world.controlPoints = getControlPointLayoutsForPreset(preset)
+      .map((entry) => createControlPoint(entry.typeId, entry.x, entry.y))
+      .filter(Boolean);
+  }
+
+  function getDoctrineCaptureTarget(owner, x = 0, y = 0) {
+    const doctrine = getOwnerDoctrine(owner);
+    const preferred = doctrine && doctrine.preferredCaptureTypes ? new Set(doctrine.preferredCaptureTypes) : null;
+    return findNearest(state.world.controlPoints || [], x, y, (point) => {
+      if (!point || point.owner === owner) return false;
+      if (preferred && preferred.has(point.typeId)) return true;
+      return point.owner === "neutral";
+    }) || null;
+  }
+
+  function updateControlPoints(dt) {
+    for (const point of state.world.controlPoints || []) {
+      if (!point) continue;
+      point.pulse += dt * 1.8;
+      const nearby = new Map();
+      for (const unit of state.world.units) {
+        if (!unit.owner || unit.owner === "neutral") continue;
+        if (Math.hypot(unit.x - point.x, unit.y - point.y) > point.radius) continue;
+        nearby.set(unit.owner, (nearby.get(unit.owner) || 0) + getControlPointCaptureStrength(unit, point));
+      }
+      const ranked = [...nearby.entries()].sort((a, b) => b[1] - a[1]);
+      const dominant = ranked.length && (ranked.length === 1 || ranked[0][1] > ranked[1][1] * 1.1)
+        ? { owner: ranked[0][0], strength: ranked[0][1] }
+        : null;
+
+      if (!dominant) {
+        if (point.captureOwner === point.owner) point.captureProgress = Math.min(1, point.captureProgress + dt * 0.04);
+      } else if (dominant.owner === point.owner) {
+        point.captureOwner = point.owner;
+        point.captureProgress = Math.min(1, point.captureProgress + dt * 0.18 * dominant.strength);
+      } else {
+        if (point.captureOwner !== dominant.owner) point.captureOwner = dominant.owner;
+        point.captureProgress = Math.max(0, point.captureProgress - dt * 0.22 * dominant.strength);
+        point.lastContestAt = state.time;
+        if (point.captureProgress <= 0.001) {
+          point.owner = dominant.owner;
+          point.captureOwner = dominant.owner;
+          point.captureProgress = 0.22;
+          point.rewardTimer = 0;
+          spawnEffect("dropPulse", point.x, point.y, point.radius * 0.5, ownerColors[point.owner] || "#dbe3e8", 0.9);
+          notify(`${getOwnerDisplayLabel(point.owner)} captured ${CONTROL_POINT_DEFS[point.typeId].name}.`, "#ffe29a");
+        }
+      }
+
+      const bonuses = CONTROL_POINT_DEFS[point.typeId] && CONTROL_POINT_DEFS[point.typeId].bonuses;
+      if (point.owner !== "neutral" && bonuses && bonuses.resourceTick) {
+        point.rewardTimer += dt;
+        const interval = Math.max(4, Number(bonuses.resourceTickInterval || 12) / Math.max(0.6, getOwnerTerritoryBonuses(point.owner).resourceTickMult || 1));
+        if (point.rewardTimer >= interval) {
+          point.rewardTimer = 0;
+          addCoins(point.owner, Math.round((bonuses.resourceTick.coins || 0) * (getOwnerTerritoryBonuses(point.owner).resourceTickMult || 1)));
+          addWood(point.owner, Math.round((bonuses.resourceTick.wood || 0) * (getOwnerTerritoryBonuses(point.owner).resourceTickMult || 1)));
+          addStone(point.owner, Math.round((bonuses.resourceTick.stone || 0) * (getOwnerTerritoryBonuses(point.owner).resourceTickMult || 1)));
+        }
+      }
+    }
+  }
+
+  function createBossState() {
+    return {
+      waveCursor: 0,
+      activeId: null,
+      lastSpawnedWave: 0,
+      warningTimer: 0,
+      warningText: "",
+      rewardFlash: 0,
+    };
+  }
+
+  function getActiveBossEntity() {
+    return state.boss && state.boss.activeId ? getEntityById(state.boss.activeId) : null;
+  }
+
+  function getBossSpawnAnchor(owner, target = getNearestHostileBase(owner, 0, 0)) {
+    const enemyHome = getEnemyAiHome(owner);
+    if (enemyHome && target) {
+      return {
+        x: lerp(enemyHome.x, target.x, 0.44),
+        y: lerp(enemyHome.y, target.y, 0.44),
+        angle: Math.atan2(target.y - enemyHome.y, target.x - enemyHome.x),
+      };
+    }
+    if (enemyHome) return { x: enemyHome.x, y: enemyHome.y, angle: enemyHome.angle || 0 };
+    return { x: 0, y: 0, angle: 0 };
+  }
+
+  function spawnBossEncounter(defId, owner = "enemy1") {
+    const def = BOSS_ENCOUNTER_DEFS[defId];
+    if (!def || getActiveBossEntity()) return null;
+    const target = getNearestHostileBase(owner, 0, 0);
+    const anchor = getBossSpawnAnchor(owner, target);
+    let entity = null;
+    if (def.type === "building") {
+      entity = spawnBuilding(owner, def.itemId, anchor.x, anchor.y, anchor.angle || 0);
+      if (entity) {
+        entity.attackCooldown = 0.4;
+        entity.radius = def.radius || entity.radius;
+        entity.bossAttackProfile = {
+          damage: def.damage,
+          range: def.range,
+          cooldown: def.cooldown,
+        };
+      }
+    } else {
+      entity = spawnCombatRole(owner, def.role, anchor.x, anchor.y, { angle: anchor.angle || 0, value: 1400 });
+      if (entity) {
+        entity.damage = def.damage;
+        entity.range = def.range;
+        entity.cooldown = def.cooldown;
+        entity.speed = def.speed;
+        entity.splash = def.splash || 0;
+        entity.armor = def.armor || entity.armor;
+        entity.radius = def.radius || entity.radius;
+        entity.hover = Boolean(def.hover || entity.hover);
+      }
+    }
+    if (!entity) return null;
+    entity.isBoss = true;
+    entity.bossId = def.id;
+    entity.displayName = def.name;
+    entity.hp = def.hp;
+    entity.maxHp = def.hp;
+    entity.bossAbilityTimer = (def.ability && def.ability.interval) || 9;
+    entity.bossMode = "active";
+    entity.bossStateTime = 0;
+    state.boss = {
+      ...createBossState(),
+      ...state.boss,
+      activeId: entity.id,
+      lastSpawnedWave: state.waves.index,
+      warningTimer: 7,
+      warningText: `${def.name} detected`,
+    };
+    spawnEffect("blast", entity.x, entity.y, entity.radius * 2.2, def.tint || "#ffe29a", 1.4);
+    spawnEffect("smoke", entity.x, entity.y, entity.radius * 2.8, "rgba(56,52,48,0.72)", 1.8);
+    notify(`Boss wave: ${def.name}. ${def.desc}`, def.tint || "#ffe29a");
+    playUiSound("warning", { volume: 0.96, cooldown: 0.2 });
+    return entity;
+  }
+
+  function grantBossReward(killerOwner, bossDef, defeatedOwner = null) {
+    if (!bossDef || !bossDef.reward) return;
+    const recipients = getHumanPlayers().filter((player) => !defeatedOwner || !areOwnersAllied(player.owner, defeatedOwner));
+    const awardPlayers = recipients.length ? recipients : (isHumanOwner(killerOwner) ? [getPlayerState(killerOwner)] : getPrimaryPlayer() ? [getPrimaryPlayer()] : []);
+    awardPlayers.forEach((player) => {
+      if (!player) return;
+      addCoins(player.owner, bossDef.reward.coins || 0);
+      grantHeroXp(player.owner, bossDef.reward.heroXp || 0, bossDef.name);
+      const techState = getTechState(player.owner);
+      const currentTech = techState && techState.currentId ? techTreeIndex.get(techState.currentId) : null;
+      if (techState && currentTech && Number.isFinite(bossDef.reward.researchBoost)) {
+        techState.progress += currentTech.time * bossDef.reward.researchBoost;
+      }
+    });
+    state.boss.rewardFlash = 1.5;
+    state.boss.warningTimer = 4;
+    state.boss.warningText = `${bossDef.name} defeated`;
+    notify(`${bossDef.name} destroyed. Reward caches secured.`, bossDef.tint || "#ffe29a");
+  }
+
+  function updateBossEntity(entity, dt) {
+    if (!entity || !entity.isBoss) return;
+    const def = BOSS_ENCOUNTER_DEFS[entity.bossId];
+    if (!def) return;
+    entity.bossAbilityTimer = Math.max(0, (entity.bossAbilityTimer || 0) - dt);
+    entity.bossStateTime = (entity.bossStateTime || 0) + dt;
+    if (def.id === "sand_worm" && entity.bossMode === "burrowed") {
+      entity.bossBurrowTimer = Math.max(0, (entity.bossBurrowTimer || 0) - dt);
+      entity.lastHitTimer = Math.max(entity.lastHitTimer || 0, 0.08);
+      if (entity.bossBurrowTimer <= 0) {
+        entity.bossMode = "active";
+        entity.speed = def.speed;
+        damageCircle(entity.x, entity.y, def.ability.radius, def.ability.damage, entity.owner, "melee", 1.08);
+        spawnEffect("blast", entity.x, entity.y, def.ability.radius * 0.5, def.tint, 0.8);
+      }
+    }
+    if (entity.bossAbilityTimer > 0) return;
+    entity.bossAbilityTimer = (def.ability && def.ability.interval) || 9;
+    if (def.id === "iron_behemoth") {
+      const target = findNearest([...state.world.units, ...state.world.buildings], entity.x, entity.y, (candidate) => isEnemy(entity, candidate));
+      if (target) {
+        damageCircle(target.x, target.y, def.ability.radius, def.ability.damage, entity.owner, "shell", 1.08);
+        spawnEffect("blast", target.x, target.y, def.ability.radius * 0.58, def.tint, 1.0);
+      }
+    } else if (def.id === "necro_bell_tower") {
+      const summonRoles = def.ability.summonRoles || [];
+      summonRoles.forEach((role, index) => {
+        const angle = (index / Math.max(1, summonRoles.length)) * TAU;
+        const unit = spawnCombatRole(entity.owner, role, entity.x + Math.cos(angle) * (entity.radius + 34), entity.y + Math.sin(angle) * (entity.radius + 34), { angle });
+        if (unit) {
+          const enemyBase = getNearestHostileBase(entity.owner, unit.x, unit.y);
+          if (enemyBase) {
+            unit.moveTarget = { x: enemyBase.x + randomRange(unit.x + index, -90, 90), y: enemyBase.y + randomRange(unit.y + index, -90, 90) };
+            unit.order = "move";
+            unit.focusMove = true;
+          }
+        }
+      });
+      damageCircle(entity.x, entity.y, def.ability.radius, def.ability.pulseDamage, entity.owner, "pulse");
+      spawnEffect("emp", entity.x, entity.y, def.ability.radius, def.tint, 1.0);
+    } else if (def.id === "storm_engine") {
+      damageCircle(entity.x, entity.y, def.ability.radius, def.ability.damage, entity.owner, "pulse", 1.12);
+      for (const unit of state.world.units) {
+        if (!isEnemy(entity, unit)) continue;
+        if (Math.hypot(unit.x - entity.x, unit.y - entity.y) > def.ability.radius) continue;
+        unit.empTimer = Math.max(unit.empTimer || 0, def.ability.emp || 5);
+      }
+      spawnEffect("emp", entity.x, entity.y, def.ability.radius, def.tint, 1.1);
+    } else if (def.id === "sand_worm") {
+      const target = findNearest([...state.world.units, ...state.world.buildings], entity.x, entity.y, (candidate) => isEnemy(entity, candidate));
+      if (target) {
+        entity.bossMode = "burrowed";
+        entity.bossBurrowTimer = def.ability.burrowDuration || 2.2;
+        entity.speed = def.speed * 1.55;
+        entity.moveTarget = { x: target.x, y: target.y };
+        spawnEffect("smoke", entity.x, entity.y, def.ability.radius * 0.5, "rgba(108,88,54,0.7)", 0.9);
+      }
+    }
+  }
+
+  function updateHeroSystems(dt) {
+    for (const owner of getHeroOwners()) {
+      const heroState = getHeroState(owner);
+      if (!heroState) continue;
+      const cooldownRate = getOwnerTechBonuses(owner).heroCooldownMult || 1;
+      heroState.abilityCooldown = Math.max(0, (heroState.abilityCooldown || 0) - dt * cooldownRate);
+      heroState.activeBuffTimer = Math.max(0, (heroState.activeBuffTimer || 0) - dt);
+      heroState.rewardFlash = Math.max(0, (heroState.rewardFlash || 0) - dt);
+      const unit = getHeroUnit(owner);
+      if (unit) {
+        syncHeroUnitStats(unit, heroState);
+      } else {
+        heroState.unitId = null;
+        if (!ownerHasForces(owner)) continue;
+        if (heroState.respawnTimer > 0) {
+          const respawnRate = (getOwnerTerritoryBonuses(owner).heroRespawnMult || 1) * (getOwnerTechBonuses(owner).heroRespawnMult || 1);
+          heroState.respawnTimer = Math.max(0, heroState.respawnTimer - dt * respawnRate);
+        } else {
+          spawnCommanderForOwner(owner);
+        }
+      }
+    }
+    state.boss.warningTimer = Math.max(0, (state.boss.warningTimer || 0) - dt);
+    state.boss.rewardFlash = Math.max(0, (state.boss.rewardFlash || 0) - dt);
+    const bossEntity = getActiveBossEntity();
+    if (bossEntity) updateBossEntity(bossEntity, dt);
+    else if (state.boss.activeId) state.boss.activeId = null;
   }
 
   function getQuickSlots(player = getActivePlayerState()) {
@@ -3897,6 +5237,8 @@
     state.camera = target.camera;
     state.input = target.input;
     state.ui = target.ui;
+    state.hero = getHeroState(target.owner) || target.hero || state.hero;
+    state.tech = getTechState(target.owner) || target.tech || state.tech;
     state.selectedIds = target.selectedIds;
     state.coins = target.resources.coins;
     state.wood = target.resources.wood;
@@ -3938,7 +5280,10 @@
       });
       if (matchType === "lan-coop" && !state.lan.localOwner) state.lan.localOwner = "player1";
     } else {
-      state.players.player = createPlayerState("player", "Commander", 0, { x: -1150, y: 980, zoom: 0.82, rotation: -0.28 }, "Controller 1");
+      state.players.player = createPlayerState("player", "Commander", 0, { x: -1150, y: 980, zoom: 0.82, rotation: -0.28 }, "Controller 1", {
+        startBase: { ...SINGLEPLAYER_START_BASE },
+        startFacing: 0,
+      });
       state.lan.localOwner = null;
     }
     setActivePlayerContext(getPrimaryPlayer());
@@ -4124,6 +5469,7 @@
 
   function getVisionRadius(entity) {
     if (!entity) return 0;
+    const strategic = getEntityStrategicModifiers(entity);
     if (entity.kind === "building") {
       const stationProfile = getStationSupportProfile(entity.itemId);
       let radius = 250;
@@ -4134,16 +5480,17 @@
       else if (entity.itemId === "citadel") radius = 470;
       else if (entity.def && (entity.def.style === "tower" || entity.def.style === "radar")) radius = 360;
       else if (entity.itemId === "market" || entity.itemId === "command_hall") radius = 320;
-      return radius * getBuildingSupportModifiers(entity).vision;
+      return radius * getBuildingSupportModifiers(entity).vision * (strategic.visionMult || 1);
     }
     if (entity.kind === "unit") {
-      if (entity.airborne) return 420;
-      if (entity.role === "scout") return 360;
-      if (entity.role === "captain") return 290;
-      if (entity.role === "archer" || entity.role === "marine") return 250;
-      if (entity.role === "engineer" || entity.role === "villager") return 210;
-      if (entity.type === "vehicle") return 270;
-      return 220;
+      let radius = 220;
+      if (entity.airborne) radius = 420;
+      else if (entity.role === "scout") radius = 360;
+      else if (entity.role === "captain") radius = 290;
+      else if (entity.role === "archer" || entity.role === "marine") radius = 250;
+      else if (entity.role === "engineer" || entity.role === "villager") radius = 210;
+      else if (entity.type === "vehicle") radius = 270;
+      return radius * (strategic.visionMult || 1);
     }
     return 0;
   }
@@ -4196,6 +5543,11 @@
         if (!unit.owner || !areOwnersAllied(unit.owner, player.owner)) continue;
         revealFogCircle(player, unit.x, unit.y, getVisionRadius(unit));
       }
+      for (const point of state.world.controlPoints || []) {
+        if (!point || !point.owner || point.owner === "neutral" || !areOwnersAllied(point.owner, player.owner)) continue;
+        const def = CONTROL_POINT_DEFS[point.typeId];
+        if (def && def.visionRadius) revealFogCircle(player, point.x, point.y, def.visionRadius);
+      }
     }
   }
 
@@ -4239,11 +5591,11 @@
   }
 
   function getAttackDamage(unit) {
-    return unit.damage + (unit.damageBonus || 0);
+    return (unit.damage + (unit.damageBonus || 0)) * (getEntityStrategicModifiers(unit).attackMult || 1);
   }
 
   function getAttackRange(unit) {
-    return unit.range + (unit.rangeBonus || 0);
+    return (unit.range + (unit.rangeBonus || 0)) * (getEntityStrategicModifiers(unit).rangeMult || 1);
   }
 
   function getFirstPersonRay(unit, player = getPlayerState(unit && unit.owner), maxDistance = null) {
@@ -4364,6 +5716,8 @@
     const player = getPlayerState(unit.owner);
     const fp = getFirstPersonState(player);
     if (!player || !fp || !fp.active || fp.unitId !== unit.id) return false;
+    const heroFp = getHeroFirstPersonProfile(unit);
+    const strategic = getEntityStrategicModifiers(unit);
 
     fp.kick = Math.max(0, fp.kick - dt * 7.5);
     fp.muzzle = Math.max(0, fp.muzzle - dt);
@@ -4381,9 +5735,9 @@
       const wishX = Math.cos(yaw) * forward + Math.cos(yaw + Math.PI / 2) * strafe;
       const wishY = Math.sin(yaw) * forward + Math.sin(yaw + Math.PI / 2) * strafe;
       const n = normalize(wishX, wishY);
-      const sprintMultiplier = state.keys.sprint && !fp.aiming ? (unit.type === "vehicle" ? 1.18 : 1.42) : 1;
-      const aimingMultiplier = fp.aiming ? 0.58 : 1;
-      const desiredSpeed = unit.speed * terrainMove * (unit.empTimer > 0 ? 0.55 : 1) * sprintMultiplier * aimingMultiplier;
+      const sprintMultiplier = state.keys.sprint && !fp.aiming ? (heroFp && heroFp.sprint ? heroFp.sprint : unit.type === "vehicle" ? 1.18 : 1.42) : 1;
+      const aimingMultiplier = fp.aiming ? (heroFp && heroFp.aim ? heroFp.aim : 0.58) : 1;
+      const desiredSpeed = unit.speed * terrainMove * (unit.empTimer > 0 ? 0.55 : 1) * (strategic.speedMult || 1) * sprintMultiplier * aimingMultiplier;
       unit.vx += n.x * desiredSpeed * dt * 4.8;
       unit.vy += n.y * desiredSpeed * dt * 4.8;
       unit.order = state.keys.sprint && !fp.aiming ? "sprint" : "move";
@@ -4422,8 +5776,8 @@
       }
     }
 
-    const sprintCap = state.keys.sprint && !fp.aiming ? (unit.type === "vehicle" ? 1.18 : 1.32) : 1;
-    const maxSpeed = unit.speed * terrainMove * (unit.airborne ? 1.1 : 1) * sprintCap;
+    const sprintCap = state.keys.sprint && !fp.aiming ? (heroFp && heroFp.sprint ? Math.max(1.06, heroFp.sprint * 0.9) : unit.type === "vehicle" ? 1.18 : 1.32) : 1;
+    const maxSpeed = unit.speed * terrainMove * (unit.airborne ? 1.1 : 1) * (strategic.speedMult || 1) * sprintCap;
     const velocity = Math.hypot(unit.vx, unit.vy);
     if (velocity > maxSpeed) {
       unit.vx = (unit.vx / velocity) * maxSpeed;
@@ -5474,24 +6828,29 @@
     state.waves.index += 1;
     state.waves.flash = 1.4;
     const waveTier = Math.min(5, 1 + Math.floor((state.waves.index - 1) / 2));
+    let cooldownMult = 1;
     for (const keep of enemyKeeps) {
-      let composition =
-        waveTier === 1 ? ["warrior", "archer"] :
-        waveTier === 2 ? ["warrior", "archer", "knight"] :
-        waveTier === 3 ? ["archer", "knight", "catapult"] :
-        waveTier === 4 ? ["knight", "lightTank", "archer"] :
-        ["mediumTank", "hovercraft", "archer", "warrior"];
+      const doctrine = getOwnerDoctrine(keep.owner);
+      let composition = doctrine && doctrine.waveTable && doctrine.waveTable.length
+        ? [...(doctrine.waveTable[Math.min(doctrine.waveTable.length - 1, waveTier - 1)] || doctrine.waveTable[0])]
+        : waveTier === 1 ? ["warrior", "archer"] :
+          waveTier === 2 ? ["warrior", "archer", "knight"] :
+          waveTier === 3 ? ["archer", "knight", "catapult"] :
+          waveTier === 4 ? ["knight", "lightTank", "archer"] :
+          ["mediumTank", "hovercraft", "archer", "warrior"];
       if (isEasyModeActive()) composition = composition.slice(0, Math.max(1, composition.length - 1));
       if (isHardModeActive()) {
-        composition = [...composition, waveTier >= 3 ? "captain" : "warrior"];
+        composition = [...composition, doctrine && doctrine.unitRoles ? doctrine.unitRoles[Math.min(doctrine.unitRoles.length - 1, waveTier - 1)] : (waveTier >= 3 ? "captain" : "warrior")];
         if (waveTier >= 4) composition.push("lightTank");
       }
+      cooldownMult *= doctrine && doctrine.waveCooldownMult ? doctrine.waveCooldownMult : 1;
+      const captureTarget = doctrine ? getDoctrineCaptureTarget(keep.owner, keep.x, keep.y) : null;
       composition.forEach((role, index) => {
         const angle = (index / composition.length) * TAU + keep.angle;
         const spawnX = keep.x + Math.cos(angle) * (keep.radius + 42);
         const spawnY = keep.y + Math.sin(angle) * (keep.radius + 42);
-        const item = weaponCatalog.find((entry) => entry.role === role);
-        const unit = item ? spawnWeaponUnit(keep.owner, item, spawnX, spawnY) : spawnUnit(keep.owner, role, spawnX, spawnY);
+        const unit = spawnCombatRole(keep.owner, role, spawnX, spawnY, { angle });
+        if (!unit) return;
         if (isEasyModeActive()) {
           unit.moveTarget = {
             x: keep.x + randomRange(spawnX + index, -120, 120),
@@ -5499,6 +6858,13 @@
           };
           unit.order = "idle";
           unit.focusMove = false;
+        } else if (captureTarget && waveTier <= 3 && index < Math.ceil(composition.length * 0.5)) {
+          unit.moveTarget = {
+            x: captureTarget.x + randomRange(spawnX + index + state.waves.index, -80, 80),
+            y: captureTarget.y + randomRange(spawnY + index + state.waves.index, -80, 80),
+          };
+          unit.order = "move";
+          unit.focusMove = true;
         } else {
           unit.moveTarget = {
             x: playerKeep.x + randomRange(spawnX + state.waves.index + index, -120, 120),
@@ -5509,8 +6875,13 @@
         }
       });
     }
+    const pendingBoss = BOSS_WAVE_SEQUENCE[state.boss.waveCursor];
+    if (pendingBoss && pendingBoss.wave === state.waves.index && !getActiveBossEntity()) {
+      spawnBossEncounter(pendingBoss.bossId, enemyKeeps[0] ? enemyKeeps[0].owner : "enemy1");
+      state.boss.waveCursor += 1;
+    }
     const baseCooldown = clamp(28 - state.waves.index * 1.25, 15, 28);
-    state.waves.cooldown = isEasyModeActive() ? baseCooldown * 1.45 : isHardModeActive() ? baseCooldown * 0.78 : baseCooldown;
+    state.waves.cooldown = (isEasyModeActive() ? baseCooldown * 1.45 : isHardModeActive() ? baseCooldown * 0.78 : baseCooldown) * cooldownMult;
     state.waves.timer = state.waves.cooldown;
     notify(`Enemy wave ${state.waves.index} is marching on your empire.`, "#ffb484");
     playUiSound("warning", { volume: 0.88, cooldown: 0.16 });
@@ -5601,26 +6972,32 @@
   function spawnEnemyEmpire(owner, startBase) {
     if (!startBase) return;
     const facing = Math.atan2(-startBase.y, -startBase.x);
+    if (!state.factions[owner]) assignFactionDoctrines(state.mapPreset);
+    if (!state.factions[owner]) state.factions[owner] = { owner };
+    state.factions[owner].startBase = { ...startBase };
+    state.factions[owner].startFacing = facing;
+    const doctrine = getOwnerDoctrine(owner);
     spawnStarterEmpire(owner, startBase, facing);
-    const supportBuildings = [
-      { itemId: Math.random() > 0.5 ? "watch_tower" : "stone_tower", x: 260, y: -60 },
-      { itemId: Math.random() > 0.5 ? "market" : "farm", x: -250, y: -120 },
-      { itemId: Math.random() > 0.5 ? "stable" : "outpost", x: 110, y: 250 },
-      { itemId: Math.random() > 0.5 ? "academy" : "watch_tower", x: -180, y: 210 },
+    const supportOffsets = [
+      { x: 260, y: -60 },
+      { x: -250, y: -120 },
+      { x: 110, y: 250 },
+      { x: -180, y: 210 },
     ];
+    const supportBuildings = (doctrine && doctrine.supportBuildings && doctrine.supportBuildings.length
+      ? doctrine.supportBuildings.slice(0, supportOffsets.length)
+      : ["watch_tower", "market", "stable", "academy"])
+      .map((itemId, index) => ({ itemId, ...supportOffsets[index] }));
     supportBuildings.forEach((entry) => {
       const offset = rotateLayoutPoint(entry.x, entry.y, facing);
       spawnBuilding(owner, entry.itemId, startBase.x + offset.x, startBase.y + offset.y, facing);
     });
-    const unitRoles = ["warrior", "archer", "warrior", "knight", "captain", Math.random() > 0.5 ? "engineer" : "warrior"];
+    const unitRoles = doctrine && doctrine.unitRoles && doctrine.unitRoles.length
+      ? doctrine.unitRoles
+      : ["warrior", "archer", "warrior", "knight", "captain", "engineer"];
     unitRoles.forEach((role, index) => {
       const offset = rotateLayoutPoint(120 + index * 26, -140 + index * 34, facing);
-      const unit = spawnUnit(
-        owner,
-        role,
-        startBase.x + offset.x + randomRange(startBase.x + index * 18, -34, 34),
-        startBase.y + offset.y + randomRange(startBase.y - index * 21, -34, 34),
-      );
+      const unit = spawnCombatRole(owner, role, startBase.x + offset.x + randomRange(startBase.x + index * 18, -34, 34), startBase.y + offset.y + randomRange(startBase.y - index * 21, -34, 34), { angle: facing });
       unit.angle = facing;
     });
   }
@@ -5730,10 +7107,19 @@
     state.world.drops.length = 0;
     state.world.notifications.length = 0;
     state.world.quests.length = 0;
+    state.world.controlPoints.length = 0;
+    state.factions = {};
+    state.boss = createBossState();
     state.waves.index = 0;
     state.waves.cooldown = 24;
     state.waves.timer = 24;
     state.waves.flash = 0;
+    getHumanPlayers().forEach((player) => {
+      player.hero = cloneHeroState(createHeroState(player.owner));
+      player.tech = cloneTechState(createTechState());
+      player.ui.techTreeOpen = false;
+    });
+    assignFactionDoctrines(preset);
 
     for (let gy = 0; gy < GRID_COUNT; gy += 1) {
       for (let gx = 0; gx < GRID_COUNT; gx += 1) {
@@ -5897,19 +7283,7 @@
         spawnEnemyEmpire(aiEnemyOwners[index], anchor);
       });
     } else {
-      spawnBuilding("player", "royal_keep", -1180, 980);
-      spawnBuilding("player", "army_house", -1000, 980);
-      spawnBuilding("player", "archer_house", -1220, 1180);
-      spawnBuilding("player", "watch_tower", -880, 1180);
-      spawnBuilding("player", "market", -1330, 820);
-      spawnBuilding("player", "farm", -1450, 980);
-      spawnBuilding("player", "lumber_camp", -1330, 1120);
-      spawnBuilding("player", "quarry", -1110, 790);
-
-      spawnUnit("player", "warrior", -980, 1100);
-      spawnUnit("player", "warrior", -1040, 1140);
-      spawnUnit("player", "archer", -1180, 1260);
-      spawnUnit("player", "knight", -1260, 1000);
+      spawnStarterEmpire("player", SINGLEPLAYER_START_BASE, 0);
       randomEnemyAnchors.forEach((anchor, index) => {
         if (!aiEnemyOwners[index]) return;
         spawnEnemyEmpire(aiEnemyOwners[index], anchor);
@@ -5920,6 +7294,11 @@
       addQuest({ title: "Break Their Vanguard", desc: "Defeat 12 enemy units.", kind: "kills", target: 12, reward: 320 });
       addQuest({ title: "Empire Treasury", desc: "Reach 2200 coins.", kind: "wealth", target: 2200, reward: 420 });
     }
+
+    spawnControlPointSet(preset);
+    getHeroOwners().forEach((owner) => {
+      if (ownerHasForces(owner)) spawnCommanderForOwner(owner);
+    });
 
     renderTerrainCache();
   }
@@ -6714,6 +8093,128 @@
     return false;
   }
 
+  function getTechNodeStatus(owner, techDef) {
+    const techState = getTechState(owner);
+    const researched = Boolean(techState && techState.researched && techState.researched[techDef.id]);
+    const current = Boolean(techState && techState.currentId === techDef.id);
+    const missing = (techDef.requires || []).filter((requirement) => !isTechResearched(owner, requirement));
+    const exclusive = ownerHasExclusiveTech(owner, techDef);
+    const affordable = canAfford(techDef.id, owner, true);
+    const busy = Boolean(techState && techState.currentId && techState.currentId !== techDef.id);
+    let note = "Click to research";
+    if (researched) note = "Researched";
+    else if (current) note = `Researching ${Math.floor(techState.progress || 0)}/${techDef.time}s`;
+    else if (exclusive) note = "Mutually exclusive path locked";
+    else if (missing.length) note = `Needs ${missing.map((techId) => (techTreeIndex.get(techId) || { name: techId }).name).join(", ")}`;
+    else if (busy) note = "Another research is already in progress";
+    else if (!affordable) note = `Need ${techDef.cost} coins`;
+    return {
+      researched,
+      current,
+      missing,
+      exclusive,
+      affordable,
+      busy,
+      available: !researched && !current && !exclusive && !missing.length && !busy && affordable,
+      note,
+      progress: current && techDef.time > 0 ? clamp((techState.progress || 0) / techDef.time, 0, 1) : 0,
+    };
+  }
+
+  function getTechTreeLayout(player = getActivePlayerState()) {
+    if (!player || !player.ui || !player.ui.techTreeOpen) return null;
+    const viewport = state.activeViewport || getViewportForPlayer(player);
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const w = Math.min(viewport.w - 28 * scale, 940 * scale);
+    const h = Math.min(viewport.h - 36 * scale, 560 * scale);
+    const x = viewport.x + (viewport.w - w) * 0.5;
+    const y = viewport.y + Math.max(22 * scale, (viewport.h - h) * 0.5);
+    const padding = 18 * scale;
+    const headerH = 78 * scale;
+    const footerH = 44 * scale;
+    const branchGap = 14 * scale;
+    const branchW = (w - padding * 2 - branchGap * 2) / 3;
+    const bodyY = y + headerH;
+    const bodyH = h - headerH - footerH;
+    const branchColors = {
+      economy: "#9fe0a4",
+      warfare: "#ffcf8d",
+      advanced: "#8fe8ff",
+    };
+    const nodes = [];
+    const columns = TECH_BRANCH_ORDER.map((branch, branchIndex) => {
+      const techs = TECH_TREE_DEFS.filter((entry) => entry.branch === branch);
+      const colX = x + padding + branchIndex * (branchW + branchGap);
+      const nodeGap = 12 * scale;
+      const nodeH = (bodyH - nodeGap * Math.max(0, techs.length - 1)) / Math.max(1, techs.length);
+      const branchNodes = techs.map((tech, techIndex) => {
+        const rect = {
+          x: colX,
+          y: bodyY + techIndex * (nodeH + nodeGap),
+          w: branchW,
+          h: nodeH,
+        };
+        const status = getTechNodeStatus(player.owner, tech);
+        const node = {
+          ...rect,
+          branch,
+          tech,
+          status,
+          accent: branchColors[branch] || "#dbe7ef",
+        };
+        nodes.push(node);
+        return node;
+      });
+      return {
+        branch,
+        label: branch === "economy" ? "Economy" : branch === "warfare" ? "Warfare" : "Advanced",
+        accent: branchColors[branch] || "#dbe7ef",
+        x: colX,
+        y: bodyY,
+        w: branchW,
+        h: bodyH,
+        nodes: branchNodes,
+      };
+    });
+    return {
+      x,
+      y,
+      w,
+      h,
+      scale,
+      padding,
+      headerH,
+      footerH,
+      closeRect: {
+        x: x + w - padding - 32 * scale,
+        y: y + 16 * scale,
+        w: 32 * scale,
+        h: 24 * scale,
+      },
+      columns,
+      nodes,
+      currentTech: player.tech && player.tech.currentId ? techTreeIndex.get(player.tech.currentId) || null : null,
+    };
+  }
+
+  function getTechNodeHitAt(px, py) {
+    const layout = getTechTreeLayout();
+    if (!layout || !isInsideRect(px, py, layout)) return null;
+    if (isInsideRect(px, py, layout.closeRect)) return { kind: "close", layout };
+    for (const node of layout.nodes) {
+      if (isInsideRect(px, py, node)) return { kind: "node", node, layout };
+    }
+    return { kind: "panel", layout };
+  }
+
+  function getTechTreeHoverMessage(hit) {
+    if (!hit) return "";
+    if (hit.kind === "close") return "Close the tech tree.";
+    if (hit.kind !== "node" || !hit.node || !hit.node.tech) return "Branching research panel. Economy, Warfare, and Advanced paths can lock each other.";
+    return `${hit.node.tech.name}: ${hit.node.tech.desc} ${hit.node.status.note}.`;
+  }
+
   function getQuickSlotAt(px, py) {
     return getBottomBarLayout().slots.find((slot) => isInsideRect(px, py, slot)) || null;
   }
@@ -6974,10 +8475,24 @@
     return null;
   }
 
-  function canAfford(itemId, owner = getActivePlayerState() && getActivePlayerState().owner) {
-    const def = itemIndex.get(itemId);
+  function canAfford(itemId, owner = getActivePlayerState() && getActivePlayerState().owner, allowTech = false) {
+    const def = itemIndex.get(itemId) || (allowTech ? techTreeIndex.get(itemId) : null);
     const resources = getOwnerResources(owner);
     return def && resources && resources.coins >= def.cost;
+  }
+
+  function getItemUnlockRequirement(itemOrId) {
+    const item = typeof itemOrId === "string" ? itemIndex.get(itemOrId) || techTreeIndex.get(itemOrId) : itemOrId;
+    if (!item) return null;
+    return item.techRequirement || (item.unlocks ? null : ITEM_TECH_REQUIREMENTS[item.id]) || null;
+  }
+
+  function getItemUnlockReason(owner, itemOrId) {
+    const requirementId = getItemUnlockRequirement(itemOrId);
+    if (!requirementId) return "";
+    const techDef = techTreeIndex.get(requirementId);
+    if (!techDef) return "";
+    return isTechResearched(owner, requirementId) ? "" : `Requires ${techDef.name}`;
   }
 
   function spendCoins(amount, owner) {
@@ -7474,6 +8989,12 @@
     const relocationBuilding = options.relocateBuilding || null;
     const isRelocation = Boolean(relocationBuilding);
     const angle = normalizePlacementAngle(options.angle || 0, item);
+    const unlockReason = getItemUnlockReason(owner, item);
+    if (unlockReason) {
+      notify(`${item.name} locked. ${unlockReason}.`, "#ffb484", { owner });
+      playUiSound("error", { volume: 0.72, cooldown: 0.08 });
+      return false;
+    }
     if (!item || (!isRelocation && !canAfford(item.id, owner))) {
       notify("Not enough coins for that deployment.", "#ff8e85");
       playUiSound("error", { volume: 0.72, cooldown: 0.08 });
@@ -7567,7 +9088,12 @@
 
   function applyDamage(entity, rawDamage, projectileType, owner, armorPierce = 1) {
     const modifier = getArmorModifier(entity.armor || "flesh", projectileType || "melee");
-    const damage = rawDamage * modifier * armorPierce;
+    let damage = rawDamage * modifier * armorPierce;
+    const defenseMult = getEntityStrategicModifiers(entity).defenseMult || 1;
+    damage /= Math.max(0.55, defenseMult);
+    if (entity.kind === "building" && owner) {
+      damage *= (getOwnerTechBonuses(owner).siegeDamageMult || 1) * (getOwnerTerritoryBonuses(owner).siegeDamageMult || 1);
+    }
     entity.hp -= damage;
     entity.lastHitTimer = 0.2;
     entity.lastCombatTimer = Math.max(entity.lastCombatTimer || 0, 2.4);
@@ -7580,6 +9106,18 @@
 
   function killEntity(entity, owner) {
     const defeatedOwner = entity.owner;
+    const bossDef = entity && entity.isBoss ? BOSS_ENCOUNTER_DEFS[entity.bossId] || null : null;
+    if (entity.isHero && entity.owner) {
+      const heroState = getHeroState(entity.owner);
+      if (heroState) {
+        const archetype = getHeroArchetypeDef(heroState);
+        heroState.unitId = null;
+        heroState.activeBuffTimer = 0;
+        heroState.respawnTimer = Math.max(heroState.respawnTimer || 0, archetype.respawn || 18);
+        heroState.rewardFlash = Math.max(heroState.rewardFlash || 0, 0.9);
+        notify(`${archetype.name} fell in battle. Reinforcements are regrouping.`, "#ffb48a", { owner: entity.owner });
+      }
+    }
     if (entity.kind === "animal") {
       addCoins(owner, 20);
       incrementQuest("harvest", 1);
@@ -7592,12 +9130,29 @@
       addCoins(owner, 90);
       notify(`Enemy ${entity.def.name} destroyed: +90 coins`, "#7df2ab");
     }
+    if (owner && defeatedOwner && owner !== defeatedOwner && owner !== "neutral") {
+      const xpLabel = entity.displayName || (entity.def && entity.def.name) || formatSelectionLabel(entity.role || entity.itemId || entity.kind);
+      const xpReward = entity.isBoss
+        ? 0
+        : entity.kind === "building"
+          ? Math.max(60, Math.round(((entity.def && entity.def.cost) || entity.maxHp || 180) * 0.35))
+          : Math.max(entity.isHero ? 140 : 26, Math.round((entity.value || entity.maxHp || 90) * 0.28));
+      if (xpReward > 0) grantHeroXp(owner, xpReward, xpLabel);
+    }
     maybeSpawnRareDrop(entity, owner);
     spawnEffect("debris", entity.x, entity.y, (entity.radius || 16) * 1.4, ownerColors[entity.owner] || "#f2f2f2", 0.8);
     spawnEffect("blast", entity.x, entity.y, (entity.radius || 16) * 0.9, "#ffb97a", 0.42);
     spawnEffect("smoke", entity.x, entity.y, (entity.radius || 16) * 1.8, "rgba(45,50,58,0.7)", 1.3);
+    if (bossDef) {
+      spawnEffect("blast", entity.x, entity.y, (entity.radius || 16) * 1.8, bossDef.tint || "#ffe29a", 0.95);
+      spawnEffect("smoke", entity.x, entity.y, (entity.radius || 16) * 2.4, "rgba(34,28,24,0.76)", 1.7);
+    }
     playWorldSound("impactBlast", entity.x, entity.y, { cooldown: 0.09, volume: entity.kind === "building" ? 1 : 0.82 });
     removeEntity(entity);
+    if (bossDef) {
+      if (state.boss.activeId === entity.id) state.boss.activeId = null;
+      grantBossReward(owner, bossDef, defeatedOwner);
+    }
     if (entity.kind === "building" && entity.itemId === "royal_keep" && owner && defeatedOwner && defeatedOwner !== owner) {
       reclaimDefeatedHousing(defeatedOwner, owner);
     }
@@ -7818,6 +9373,10 @@
         if (building.itemId === "storm_generator") multiplier += 0.06;
       }
     }
+    multiplier *= getOwnerTechBonuses(owner).productionMult || 1;
+    multiplier *= getOwnerTerritoryBonuses(owner).productionMult || 1;
+    const doctrine = getOwnerDoctrine(owner);
+    if (doctrine && doctrine.productionMult) multiplier *= doctrine.productionMult;
     return multiplier;
   }
 
@@ -7827,6 +9386,7 @@
     building.lastTaxedTimer = Math.max(0, (building.lastTaxedTimer || 0) - dt);
     const terrainMultiplier = getTerrainStructureMultiplier(building);
     const supportMultiplier = getBuildingSupportModifiers(building);
+    const strategic = getEntityStrategicModifiers(building);
     const terrainDamage = getTerrainAttrition(building, dt);
     if (terrainDamage > 0 && building.hp > 1) {
       building.hp = Math.max(1, building.hp - terrainDamage);
@@ -7844,28 +9404,34 @@
           ? building.owner !== "neutral"
           : building.owner === "player";
     if (building.def.spawnRole && canProduce) {
+      const doctrine = getOwnerDoctrine(building.owner);
       const hostilityRate = !isHumanOwner(building.owner) && isHardModeActive() ? 1.22 : 1;
       building.spawnCooldown -= dt * getProductionMultiplier(building.owner) * terrainMultiplier * hostilityRate * supportMultiplier.spawnRate;
       if (building.spawnCooldown <= 0) {
         building.spawnCooldown = building.def.spawnRate || 22;
         const spawnAngle = randomRange(building.x + building.y + state.time, 0, TAU);
-        const unit = spawnUnit(
+        const unit = spawnCombatRole(
           building.owner,
           building.def.spawnRole,
           building.x + Math.cos(spawnAngle) * (building.radius + 28),
           building.y + Math.sin(spawnAngle) * (building.radius + 28),
+          { angle: spawnAngle },
         );
-        if (!isHumanOwner(building.owner)) {
+        if (unit && !isHumanOwner(building.owner)) {
           if (isEasyModeActive()) {
             const home = getEnemyAiHome(building.owner) || building;
             unit.moveTarget = { x: home.x + randomRange(unit.x, -90, 90), y: home.y + randomRange(unit.y, -90, 90) };
             unit.order = "idle";
             unit.focusMove = false;
           } else {
-            const enemyBase = getNearestHostileBase(building.owner, unit.x, unit.y);
-            if (enemyBase) {
-              unit.moveTarget = { x: enemyBase.x + randomRange(unit.x, -100, 100), y: enemyBase.y + randomRange(unit.y, -100, 100) };
+            const captureTarget = getDoctrineCaptureTarget(building.owner, unit.x, unit.y);
+            const rallyTarget = captureTarget && doctrine && rand(unit.x * 0.06 + unit.y * 0.02 + state.time) < Math.max(0.22, (doctrine.captureBias || 1) * 0.28)
+              ? captureTarget
+              : getNearestHostileBase(building.owner, unit.x, unit.y);
+            if (rallyTarget) {
+              unit.moveTarget = { x: rallyTarget.x + randomRange(unit.x, -100, 100), y: rallyTarget.y + randomRange(unit.y, -100, 100) };
               unit.order = "move";
+              unit.focusMove = true;
             }
           }
         }
@@ -7887,9 +9453,10 @@
     }
 
     if (building.def.attack) {
-      building.attackCooldown -= dt * supportMultiplier.attackRate;
+      building.attackCooldown -= dt * supportMultiplier.attackRate * (strategic.attackRateMult || 1);
       if (building.attackCooldown <= 0) {
-        const rangeBoost = getTerrainAttackRangeBonus(building) * supportMultiplier.defenseRange;
+        const attackProfile = building.bossAttackProfile || null;
+        const rangeBoost = getTerrainAttackRangeBonus(building) * supportMultiplier.defenseRange * (strategic.defenseRangeMult || 1) * (strategic.rangeMult || 1);
         const target = findNearest(
           [...state.world.units, ...state.world.buildings],
           building.x,
@@ -7897,12 +9464,13 @@
           (entity) => {
             if (shouldEnemyStandDown(building) && isHumanOwner(entity.owner)) return false;
             if (isEasyModeActive() && !isHumanOwner(building.owner) && isHumanOwner(entity.owner)) return false;
-            return isEnemy(building, entity) && Math.hypot(entity.x - building.x, entity.y - building.y) <= (building.def.range || 260) * rangeBoost;
+            const baseRange = (attackProfile && attackProfile.range) || building.def.range || 260;
+            return isEnemy(building, entity) && Math.hypot(entity.x - building.x, entity.y - building.y) <= baseRange * rangeBoost;
           },
         );
         if (target) {
-          const damage = building.def.attack === "machine" ? 8 : building.def.attack === "bolt" ? 34 : building.def.attack === "shell" ? 70 : building.def.attack === "missile" ? 118 : building.def.attack === "pulse" ? 28 : building.def.attack === "mortar" ? 82 : 16;
-          building.attackCooldown = 1 / (building.def.attackRate || 1.2);
+          const damage = (attackProfile && attackProfile.damage) || (building.def.attack === "machine" ? 8 : building.def.attack === "bolt" ? 34 : building.def.attack === "shell" ? 70 : building.def.attack === "missile" ? 118 : building.def.attack === "pulse" ? 28 : building.def.attack === "mortar" ? 82 : 16);
+          building.attackCooldown = attackProfile && attackProfile.cooldown ? attackProfile.cooldown : 1 / (building.def.attackRate || 1.2);
           if (building.def.attack === "machine") {
             applyDamage(target, damage, "bullet", building.owner);
             spawnEffect("muzzle", building.x, building.y, 14, "#ffdb9d", 0.12);
@@ -7923,7 +9491,8 @@
     unit.lastHitTimer = Math.max(0, unit.lastHitTimer - dt);
     unit.lastCombatTimer = Math.max(0, (unit.lastCombatTimer || 0) - dt);
     unit.empTimer = Math.max(0, unit.empTimer - dt);
-    unit.attackCooldown -= dt;
+    const strategic = getEntityStrategicModifiers(unit);
+    unit.attackCooldown -= dt * (strategic.attackRateMult || 1);
     unit.interactCooldown = Math.max(0, (unit.interactCooldown || 0) - dt);
     const terrainMove = getTerrainMoveMultiplier(unit);
     const terrainDamage = getTerrainAttrition(unit, dt);
@@ -7946,7 +9515,8 @@
         unit.aiTimer = randomRange(unit.x + unit.y + state.time, 0.4, 1.1);
         if (!unit.targetId && !shouldEnemyStandDown(unit)) {
           const target = findNearest([...state.world.units, ...state.world.buildings], unit.x, unit.y, (entity) => isEnemy(unit, entity));
-          const aggroRange = isEasyModeActive() ? 180 : isHardModeActive() ? 560 : 420;
+          const doctrine = getOwnerDoctrine(unit.owner);
+          const aggroRange = doctrine && doctrine.aggroRange ? doctrine.aggroRange : (isEasyModeActive() ? 180 : isHardModeActive() ? 560 : 420);
           if (target && Math.hypot(target.x - unit.x, target.y - unit.y) < aggroRange) {
             unit.targetId = target.id;
             unit.order = "attack";
@@ -7962,7 +9532,10 @@
                 resetUnitPathState(unit);
               }
             } else {
-              const enemyBase = getNearestHostileBase(unit.owner, unit.x, unit.y);
+              const captureTarget = getDoctrineCaptureTarget(unit.owner, unit.x, unit.y);
+              const enemyBase = captureTarget && rand(unit.x * 0.1 + unit.y * 0.2 + state.time) > 0.36
+                ? captureTarget
+                : getNearestHostileBase(unit.owner, unit.x, unit.y);
               if (enemyBase) {
                 unit.moveTarget = { x: enemyBase.x + randomRange(unit.x, -120, 120), y: enemyBase.y + randomRange(unit.y, -120, 120) };
                 unit.order = "move";
@@ -8091,7 +9664,7 @@
     if (unit.moveTarget) {
       const steeringTarget = resolveUnitSteeringTarget(unit, dt);
       const n = normalize(steeringTarget.x - unit.x, steeringTarget.y - unit.y);
-      const desiredSpeed = unit.speed * terrainMove * (unit.empTimer > 0 ? 0.55 : 1) * getFormationSpeedMultiplier(unit);
+      const desiredSpeed = unit.speed * terrainMove * (unit.empTimer > 0 ? 0.55 : 1) * getFormationSpeedMultiplier(unit) * (strategic.speedMult || 1);
       unit.vx += n.x * desiredSpeed * dt * 4.2;
       unit.vy += n.y * desiredSpeed * dt * 4.2;
       unit.angle = angleLerp(unit.angle, Math.atan2(n.y, n.x), 0.12);
@@ -8141,7 +9714,7 @@
       }
     }
 
-    const maxSpeed = unit.speed * terrainMove * (unit.airborne ? 1.1 : 1);
+    const maxSpeed = unit.speed * terrainMove * (unit.airborne ? 1.1 : 1) * (strategic.speedMult || 1);
     const velocity = Math.hypot(unit.vx, unit.vy);
     if (velocity > maxSpeed) {
       unit.vx = (unit.vx / velocity) * maxSpeed;
@@ -8272,7 +9845,9 @@
       else if (building.itemId === "village_house") income += 3 + nearbyVillagers;
     }
     const nearbyCivilians = state.world.civilians.filter((civilian) => findNearest(ownedBuildings, civilian.x, civilian.y, (b) => Math.hypot(b.x - civilian.x, b.y - civilian.y) < 420)).length;
-    return Math.round((income + nearbyCivilians * 2) * multiplier);
+    const bonuses = getOwnerTechBonuses(owner);
+    const territory = getOwnerTerritoryBonuses(owner);
+    return Math.round(((income + nearbyCivilians * 2 + (bonuses.incomeFlat || 0) + (territory.incomeFlat || 0)) * multiplier) * (bonuses.incomeMult || 1) * (territory.incomeMult || 1));
   }
 
   function taxTick(owner) {
@@ -8340,6 +9915,9 @@
     if (wealthQuest && getPrimaryPlayer()) wealthQuest.progress = Math.min(wealthQuest.target, getPrimaryPlayer().resources.coins);
 
     updateEnemyWaves(simDt);
+    updateResearchState(simDt);
+    updateControlPoints(simDt);
+    updateHeroSystems(simDt);
     updateResourceNodes(simDt);
     rebuildFormationProgressCache();
     for (const civilian of state.world.civilians) updateCivilian(civilian, simDt);
@@ -9567,6 +11145,7 @@
     drawGrid();
     drawResources();
     drawDrops();
+    drawControlPoints();
     drawBuildings();
     drawCommandLinks();
     drawUnits();
@@ -9902,6 +11481,7 @@
         ctx.fill();
       }
       drawBuildingModel(building, ownerColor, hit);
+      drawStrategicEntityMarkers(building);
       if (quality.drawFullHealthBars || selected || hit) drawHealthRing(building, selected);
       if ((quality.drawFullHealthBars || selected) && building.owner === "neutral" && building.maxTaxReserve) {
         const meterWidth = building.radius * 1.4;
@@ -10067,6 +11647,7 @@
         ctx.fill();
       }
       drawUnitModel(unit);
+      drawStrategicEntityMarkers(unit);
       if (state.selectedIds.has(unit.id)) drawSelectionHalo(unit);
       if (shouldDrawUnitHealth(unit)) drawFloatingHealth(unit);
       ctx.restore();
@@ -10447,13 +12028,323 @@
     drawTopHud(w);
     drawMinimap();
     drawQuestPanel(w);
+    drawHeroHud();
+    drawBossHud();
     drawHelpOverlay();
     drawBuildingActionMenu();
     drawSelectionHud(w, h);
     if (state.ui.openPanel) drawCatalogPanel(state.ui.openPanel);
     drawBottomBar();
+    if (state.ui.techTreeOpen) drawTechTreePanel();
     drawNotifications();
     drawRecentMessage(w, h);
+  }
+
+  function getHeroHudLayout() {
+    const player = getActivePlayerState();
+    if (!player) return null;
+    const viewport = state.activeViewport || getViewportForPlayer(player);
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const bottomBar = getBottomBarLayout();
+    const selection = getSelectionHudLayout();
+    const w = Math.min(320 * scale, viewport.w * (profile.tight ? 0.42 : 0.34));
+    const h = (profile.tight ? 92 : 104) * scale;
+    const x = selection
+      ? Math.min(selection.x + selection.w + 12 * scale, viewport.x + viewport.w - w - 18 * scale)
+      : viewport.x + 18 * scale;
+    const y = bottomBar.y - h - 12 * scale;
+    return { x, y, w, h, scale, profile };
+  }
+
+  function getOwnerDoctrineSummary(owner) {
+    const doctrine = getOwnerDoctrine(owner);
+    if (!doctrine) return "";
+    return `${doctrine.name}: ${doctrine.desc}`;
+  }
+
+  function getEnemyDoctrineSummary(owner) {
+    const hostileNames = getActiveCombatOwners()
+      .filter((candidate) => candidate && candidate !== owner && !areOwnersAllied(candidate, owner))
+      .map((candidate) => {
+        const doctrine = getOwnerDoctrine(candidate);
+        return doctrine ? doctrine.shortName || doctrine.name : "";
+      })
+      .filter(Boolean);
+    return [...new Set(hostileNames)].join(" | ");
+  }
+
+  function getTerritorySummary(owner) {
+    const owned = (state.world.controlPoints || []).filter((point) => point.owner === owner);
+    if (!owned.length) return "No capture points secured";
+    return owned
+      .slice(0, 3)
+      .map((point) => {
+        const def = CONTROL_POINT_DEFS[point.typeId];
+        return def ? def.bonusText : formatSelectionLabel(point.typeId);
+      })
+      .join(" | ");
+  }
+
+  function drawBarFrame(x, y, w, h, fillRatio, fillColor, backColor = "rgba(255,255,255,0.08)") {
+    ctx.fillStyle = backColor;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(x, y, w * clamp(fillRatio, 0, 1), h);
+  }
+
+  function drawHeroHud() {
+    const player = getActivePlayerState();
+    const heroState = getHeroState(player && player.owner);
+    if (!player || !heroState) return;
+    const archetype = getHeroArchetypeDef(heroState);
+    const heroUnit = getHeroUnit(player.owner);
+    const layout = getHeroHudLayout();
+    if (!layout) return;
+    const fill = ctx.createLinearGradient(layout.x, layout.y, layout.x, layout.y + layout.h);
+    fill.addColorStop(0, "rgba(9,16,22,0.9)");
+    fill.addColorStop(1, "rgba(7,12,18,0.8)");
+    roundRect(ctx, layout.x, layout.y, layout.w, layout.h, 20 * layout.scale, fill, "rgba(159,232,255,0.22)");
+    const rewardGlow = heroState.rewardFlash > 0 ? withAlpha("#ffe29a", 0.12 + heroState.rewardFlash * 0.16) : "rgba(255,255,255,0.04)";
+    ctx.fillStyle = rewardGlow;
+    ctx.fillRect(layout.x + 10 * layout.scale, layout.y + 10 * layout.scale, layout.w - 20 * layout.scale, 6 * layout.scale);
+    ctx.fillStyle = "#9fe8ff";
+    ctx.font = `700 ${Math.round(15 * layout.scale)}px Cambria`;
+    ctx.fillText(archetype.name, layout.x + 14 * layout.scale, layout.y + 20 * layout.scale);
+    drawLabelPill(`LV ${heroState.level || 1}`, layout.x + layout.w - 58 * layout.scale, layout.y + 10 * layout.scale, "rgba(159,232,255,0.18)", "rgba(159,232,255,0.36)", "#f5efe3", layout.scale, 44 * layout.scale);
+    ctx.fillStyle = "#c7d8e2";
+    ctx.font = `${Math.round(11 * layout.scale)}px Cambria`;
+    ctx.fillText(truncateTextToWidth(archetype.subtitle || "Commander", layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + 36 * layout.scale);
+    const hpRatio = heroUnit ? clamp(heroUnit.hp / Math.max(1, heroUnit.maxHp || 1), 0, 1) : 0;
+    const xpRatio = heroState.level >= 8 ? 1 : clamp((heroState.xp || 0) / Math.max(1, heroState.nextXp || 1), 0, 1);
+    ctx.fillStyle = "#f3eee2";
+    ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
+    ctx.fillText(heroUnit ? `Health ${Math.round(heroUnit.hp)}/${heroUnit.maxHp}` : `Respawn ${Math.max(0, heroState.respawnTimer || 0).toFixed(1)}s`, layout.x + 14 * layout.scale, layout.y + 53 * layout.scale);
+    drawBarFrame(layout.x + 14 * layout.scale, layout.y + 58 * layout.scale, layout.w - 28 * layout.scale, 8 * layout.scale, hpRatio, heroUnit ? "#7df2ab" : "#ffb48a");
+    ctx.fillStyle = "#c7d8e2";
+    ctx.fillText(heroState.level >= 8 ? "XP Maxed" : `XP ${(heroState.xp || 0)}/${heroState.nextXp || 1}`, layout.x + 14 * layout.scale, layout.y + 76 * layout.scale);
+    drawBarFrame(layout.x + 14 * layout.scale, layout.y + 81 * layout.scale, layout.w - 28 * layout.scale, 7 * layout.scale, xpRatio, "#9fe8ff");
+    const abilityText = heroUnit
+      ? heroState.abilityCooldown > 0
+        ? `${archetype.active.name} ${heroState.abilityCooldown.toFixed(1)}s`
+        : `${archetype.active.name} ready [${formatKeybindLabel(getKeybind("heroAbility"))}]`
+      : `${archetype.active.name} offline`;
+    const doctrineLine = truncateTextToWidth(getOwnerDoctrineSummary(player.owner), layout.w - 28 * layout.scale);
+    const intelLine = getEnemyDoctrineSummary(player.owner);
+    ctx.fillStyle = heroState.activeBuffTimer > 0 ? "#ffe29a" : "#d7e2e8";
+    ctx.font = `${Math.round(10.5 * layout.scale)}px Cambria`;
+    ctx.fillText(truncateTextToWidth(abilityText, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + layout.h - 26 * layout.scale);
+    ctx.fillStyle = "#9bb0bc";
+    ctx.font = `${Math.round(9.5 * layout.scale)}px Cambria`;
+    ctx.fillText(truncateTextToWidth(`${getTerritorySummary(player.owner)}${intelLine ? ` | Enemy ${intelLine}` : ""}`, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + layout.h - 12 * layout.scale);
+    if (doctrineLine) {
+      ctx.fillStyle = "#8fcf9b";
+      ctx.font = `${Math.round(9.5 * layout.scale)}px Cambria`;
+      ctx.fillText(doctrineLine, layout.x + 14 * layout.scale, layout.y + layout.h - 40 * layout.scale);
+    }
+  }
+
+  function drawControlPoints() {
+    const activePlayer = getActivePlayerState();
+    for (const point of state.world.controlPoints || []) {
+      if (!isWorldCircleVisibleInActiveViewport(point.x, point.y, point.radius, 180)) continue;
+      const def = CONTROL_POINT_DEFS[point.typeId];
+      if (!def) continue;
+      const ownerColor = point.owner === "neutral" ? "#dbe3e8" : ownerColors[point.owner] || "#dbe3e8";
+      const captureColor = point.captureOwner === "neutral" ? "#ffd889" : ownerColors[point.captureOwner] || "#ffd889";
+      const pulse = 1 + Math.sin(point.pulse || 0) * 0.04;
+      ctx.save();
+      ctx.translate(point.x, point.y);
+      ctx.lineWidth = 2 / state.camera.zoom;
+      ctx.strokeStyle = withAlpha(ownerColor, point.owner === "neutral" ? 0.28 : 0.5);
+      ctx.beginPath();
+      ctx.arc(0, 0, point.radius * pulse, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = withAlpha(captureColor, 0.85);
+      ctx.lineWidth = 4 / state.camera.zoom;
+      ctx.beginPath();
+      ctx.arc(0, 0, point.radius * 0.92, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(point.captureProgress || 0, 0, 1));
+      ctx.stroke();
+      ctx.fillStyle = "rgba(8,14,20,0.42)";
+      ctx.beginPath();
+      ctx.arc(0, 0, point.radius * 0.42, 0, TAU);
+      ctx.fill();
+      const spriteSize = point.radius * 0.82;
+      if (!drawSpriteFromGroup("assets", def.itemId, 0, 0, spriteSize, spriteSize, 0, point.owner === "neutral" ? 0.8 : 0.96)) {
+        ctx.fillStyle = withAlpha(ownerColor, 0.88);
+        ctx.beginPath();
+        ctx.arc(0, 0, point.radius * 0.18, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = withAlpha(ownerColor, 0.82);
+        ctx.lineWidth = 3 / state.camera.zoom;
+        ctx.beginPath();
+        ctx.moveTo(-point.radius * 0.16, 0);
+        ctx.lineTo(point.radius * 0.16, 0);
+        ctx.moveTo(0, -point.radius * 0.16);
+        ctx.lineTo(0, point.radius * 0.16);
+        ctx.stroke();
+      }
+      if (activePlayer && point.owner && point.owner !== "neutral" && areOwnersAllied(point.owner, activePlayer.owner) && def.visionRadius) {
+        ctx.strokeStyle = withAlpha(ownerColor, 0.12);
+        ctx.lineWidth = 1.5 / state.camera.zoom;
+        ctx.beginPath();
+        ctx.arc(0, 0, def.visionRadius, 0, TAU);
+        ctx.stroke();
+      }
+      const labelY = -point.radius - 18 / state.camera.zoom;
+      const labelW = Math.max(74 / state.camera.zoom, (def.name.length * 7.8) / state.camera.zoom);
+      roundRect(ctx, -labelW * 0.5, labelY - 12 / state.camera.zoom, labelW, 20 / state.camera.zoom, 9 / state.camera.zoom, "rgba(7,14,20,0.86)", withAlpha(ownerColor, 0.3));
+      ctx.fillStyle = "#f1f6fa";
+      ctx.font = `700 ${Math.round(12 / Math.max(0.48, state.camera.zoom))}px Cambria`;
+      ctx.textAlign = "center";
+      ctx.fillText(def.name, 0, labelY + 2 / state.camera.zoom);
+      ctx.fillStyle = withAlpha(ownerColor, 0.88);
+      ctx.font = `${Math.round(10 / Math.max(0.48, state.camera.zoom))}px Cambria`;
+      ctx.fillText(def.bonusText || "", 0, labelY + 14 / state.camera.zoom);
+      ctx.textAlign = "left";
+      ctx.restore();
+    }
+  }
+
+  function drawStrategicEntityMarkers(entity) {
+    if (!entity || (!entity.isHero && !entity.isBoss)) return;
+    const bossDef = entity.isBoss ? BOSS_ENCOUNTER_DEFS[entity.bossId] || null : null;
+    const accent = entity.isBoss ? (bossDef && bossDef.tint) || "#ffe29a" : "#ffe29a";
+    ctx.save();
+    ctx.rotate(-(entity.angle || 0));
+    ctx.strokeStyle = withAlpha(accent, entity.isBoss ? 0.82 : 0.56);
+    ctx.lineWidth = (entity.isBoss ? 3.5 : 2.2) / state.camera.zoom;
+    ctx.beginPath();
+    ctx.arc(0, 0, entity.radius + (entity.isBoss ? 14 : 10) + Math.sin(state.time * 3.2 + entity.id.length) * 1.4, 0, TAU);
+    ctx.stroke();
+    if (entity.isHero) {
+      ctx.fillStyle = "#ffe29a";
+      ctx.beginPath();
+      ctx.moveTo(0, -entity.radius - 14);
+      ctx.lineTo(5, -entity.radius - 6);
+      ctx.lineTo(-5, -entity.radius - 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = accent;
+    ctx.font = `700 ${Math.round(10 / Math.max(0.48, state.camera.zoom))}px Cambria`;
+    ctx.textAlign = "center";
+    ctx.fillText(entity.displayName || (bossDef && bossDef.name) || getSelectionEntityName(entity), 0, -entity.radius - (entity.isBoss ? 18 : 12));
+    ctx.textAlign = "left";
+    ctx.restore();
+  }
+
+  function drawBossHud() {
+    const viewport = state.activeViewport || getViewportForPlayer();
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const bossEntity = getActiveBossEntity();
+    if (state.boss.warningTimer > 0) {
+      const warningAlpha = clamp(state.boss.warningTimer / 4, 0, 1);
+      const warningW = Math.min(viewport.w - 30 * scale, 420 * scale);
+      const warningX = viewport.x + (viewport.w - warningW) * 0.5;
+      const warningY = viewport.y + 18 * scale;
+      roundRect(ctx, warningX, warningY, warningW, 34 * scale, 16 * scale, withAlpha("rgba(54,24,18,0.94)", 0.86), withAlpha("#ffcf8d", 0.42));
+      ctx.fillStyle = withAlpha("#ffe29a", 0.76 + warningAlpha * 0.24);
+      ctx.font = `700 ${Math.round(16 * scale)}px Cambria`;
+      ctx.textAlign = "center";
+      ctx.fillText(state.boss.warningText || "Boss detected", warningX + warningW * 0.5, warningY + 22 * scale);
+      ctx.textAlign = "left";
+    }
+    if (!bossEntity) return;
+    const bossDef = BOSS_ENCOUNTER_DEFS[bossEntity.bossId] || { name: bossEntity.displayName || "Boss", tint: "#ffe29a" };
+    const w = Math.min(viewport.w - 40 * scale, 460 * scale);
+    const x = viewport.x + (viewport.w - w) * 0.5;
+    const y = viewport.y + 58 * scale;
+    const hpRatio = clamp(bossEntity.hp / Math.max(1, bossEntity.maxHp || 1), 0, 1);
+    roundRect(ctx, x, y, w, 54 * scale, 20 * scale, state.boss.rewardFlash > 0 ? "rgba(34,22,14,0.96)" : "rgba(9,16,22,0.92)", withAlpha(bossDef.tint || "#ffe29a", 0.34));
+    ctx.fillStyle = bossDef.tint || "#ffe29a";
+    ctx.font = `700 ${Math.round(16 * scale)}px Cambria`;
+    ctx.fillText(bossDef.name, x + 16 * scale, y + 18 * scale);
+    ctx.fillStyle = "#d7e2e8";
+    ctx.font = `${Math.round(10.5 * scale)}px Cambria`;
+    ctx.fillText(`Wave ${state.boss.lastSpawnedWave || state.waves.index}`, x + 16 * scale, y + 32 * scale);
+    drawBarFrame(x + 16 * scale, y + 38 * scale, w - 32 * scale, 10 * scale, hpRatio, bossDef.tint || "#ffe29a", "rgba(255,255,255,0.08)");
+  }
+
+  function drawTechTreePanel() {
+    const layout = getTechTreeLayout();
+    const player = getActivePlayerState();
+    if (!layout || !player) return;
+    const panelFill = ctx.createLinearGradient(layout.x, layout.y, layout.x, layout.y + layout.h);
+    panelFill.addColorStop(0, "rgba(8,16,23,0.97)");
+    panelFill.addColorStop(1, "rgba(6,11,16,0.94)");
+    roundRect(ctx, layout.x, layout.y, layout.w, layout.h, 24 * layout.scale, panelFill, "rgba(159,232,255,0.22)");
+    ctx.fillStyle = "rgba(159,232,255,0.1)";
+    ctx.fillRect(layout.x + 12 * layout.scale, layout.y + 12 * layout.scale, layout.w - 24 * layout.scale, 8 * layout.scale);
+    ctx.fillStyle = "#9fe8ff";
+    ctx.font = `700 ${Math.round(24 * layout.scale)}px Cambria`;
+    ctx.fillText(`Branching Tech Tree [${formatKeybindLabel(getKeybind("openTechTree"))}]`, layout.x + layout.padding, layout.y + 30 * layout.scale);
+    ctx.fillStyle = "#b7c8d1";
+    ctx.font = `${Math.round(12 * layout.scale)}px Cambria`;
+    ctx.fillText("Economy, Warfare, and Advanced upgrades unlock new catalogs and can lock exclusive sub-paths.", layout.x + layout.padding, layout.y + 50 * layout.scale);
+    roundRect(ctx, layout.closeRect.x, layout.closeRect.y, layout.closeRect.w, layout.closeRect.h, 10 * layout.scale, "rgba(18,28,36,0.9)", "rgba(255,255,255,0.12)");
+    ctx.fillStyle = "#f4efe2";
+    ctx.font = `700 ${Math.round(14 * layout.scale)}px Cambria`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("X", layout.closeRect.x + layout.closeRect.w * 0.5, layout.closeRect.y + layout.closeRect.h * 0.5);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    if (layout.currentTech && player.tech) {
+      const progress = clamp((player.tech.progress || 0) / Math.max(1, layout.currentTech.time || 1), 0, 1);
+      drawLabelPill(`Active: ${layout.currentTech.name}`, layout.x + layout.w - 218 * layout.scale, layout.y + 18 * layout.scale, "rgba(143,232,255,0.18)", "rgba(143,232,255,0.34)", "#f5efe3", layout.scale, 158 * layout.scale);
+      drawBarFrame(layout.x + layout.w - 218 * layout.scale, layout.y + 44 * layout.scale, 188 * layout.scale, 6 * layout.scale, progress, "#9fe8ff");
+    }
+    const hover = getTechNodeHitAt(state.input.mouseScreenX, state.input.mouseScreenY);
+    layout.columns.forEach((column) => {
+      roundRect(ctx, column.x, column.y, column.w, column.h, 18 * layout.scale, "rgba(10,18,25,0.88)", withAlpha(column.accent, 0.22));
+      ctx.fillStyle = column.accent;
+      ctx.font = `700 ${Math.round(15 * layout.scale)}px Cambria`;
+      ctx.fillText(column.label, column.x + 12 * layout.scale, column.y + 18 * layout.scale);
+      column.nodes.forEach((node) => {
+        const hovered = hover && hover.kind === "node" && hover.node.tech.id === node.tech.id;
+        const fill = ctx.createLinearGradient(node.x, node.y, node.x, node.y + node.h);
+        if (node.status.researched) {
+          fill.addColorStop(0, withAlpha(node.accent, 0.24));
+          fill.addColorStop(1, "rgba(12,28,22,0.92)");
+        } else if (node.status.current) {
+          fill.addColorStop(0, withAlpha(node.accent, 0.24));
+          fill.addColorStop(1, "rgba(11,24,31,0.94)");
+        } else if (node.status.available) {
+          fill.addColorStop(0, withAlpha(node.accent, 0.18));
+          fill.addColorStop(1, "rgba(18,22,18,0.94)");
+        } else {
+          fill.addColorStop(0, "rgba(18,22,29,0.94)");
+          fill.addColorStop(1, "rgba(9,14,18,0.96)");
+        }
+        roundRect(ctx, node.x + 8 * layout.scale, node.y + 26 * layout.scale, node.w - 16 * layout.scale, node.h - 34 * layout.scale, 14 * layout.scale, fill, hovered ? withAlpha(node.accent, 0.58) : withAlpha(node.accent, 0.2));
+        drawLabelPill(node.status.researched ? "DONE" : node.status.current ? "ACTIVE" : node.status.available ? "READY" : node.status.exclusive ? "LOCKED" : node.status.missing.length ? "REQ" : node.status.busy ? "BUSY" : "LOCKED", node.x + 18 * layout.scale, node.y + 36 * layout.scale, withAlpha(node.accent, 0.18), withAlpha(node.accent, 0.28), "#f5efe3", layout.scale, 58 * layout.scale);
+        drawLabelPill(`${node.tech.cost}C`, node.x + node.w - 70 * layout.scale, node.y + 36 * layout.scale, "rgba(20,16,12,0.82)", "rgba(255,226,154,0.24)", "#ffe3ae", layout.scale, 48 * layout.scale);
+        ctx.fillStyle = "#f3eee2";
+        ctx.font = `700 ${Math.round(12 * layout.scale)}px Cambria`;
+        const titleLines = getClampedTextLines(node.tech.name, node.w - 40 * layout.scale, 2);
+        titleLines.forEach((line, index) => {
+          ctx.fillText(line, node.x + 18 * layout.scale, node.y + (58 + index * 12) * layout.scale);
+        });
+        ctx.fillStyle = "#a8bcc7";
+        ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
+        const descLines = getClampedTextLines(node.tech.desc, node.w - 40 * layout.scale, 2);
+        descLines.forEach((line, index) => {
+          ctx.fillText(line, node.x + 18 * layout.scale, node.y + (86 + index * 11) * layout.scale);
+        });
+        ctx.fillStyle = node.status.available ? "#8df2b7" : node.status.current ? "#9fe8ff" : node.status.researched ? "#ffe29a" : "#ffcf8d";
+        ctx.fillText(truncateTextToWidth(node.status.note, node.w - 40 * layout.scale), node.x + 18 * layout.scale, node.y + (112) * layout.scale);
+        ctx.fillStyle = "#8fa5b1";
+        ctx.fillText(truncateTextToWidth(`Unlocks ${(node.tech.unlocks || []).length || 0} items | ${Math.round(node.tech.time)}s`, node.w - 40 * layout.scale), node.x + 18 * layout.scale, node.y + (126) * layout.scale);
+        if (node.status.current) {
+          drawBarFrame(node.x + 18 * layout.scale, node.y + (132) * layout.scale, node.w - 36 * layout.scale, 6 * layout.scale, node.status.progress, node.accent, "rgba(255,255,255,0.08)");
+        }
+      });
+    });
+    ctx.fillStyle = "#8fa5b1";
+    ctx.font = `${Math.round(11 * layout.scale)}px Cambria`;
+    ctx.fillText("Only one research may run at a time. Merchant Compacts vs Tribute Forges and Cavalry Code vs Siege Mastery are exclusive choices.", layout.x + layout.padding, layout.y + layout.h - 10 * layout.scale);
   }
 
   function roundRect(context, x, y, w, h, r, fill, stroke) {
@@ -10544,6 +12435,28 @@
       const point = worldToMinimap(unit.x, unit.y, { x: layout.mapX, y: layout.mapY, w: layout.mapW, h: layout.mapH });
       ctx.fillStyle = withAlpha(ownerColors[unit.owner] || "#ffffff", 0.8);
       ctx.fillRect(point.x - 1, point.y - 1, 2, 2);
+    }
+    for (const pointEntry of state.world.controlPoints || []) {
+      const point = worldToMinimap(pointEntry.x, pointEntry.y, { x: layout.mapX, y: layout.mapY, w: layout.mapW, h: layout.mapH });
+      const ownerColor = pointEntry.owner === "neutral" ? "#dbe3e8" : ownerColors[pointEntry.owner] || "#dbe3e8";
+      ctx.fillStyle = ownerColor;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 3.2, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = withAlpha(pointEntry.captureOwner === "neutral" ? "#ffd889" : ownerColors[pointEntry.captureOwner] || "#ffd889", 0.9);
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 4.8, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(pointEntry.captureProgress || 0, 0, 1));
+      ctx.stroke();
+    }
+    const bossEntity = getActiveBossEntity();
+    if (bossEntity) {
+      const point = worldToMinimap(bossEntity.x, bossEntity.y, { x: layout.mapX, y: layout.mapY, w: layout.mapW, h: layout.mapH });
+      ctx.strokeStyle = withAlpha((BOSS_ENCOUNTER_DEFS[bossEntity.bossId] || {}).tint || "#ffe29a", 0.95);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 5.8, 0, TAU);
+      ctx.stroke();
     }
     ctx.drawImage(player.fog.maskCanvas, layout.mapX, layout.mapY, layout.mapW, layout.mapH);
     const viewport = state.activeViewport || getViewportForPlayer();
@@ -11323,6 +13236,7 @@
       ctx.font = `${Math.round(12 * layout.scale)}px Cambria`;
       ctx.fillText("Try a broader category or clear the search box.", layout.listX + 4 * layout.scale, layout.listY + 48 * layout.scale);
     }
+    const activeOwner = getActivePlayerState() && getActivePlayerState().owner;
     layout.items.forEach((item, index) => {
       const col = index % layout.cols;
       const row = Math.floor(index / layout.cols);
@@ -11333,12 +13247,14 @@
       if (y + h < layout.listY - 4 || y > layout.listY + layout.bodyH + 4) return;
       const dragging = state.ui.draggingItemId === item.id;
       const affordable = canAfford(item.id);
+      const unlocked = activeOwner ? isItemUnlocked(activeOwner, item) : true;
+      const lockReason = unlocked || !activeOwner ? "" : getItemUnlockReason(activeOwner, item);
       const theme = getItemVisualTheme(item);
       const cardFill = ctx.createLinearGradient(x, y, x + w, y + h);
       cardFill.addColorStop(0, dragging ? withAlpha(theme.accentSoft, 0.28) : withAlpha(theme.accentSoft, 0.16));
       cardFill.addColorStop(0.48, "rgba(16,23,31,0.95)");
       cardFill.addColorStop(1, "rgba(9,14,19,0.98)");
-      roundRect(ctx, x, y, w, h, 18 * layout.scale, cardFill, affordable ? withAlpha(theme.edge, 0.18) : "rgba(255,138,128,0.34)");
+      roundRect(ctx, x, y, w, h, 18 * layout.scale, cardFill, unlocked ? (affordable ? withAlpha(theme.edge, 0.18) : "rgba(255,138,128,0.34)") : "rgba(255,212,138,0.4)");
       ctx.fillStyle = "rgba(255,255,255,0.05)";
       ctx.fillRect(x + 4 * layout.scale, y + 4 * layout.scale, w - 8 * layout.scale, 4 * layout.scale);
       const iconBoxSize = Math.min(56 * layout.scale, h - 28 * layout.scale);
@@ -11348,7 +13264,7 @@
       iconWell.addColorStop(0, withAlpha(theme.accent, 0.18));
       iconWell.addColorStop(1, "rgba(9,14,18,0.92)");
       roundRect(ctx, iconBoxX, iconBoxY, iconBoxSize, iconBoxSize, 12 * layout.scale, iconWell, withAlpha(theme.edge, 0.22));
-      drawItemGlyph(item, iconBoxX + 4 * layout.scale, iconBoxY + 4 * layout.scale, iconBoxSize - 8 * layout.scale, !affordable);
+      drawItemGlyph(item, iconBoxX + 4 * layout.scale, iconBoxY + 4 * layout.scale, iconBoxSize - 8 * layout.scale, !affordable || !unlocked);
       const textX = iconBoxX + iconBoxSize + 12 * layout.scale;
       const textW = Math.max(48 * layout.scale, w - (textX - x) - 12 * layout.scale);
       drawLabelPill(getItemBadgeText(item), textX, y + 10 * layout.scale, theme.chipFill, withAlpha(theme.edge, 0.22), "#f6f0e3", layout.scale, textW - 52 * layout.scale);
@@ -11361,11 +13277,11 @@
       ctx.fillStyle = dragging ? "#dfe9ef" : "#a8bcc7";
       ctx.font = `${Math.round(10.5 * layout.scale)}px Cambria`;
       ctx.fillText(truncateTextToWidth(getItemMetaText(item), textW), textX, y + 63 * layout.scale);
-      ctx.fillStyle = "#c9d7de";
+      ctx.fillStyle = unlocked ? "#c9d7de" : "#ffd7a8";
       ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
-      ctx.fillText(truncateTextToWidth(getItemStatText(item), textW), textX, y + 77 * layout.scale);
-      drawLabelPill(`${item.cost} C`, x + w - 54 * layout.scale, y + h - 22 * layout.scale, affordable ? withAlpha(theme.accent, 0.18) : "rgba(111,32,28,0.84)", affordable ? withAlpha(theme.edge, 0.34) : "rgba(255,138,128,0.62)", affordable ? "#ffe6b2" : "#ffd1cb", layout.scale, 46 * layout.scale);
-      ctx.fillStyle = withAlpha(theme.accent, affordable ? 0.86 : 0.38);
+      ctx.fillText(truncateTextToWidth(unlocked ? getItemStatText(item) : lockReason, textW), textX, y + 77 * layout.scale);
+      drawLabelPill(unlocked ? `${item.cost} C` : "LOCK", x + w - 54 * layout.scale, y + h - 22 * layout.scale, unlocked ? (affordable ? withAlpha(theme.accent, 0.18) : "rgba(111,32,28,0.84)") : "rgba(94,68,26,0.86)", unlocked ? (affordable ? withAlpha(theme.edge, 0.34) : "rgba(255,138,128,0.62)") : "rgba(255,212,138,0.62)", unlocked ? (affordable ? "#ffe6b2" : "#ffd1cb") : "#ffe6b2", layout.scale, 46 * layout.scale);
+      ctx.fillStyle = withAlpha(theme.accent, unlocked ? (affordable ? 0.86 : 0.38) : 0.62);
       ctx.fillRect(x + w - 42 * layout.scale, y + 12 * layout.scale, 26 * layout.scale, 3 * layout.scale);
     });
     ctx.restore();
@@ -11390,6 +13306,7 @@
   function drawBottomBar() {
     const layout = getBottomBarLayout();
     const quickSlots = getQuickSlots();
+    const activeOwner = getActivePlayerState() && getActivePlayerState().owner;
     const scale = layout.scale || 1;
     const frameX = layout.x - 22;
     const frameY = layout.y - 24;
@@ -11448,18 +13365,24 @@
         continue;
       }
       const affordable = canAfford(item.id);
+      const unlocked = activeOwner ? isItemUnlocked(activeOwner, item) : true;
       const iconSize = Math.min(slot.w - 24 * scale, 42 * scale);
       const iconX = slot.x + (slot.w - iconSize) * 0.5;
       const iconY = slot.y + 14 * scale;
       roundRect(ctx, iconX - 4 * scale, iconY - 3 * scale, iconSize + 8 * scale, iconSize + 8 * scale, 14 * scale, "rgba(0,0,0,0.14)", withAlpha(theme.edge, 0.16));
-      drawItemGlyph(item, iconX, iconY, iconSize, !affordable);
+      drawItemGlyph(item, iconX, iconY, iconSize, !affordable || !unlocked);
       ctx.fillStyle = "#f3ece0";
       ctx.font = `700 ${Math.round(10 * scale)}px Cambria`;
       const nameLines = getClampedTextLines(item.name, slot.w - 14 * scale, 2);
       nameLines.forEach((line, lineIndex) => {
         ctx.fillText(line, slot.x + 7 * scale, slot.y + slot.h - (18 - lineIndex * 10) * scale);
       });
-      drawLabelPill(`${item.cost}C`, slot.x + slot.w - 38, slot.y + 6, affordable ? withAlpha(theme.accent, 0.18) : "rgba(111,32,28,0.84)", affordable ? withAlpha(theme.edge, 0.26) : "rgba(255,138,128,0.62)", affordable ? "#ffe3ae" : "#ffd1cb", 0.9, 32);
+      drawLabelPill(unlocked ? `${item.cost}C` : "LOCK", slot.x + slot.w - 38, slot.y + 6, unlocked ? (affordable ? withAlpha(theme.accent, 0.18) : "rgba(111,32,28,0.84)") : "rgba(94,68,26,0.86)", unlocked ? (affordable ? withAlpha(theme.edge, 0.26) : "rgba(255,138,128,0.62)") : "rgba(255,212,138,0.6)", unlocked ? (affordable ? "#ffe3ae" : "#ffd1cb") : "#ffe3ae", 0.9, 32);
+      if (!unlocked) {
+        ctx.fillStyle = "rgba(255,220,156,0.82)";
+        ctx.font = `700 ${Math.round(9 * scale)}px Cambria`;
+        ctx.fillText("Tech locked", slot.x + 8 * scale, slot.y + 24 * scale);
+      }
       if (active) {
         ctx.fillStyle = withAlpha(theme.accent, 0.88);
         ctx.fillRect(slot.x + 10, slot.y + slot.h - 6, slot.w - 20, 3);
@@ -11575,7 +13498,11 @@
 
   function getItemHoverMessage(item) {
     if (!item) return "";
-    return `${item.name}: ${item.desc || getItemMetaText(item)}`;
+    const owner = getActivePlayerState() && getActivePlayerState().owner;
+    const unlockReason = owner ? getItemUnlockReason(owner, item) : "";
+    return unlockReason
+      ? `${item.name}: ${unlockReason}. ${item.desc || getItemMetaText(item)}`
+      : `${item.name}: ${item.desc || getItemMetaText(item)}`;
   }
 
   function getEntityHoverMessage(entity) {
@@ -11589,6 +13516,8 @@
 
   function isPointerOverUiOverlay(x, y) {
     if (state.ui.openPanel && isInsideRect(x, y, getPanelLayout(state.ui.openPanel))) return true;
+    const techTree = getTechTreeLayout();
+    if (techTree && isInsideRect(x, y, techTree)) return true;
     const helpOverlay = getHelpOverlayHitAt(x, y);
     if (helpOverlay) return true;
     const buildingAction = getBuildingActionMenuLayout();
@@ -11625,10 +13554,13 @@
   function updateHoverMessage(player, x, y, worldPos) {
     setActivePlayerContext(player, getViewportForPlayer(player));
     let message = "";
-    const helpHit = getHelpOverlayHitAt(x, y, player);
-    const panelControl = getPanelControlAt(x, y);
-    const card = panelControl || helpHit ? null : getItemCardAt(x, y);
-    if (helpHit) {
+    const techHit = getTechNodeHitAt(x, y);
+    const helpHit = techHit ? null : getHelpOverlayHitAt(x, y, player);
+    const panelControl = techHit || helpHit ? null : getPanelControlAt(x, y);
+    const card = techHit || panelControl || helpHit ? null : getItemCardAt(x, y);
+    if (techHit) {
+      message = getTechTreeHoverMessage(techHit);
+    } else if (helpHit) {
       message = helpHit.player.ui.help && helpHit.player.ui.help.open
         ? "Click or press H to hide the field guide."
         : "Click or press H to reopen the field guide.";
@@ -12098,9 +14030,29 @@
       playUiSound(nextPanel ? "panelOpen" : "panelClose", { volume: 0.58, cooldown: 0.05 });
     }
     player.ui.openPanel = nextPanel;
+    if (nextPanel) player.ui.techTreeOpen = false;
     if (player.ui.panelSearchFocus && player.ui.panelSearchFocus !== nextPanel) player.ui.panelSearchFocus = null;
     if (nextPanel) markTutorialStep(player, "catalog");
     return nextPanel;
+  }
+
+  function setPlayerTechTreeOpen(player, open = true) {
+    if (!player || !player.ui) return false;
+    const nextOpen = Boolean(open);
+    if (nextOpen) {
+      if (player.ui.openPanel) setPlayerOpenPanel(player, null);
+      player.ui.panelSearchFocus = null;
+    }
+    if (player.ui.techTreeOpen !== nextOpen) {
+      playUiSound(nextOpen ? "panelOpen" : "panelClose", { volume: 0.54, cooldown: 0.05 });
+    }
+    player.ui.techTreeOpen = nextOpen;
+    return nextOpen;
+  }
+
+  function togglePlayerTechTree(player = getActivePlayerState()) {
+    if (!player) return false;
+    return setPlayerTechTreeOpen(player, !Boolean(player.ui && player.ui.techTreeOpen));
   }
 
   function handleLeftDown(player, x, y, source = "mouse") {
@@ -12114,6 +14066,27 @@
     state.input.cursorX = x;
     state.input.cursorY = y;
     state.ui.selectionBox = null;
+    const techHit = getTechNodeHitAt(x, y);
+    if (techHit) {
+      if (techHit.kind === "close") {
+        setPlayerTechTreeOpen(player, false);
+        playUiSound("uiClick", { volume: 0.46, cooldown: 0.04 });
+      } else if (techHit.kind === "node") {
+        const { tech, status } = techHit.node;
+        if (status.available) {
+          requestResearchStart(player.owner, tech.id);
+        } else if (status.current) {
+          notify(`${tech.name} is already being researched.`, "#9fe8ff", { owner: player.owner, lowPriority: true });
+          playUiSound("uiClick", { volume: 0.42, cooldown: 0.04 });
+        } else {
+          notify(status.note, "#ffb484", { owner: player.owner, lowPriority: true });
+          playUiSound("error", { volume: 0.44, cooldown: 0.04 });
+        }
+      }
+      state.input.leftDown = false;
+      state.input.actionSource = "panel";
+      return;
+    }
     const helpHit = getHelpOverlayHitAt(x, y, player);
     if (helpHit) {
       togglePlayerHelp(player);
@@ -12255,6 +14228,15 @@
     if (slot) {
       const quickSlots = getQuickSlots(player);
       const itemId = quickSlots[slot.side][slot.index];
+      const item = itemId ? itemIndex.get(itemId) : null;
+      const unlockReason = item ? getItemUnlockReason(player.owner, item) : "";
+      if (item && unlockReason) {
+        notify(`${item.name} locked. ${unlockReason}.`, "#ffb484", { owner: player.owner });
+        playUiSound("error", { volume: 0.46, cooldown: 0.04 });
+        state.input.leftDown = false;
+        state.input.actionSource = null;
+        return;
+      }
       state.ui.activePlacementId = state.ui.activePlacementId === itemId ? null : itemId;
       state.ui.relocatingBuildingId = null;
       if (state.ui.activePlacementId) state.ui.placementAngle = 0;
@@ -12394,6 +14376,8 @@
         return;
       }
     }
+    const techTree = getTechTreeLayout();
+    if (techTree && isInsideRect(pointer.x, pointer.y, techTree)) return;
     state.camera.zoom = clamp(state.camera.zoom - event.deltaY * 0.0006, 0.36, 1.9);
     markTutorialStep(player, "zoom");
   }
@@ -12655,6 +14639,14 @@
         return;
       }
     }
+    if (state.mode === "playing" && primary && eventMatchesAction(event, "heroAbility")) {
+      event.preventDefault();
+      if (!requestHeroAbility(primary.owner, getHeroAbilityTarget(primary.owner))) {
+        notify("Hero ability unavailable.", "#ffb484", { owner: primary.owner, lowPriority: true });
+        playUiSound("error", { volume: 0.46, cooldown: 0.04 });
+      }
+      return;
+    }
     if (key === "w") state.keys.forward = true;
     else if (key === "s") state.keys.back = true;
     else if (key === "a") state.keys.left = true;
@@ -12702,6 +14694,11 @@
       event.preventDefault();
       togglePlayerHelp(primary);
       playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      return;
+    }
+    if (eventMatchesAction(event, "openTechTree")) {
+      event.preventDefault();
+      togglePlayerTechTree(primary);
       return;
     }
     if (eventMatchesAction(event, "openWeapons")) {
@@ -12870,6 +14867,9 @@
           status: state.lan.statusText,
         }
         : null,
+      ui: {
+        techTreeOpen: Boolean(primary && primary.ui && primary.ui.techTreeOpen),
+      },
       players: getHumanPlayers().map((player) => ({
         owner: player.owner,
         label: player.label,
@@ -12894,6 +14894,27 @@
           visiblePct: Number(getPlayerFogCoverage(player).toFixed(1)),
           visibleCells: player.fog ? player.fog.exploredCount : 0,
         },
+        hero: player.hero
+          ? {
+            archetypeId: player.hero.archetypeId || null,
+            level: player.hero.level,
+            xp: Math.round(player.hero.xp || 0),
+            nextXp: Math.round(player.hero.nextXp || 0),
+            unitId: player.hero.unitId,
+            dead: Boolean(player.hero.dead),
+            respawnTimer: Number((player.hero.respawnTimer || 0).toFixed(1)),
+            abilityCooldown: Number((player.hero.abilityCooldown || 0).toFixed(1)),
+            activeBuffTimer: Number((player.hero.activeBuffTimer || 0).toFixed(1)),
+          }
+          : null,
+        tech: player.tech
+          ? {
+            currentId: player.tech.currentId || null,
+            progress: Number((player.tech.progress || 0).toFixed(1)),
+            researched: { ...(player.tech.researched || {}) },
+            lastCompletedId: player.tech.lastCompletedId || null,
+          }
+          : null,
         panels: { open: player.ui.openPanel, activePlacement: player.ui.activePlacementId },
         firstPerson: player.firstPerson && player.firstPerson.active
           ? {
@@ -12952,6 +14973,38 @@
         .filter((unit) => !isHumanOwner(unit.owner))
         .slice(0, 10)
         .map((unit) => ({ id: unit.id, owner: unit.owner, role: unit.role, x: Math.round(unit.x), y: Math.round(unit.y), hp: Math.round(unit.hp) })),
+      factions: Object.values(state.factions || {})
+        .map((faction) => ({
+          owner: faction.owner,
+          name: faction.name || getOwnerDisplayLabel(faction.owner),
+          doctrineId: faction.doctrineId || null,
+          hero: faction.hero
+            ? {
+              archetypeId: faction.hero.archetypeId || null,
+              level: faction.hero.level,
+              unitId: faction.hero.unitId,
+              dead: Boolean(faction.hero.dead),
+            }
+            : null,
+          tech: faction.tech
+            ? {
+              currentId: faction.tech.currentId || null,
+              progress: Number((faction.tech.progress || 0).toFixed(1)),
+              researched: { ...(faction.tech.researched || {}) },
+            }
+            : null,
+        })),
+      boss: state.boss
+        ? {
+          active: Boolean(state.boss.active),
+          defId: state.boss.defId || null,
+          entityId: state.boss.entityId || null,
+          wave: state.boss.wave || 0,
+          hp: Math.round(state.boss.hp || 0),
+          maxHp: Math.round(state.boss.maxHp || 0),
+          warningTimer: Number((state.boss.warningTimer || 0).toFixed(1)),
+        }
+        : null,
       drops: state.world.drops.slice(0, 8).map((drop) => ({ id: drop.id, item: drop.def.id, x: Math.round(drop.x), y: Math.round(drop.y), ttl: Number(drop.ttl.toFixed(1)) })),
       effectsSummary: state.world.effects.slice(0, 12).map((effect) => ({ type: effect.type, radius: Math.round(effect.radius), shards: effect.shards ? effect.shards.length : 0 })),
       hostileSummary: {
@@ -13001,6 +15054,16 @@
         }
         : null,
       quests: state.world.quests.map((quest) => ({ title: quest.title, progress: Math.round(quest.progress), target: quest.target, done: quest.done })),
+      controlPoints: (state.world.controlPoints || []).map((point) => ({
+        id: point.id,
+        typeId: point.typeId,
+        owner: point.owner,
+        captureOwner: point.captureOwner || null,
+        captureProgress: Number((point.captureProgress || 0).toFixed(2)),
+        bonusLabel: point.bonusLabel || null,
+        x: Math.round(point.x),
+        y: Math.round(point.y),
+      })),
     };
     return JSON.stringify(payload);
   }
@@ -13211,6 +15274,10 @@
     playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
     joinLanMatch("lan-coop");
   });
+  if (lanStartBtn) lanStartBtn.addEventListener("click", () => {
+    playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+    requestLanRoomStart();
+  });
   syncLanOriginUi();
   if (difficultyBtn) difficultyBtn.addEventListener("click", () => {
     playUiSound("uiClick", { volume: 0.48, cooldown: 0.04 });
@@ -13240,6 +15307,12 @@
     helpBtn.addEventListener("click", () => {
       playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
       togglePlayerHelp(getPrimaryPlayer());
+    });
+  }
+  if (techTreeBtn) {
+    techTreeBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      togglePlayerTechTree(getPrimaryPlayer());
     });
   }
   if (settingsBtn) {

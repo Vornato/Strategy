@@ -68,6 +68,11 @@ Features:
 - Neutral settlements now include store-like village markets and granaries, and the HUD shows live `Income` so the economic network is easier to read during play.
 - Added persistent fog of war so terrain stays revealed once your units or buildings clear it, while unreached land remains hidden under the shroud.
 - Added a small minimap directly below the top-left HUD that keeps the same persistent exploration reveal, plus unit/building markers and the current camera frame.
+- Added a Hero Commander system with one hero per side, multiple archetypes, XP leveling, passive command auras, active abilities, HUD status cards, and respawn-driven recovery so a fallen commander does not hard-lock the match.
+- Added a branching Tech Tree with Economy, Warfare, and Advanced paths, visible in-match research UI, mutual-exclusion choices, research progress, and catalog/quick-bar lock feedback for tech-gated units, buildings, and weapons.
+- Added faction doctrine personalities for `Fortress Kingdom`, `Raider Horde`, `Iron Legion`, and `Shadow Order`, each with different support building mixes, production bias, aggro timing, wave composition, capture priorities, and player-facing doctrine readouts.
+- Added map Capture Points including watchtowers, treasury posts, supply depots, shrine beacons, mine quarries, and radar points, with capture progress, minimap support, territory bonuses, and AI routing toward strategic objectives.
+- Added milestone Boss Wave encounters featuring the `Iron Behemoth`, `Necro Bell Tower`, `Storm Engine`, and `Sand Worm`, complete with top-center boss health UI, warning banners, unique ability behavior, boss rewards, and stronger battlefield emphasis.
 
 Change Log:
 - 2026-03-13: Created the project tracking file.
@@ -116,3 +121,8 @@ Change Log:
 - 2026-03-18: Hardened local pointer control by giving recent mouse input priority over connected gamepads and filtering stick drift with stronger radial deadzones, so slight controller drift no longer makes the cursor or camera slowly slide upward while using the mouse.
 - 2026-03-18: Upgraded first-person presentation with a more cinematic pseudo-3D pass: camera bob/lean motion, layered skyline silhouettes, richer sky and cloud treatment, improved ground perspective with water shimmer and track lines, stronger atmospheric depth fade on world objects, viewmodel shadow/sway polish, post-processing vignette/grade, and a more professional combat HUD with dynamic reticle, heading, weapon readout, and target range panel.
 - 2026-03-18: Expanded support-station gameplay so `Radar Hub` reveals more fog, `Signal Beacon`, `Observatory`, `Power Plant`, `Refinery`, `Command Hall`, and `Storm Generator` now grant meaningful nearby sight/range/production/reload bonuses, and the bottom status strip shows live building/item descriptions while hovering cards, quick slots, selection icons, or world entities.
+- 2026-03-19: Added the Hero Commander system with archetype-based hero units, per-side hero state/save data, passive aura bonuses, active abilities, XP leveling, respawn timers, HUD status cards, and improved hero first-person handling.
+- 2026-03-19: Added a branching Tech Tree with an in-match research panel, mutually exclusive branch choices, research progress tracking, save/LAN support, and visible catalog/quick-bar locking for tech-gated content.
+- 2026-03-19: Added doctrine-driven enemy faction personalities for `Fortress Kingdom`, `Raider Horde`, `Iron Legion`, and `Shadow Order`, including faction summaries, distinct production/wave bias, capture preferences, and different battlefield pressure profiles.
+- 2026-03-19: Added neutral Capture Points with territory control logic, point-specific bonuses, fog/minimap/world rendering, and AI interaction so map control now matters for economy, vision, production, and hero growth.
+- 2026-03-19: Added milestone Boss Wave encounters with unique boss state machines, warning banners, boss HUD health bars, boss rewards, and reinforced VFX for major PvE escalation beats.
