@@ -15,7 +15,10 @@
   const joinLanBtn = document.getElementById("join-lan-btn");
   const hostLanCoopBtn = document.getElementById("host-lan-coop-btn");
   const joinLanCoopBtn = document.getElementById("join-lan-coop-btn");
+  const settingsBtn = document.getElementById("settings-btn");
   const mapPresetButtons = Array.from(document.querySelectorAll("[data-map-preset]"));
+  const lanPanel = document.getElementById("lan-panel");
+  const lanInputs = document.getElementById("lan-inputs");
   const lanCodeInput = document.getElementById("lan-code-input");
   const lanLinkInput = document.getElementById("lan-link-input");
   const lanHint = document.getElementById("lan-hint");
@@ -28,7 +31,21 @@
   const speedNormalBtn = document.getElementById("speed-normal-btn");
   const speedFastBtn = document.getElementById("speed-fast-btn");
   const speedUltraBtn = document.getElementById("speed-ultra-btn");
+  const helpBtn = document.getElementById("help-btn");
+  const liveSettingsBtn = document.getElementById("live-settings-btn");
   const assistStatus = document.getElementById("assist-status");
+  const settingsOverlay = document.getElementById("settings-overlay");
+  const settingsCloseBtn = document.getElementById("settings-close-btn");
+  const graphicsQualitySelect = document.getElementById("graphics-quality-select");
+  const fontScaleInput = document.getElementById("font-scale-input");
+  const fontScaleValue = document.getElementById("font-scale-value");
+  const colorModeSelect = document.getElementById("color-mode-select");
+  const sfxVolumeInput = document.getElementById("sfx-volume-input");
+  const sfxVolumeValue = document.getElementById("sfx-volume-value");
+  const musicVolumeInput = document.getElementById("music-volume-input");
+  const musicVolumeValue = document.getElementById("music-volume-value");
+  const keybindStatus = document.getElementById("keybind-status");
+  const keybindButtons = Array.from(document.querySelectorAll("[data-keybind-action]"));
   const slashOverlay = document.getElementById("slash-overlay");
   const slashCommandInput = document.getElementById("slash-command-input");
   const adminOverlay = document.getElementById("admin-overlay");
@@ -41,7 +58,9 @@
   const adminCopyLogBtn = document.getElementById("admin-copy-log-btn");
   const adminCloseBtn = document.getElementById("admin-close-btn");
   const adminLog = document.getElementById("admin-log");
+  const lanActionButtons = [hostLanBtn, joinLanBtn, hostLanCoopBtn, joinLanCoopBtn];
   const DEFAULT_LAN_SERVER_PORT = 4173;
+  const SETTINGS_STORAGE_KEY = "top-knights-settings-v1";
 
   const WORLD_SIZE = 4600;
   const TILE_SIZE = 92;
@@ -50,6 +69,213 @@
   const CAMERA_LIMIT = WORLD_SIZE * 0.38;
   const TAU = Math.PI * 2;
   const MAP_PRESET_ORDER = ["green", "canyon", "desert", "ocean"];
+  const TUTORIAL_STEP_ORDER = ["pan", "rotate", "zoom", "catalog", "select", "command"];
+  const TUTORIAL_STEP_COPY = {
+    pan: {
+      label: "Pan",
+      mouse: "Hold right mouse and drag the map.",
+      controller: "Use the right stick to move the camera.",
+    },
+    rotate: {
+      label: "Rotate",
+      mouse: "Hold middle mouse and drag left or right.",
+      controller: "Tap R3 to rotate the camera 45 degrees.",
+    },
+    zoom: {
+      label: "Zoom",
+      mouse: "Use the mouse wheel to zoom the battlefield.",
+      controller: "Use LB and RB to zoom in or out.",
+    },
+    catalog: {
+      label: "Catalog",
+      mouse: "Open assets with E or weapons with Q.",
+      controller: "Open assets with X or weapons with B.",
+    },
+    select: {
+      label: "Select",
+      mouse: "Drag-select your troops or click a friendly unit.",
+      controller: "Use A to click or drag-select your troops.",
+    },
+    command: {
+      label: "Command",
+      mouse: "Left-click the ground or a target to issue an order.",
+      controller: "Press A over the battlefield to issue an order.",
+    },
+  };
+  const DEFAULT_KEYBINDS = {
+    openWeapons: "q",
+    openAssets: "e",
+    clearSelection: "x",
+    fullscreen: "f",
+    help: "h",
+    openSettings: "o",
+    toggleDifficulty: "d",
+    rotatePlacement: "r",
+    moveBuilding: "m",
+    demolishBuilding: "delete",
+    speedSlow: "-",
+    speedNormal: "1",
+    speedFast: "2",
+    speedUltra: "5",
+  };
+  const KEYBIND_LABELS = {
+    openWeapons: "Weapons",
+    openAssets: "Assets",
+    clearSelection: "Clear",
+    fullscreen: "Fullscreen",
+    help: "Help",
+    openSettings: "Settings",
+    toggleDifficulty: "Difficulty",
+    rotatePlacement: "Rotate Build",
+    moveBuilding: "Move Building",
+    demolishBuilding: "Demolish",
+    speedSlow: "0.5x Speed",
+    speedNormal: "1x Speed",
+    speedFast: "2x Speed",
+    speedUltra: "5x Speed",
+  };
+  const GRAPHICS_PRESETS = {
+    high: { id: "high", label: "High", effectLimit: 220, damageTextLimit: 32, effectDensity: 1, drawShadows: true, drawAmbient: true, drawFullHealthBars: true, simplifyModels: false },
+    medium: { id: "medium", label: "Medium", effectLimit: 140, damageTextLimit: 20, effectDensity: 0.65, drawShadows: true, drawAmbient: true, drawFullHealthBars: false, simplifyModels: false },
+    low: { id: "low", label: "Low", effectLimit: 84, damageTextLimit: 12, effectDensity: 0.32, drawShadows: false, drawAmbient: false, drawFullHealthBars: false, simplifyModels: true },
+  };
+  const OWNER_COLOR_PALETTES = {
+    default: {
+      player: "#68d7ff",
+      player1: "#68d7ff",
+      player2: "#ff7f72",
+      player3: "#8de7b8",
+      player4: "#f5dd82",
+      enemy1: "#ff6d6d",
+      enemy2: "#ffb057",
+      neutral: "#cfd6dc",
+      ally: "#7df2ab",
+    },
+    colorblind: {
+      player: "#63c8ff",
+      player1: "#63c8ff",
+      player2: "#ffb548",
+      player3: "#b59cff",
+      player4: "#f2e55e",
+      enemy1: "#ff8f3d",
+      enemy2: "#ffd166",
+      neutral: "#d8e0e7",
+      ally: "#8dd8ff",
+    },
+    "high-contrast": {
+      player: "#3ed3ff",
+      player1: "#3ed3ff",
+      player2: "#ff5959",
+      player3: "#51ff9f",
+      player4: "#fff16a",
+      enemy1: "#ff3434",
+      enemy2: "#ff9b2f",
+      neutral: "#f0f3f6",
+      ally: "#8affc1",
+    },
+  };
+
+  function createHelpState() {
+    return {
+      open: true,
+      steps: Object.fromEntries(TUTORIAL_STEP_ORDER.map((step) => [step, false])),
+      lastCompletedStep: null,
+      lastCompletedAt: -999,
+    };
+  }
+
+  function normalizeKeybindKey(value) {
+    const key = String(value || "").trim().toLowerCase();
+    if (!key) return "";
+    if (key === " ") return "space";
+    if (key === "esc") return "escape";
+    return key;
+  }
+
+  function formatKeybindLabel(key) {
+    const normalized = normalizeKeybindKey(key);
+    if (!normalized) return "Unbound";
+    if (normalized === " ") return "Space";
+    if (normalized.length === 1) return normalized.toUpperCase();
+    return normalized.replace(/(^\w)|([_-]\w)/g, (match) => match.replace(/[_-]/g, "").toUpperCase());
+  }
+
+  function sanitizeGraphicsQuality(value) {
+    return GRAPHICS_PRESETS[value] ? value : "high";
+  }
+
+  function sanitizeColorMode(value) {
+    return OWNER_COLOR_PALETTES[value] ? value : "default";
+  }
+
+  function clampSettingPercent(value, fallback) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return clamp(numeric, 0, 1);
+  }
+
+  function sanitizeFontScale(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 1;
+    return clamp(numeric, 0.9, 1.35);
+  }
+
+  function sanitizeKeybinds(bindings = {}) {
+    const next = {};
+    for (const [action, defaultKey] of Object.entries(DEFAULT_KEYBINDS)) {
+      next[action] = normalizeKeybindKey(bindings[action] || defaultKey) || defaultKey;
+    }
+    return next;
+  }
+
+  function createDefaultSettings() {
+    return {
+      graphicsQuality: "high",
+      fontScale: 1,
+      colorMode: "default",
+      sfxVolume: 0.68,
+      musicVolume: 1,
+      keybinds: sanitizeKeybinds(DEFAULT_KEYBINDS),
+    };
+  }
+
+  function loadStoredSettings() {
+    const defaults = createDefaultSettings();
+    try {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!raw) return defaults;
+      const parsed = JSON.parse(raw);
+      return {
+        graphicsQuality: sanitizeGraphicsQuality(parsed.graphicsQuality),
+        fontScale: sanitizeFontScale(parsed.fontScale),
+        colorMode: sanitizeColorMode(parsed.colorMode),
+        sfxVolume: clampSettingPercent(parsed.sfxVolume, defaults.sfxVolume),
+        musicVolume: clampSettingPercent(parsed.musicVolume, defaults.musicVolume),
+        keybinds: sanitizeKeybinds(parsed.keybinds),
+      };
+    } catch (error) {
+      return defaults;
+    }
+  }
+
+  function saveSettings() {
+    if (!state || !state.settings) return;
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
+    } catch (error) {}
+  }
+
+  function getGraphicsPreset() {
+    return GRAPHICS_PRESETS[sanitizeGraphicsQuality(state.settings && state.settings.graphicsQuality)] || GRAPHICS_PRESETS.high;
+  }
+
+  function getKeybind(action) {
+    return normalizeKeybindKey(state.settings && state.settings.keybinds && state.settings.keybinds[action]) || DEFAULT_KEYBINDS[action] || "";
+  }
+
+  function eventMatchesAction(event, action) {
+    return normalizeKeybindKey(event.key) === getKeybind(action);
+  }
 
   function isLanBlockedOnCurrentOrigin() {
     return location.protocol === "https:";
@@ -57,7 +283,7 @@
 
   function getLanIdleStatusText(sharedRoom = null) {
     if (isLanBlockedOnCurrentOrigin()) {
-      return "GitHub Pages / HTTPS build ready for campaign and local split-screen. LAN requires opening the game from http://HOST:4173 because the built-in LAN server is HTTP-only.";
+      return "Hosted HTTPS build detected. LAN controls are hidden here because the built-in room server only works from http://HOST:4173 on the host machine.";
     }
     if (sharedRoom) {
       return `Shared LAN link detected for room ${sharedRoom.roomCode}. Press Start to join and launch ${sharedRoom.matchType === "lan-coop" ? "co-op" : "versus"} for everyone in the room.`;
@@ -70,7 +296,7 @@
 
   function getLanHintMarkup() {
     if (isLanBlockedOnCurrentOrigin()) {
-      return "GitHub Pages runs over <code>https://</code>, so browsers block this build from talking to the built-in <code>http://HOST:4173</code> LAN server. Use GitHub Pages for campaign and local split-screen, and open the game from the host PC's LAN URL for room hosting/joining.";
+      return "This hosted build runs over <code>https://</code>, so browsers refuse the game's built-in <code>http://HOST:4173</code> LAN server. Campaign and local split-screen still work here. For LAN, open the game from the host PC's local HTTP address instead.";
     }
     return "Run <code>node server.js</code> on the host machine, open this page from that machine's LAN IP such as <code>http://192.168.1.10:4173</code>, then share the generated link or room code. GitHub Pages can host the single-player and local split-screen build, but LAN still requires the built-in HTTP server.";
   }
@@ -80,17 +306,20 @@
     const disabledTitle = lanBlocked
       ? "LAN is unavailable from HTTPS-hosted builds like GitHub Pages. Open the game from http://HOST:4173 to use LAN rooms."
       : "";
-    for (const button of [hostLanBtn, joinLanBtn, hostLanCoopBtn, joinLanCoopBtn]) {
+    for (const button of lanActionButtons) {
       if (!button) continue;
       button.disabled = lanBlocked;
       button.title = disabledTitle;
+      button.classList.toggle("hidden", lanBlocked);
     }
     if (lanCodeInput) {
       lanCodeInput.disabled = lanBlocked;
       lanCodeInput.title = disabledTitle;
-      if (lanBlocked && !lanCodeInput.value) lanCodeInput.placeholder = "LAN disabled on HTTPS build";
+      if (lanBlocked && !lanCodeInput.value) lanCodeInput.placeholder = "LAN unavailable on HTTPS build";
       else lanCodeInput.placeholder = "ABCDE";
     }
+    if (lanInputs) lanInputs.classList.toggle("hidden", lanBlocked);
+    if (lanPanel) lanPanel.classList.toggle("hosted-build", lanBlocked);
     if (lanHint) lanHint.innerHTML = getLanHintMarkup();
   }
 
@@ -102,17 +331,7 @@
     return false;
   }
 
-  const ownerColors = {
-    player: "#68d7ff",
-    player1: "#68d7ff",
-    player2: "#ff7f72",
-    player3: "#8de7b8",
-    player4: "#f5dd82",
-    enemy1: "#ff6d6d",
-    enemy2: "#ffb057",
-    neutral: "#cfd6dc",
-    ally: "#7df2ab",
-  };
+  const ownerColors = { ...OWNER_COLOR_PALETTES.default };
 
   const starterEmpireLayout = {
     buildings: [
@@ -416,14 +635,25 @@
     ui: {
       openPanel: null,
       activePlacementId: null,
+      placementAngle: 0,
+      relocatingBuildingId: null,
       hoveredSlot: null,
       draggingItemId: null,
       dragSource: null,
       panelScroll: { assets: 0, weapons: 0 },
+      panelSearch: { assets: "", weapons: "" },
+      panelCategory: { assets: "all", weapons: "all" },
+      panelCollapsed: { assets: false, weapons: false },
+      panelSearchFocus: null,
       selectionBox: null,
       hoveredEnemyIds: [],
       hoverMessage: "",
       recentMessage: "Build, tax, and conquer the rival nations.",
+      help: createHelpState(),
+    },
+    settings: loadStoredSettings(),
+    settingsUi: {
+      listeningAction: null,
     },
     ids: 0,
     selectedIds: new Set(),
@@ -772,7 +1002,7 @@
     if (!audioState.context) {
       audioState.context = new AudioContextCtor();
       audioState.sfxGain = audioState.context.createGain();
-      audioState.sfxGain.gain.value = 0.68;
+      audioState.sfxGain.gain.value = clampSettingPercent(state.settings && state.settings.sfxVolume, 0.68);
       audioState.sfxGain.connect(audioState.context.destination);
       audioState.noiseBuffer = createNoiseBuffer(audioState.context);
     }
@@ -902,6 +1132,23 @@
       point.x <= point.viewport.x + point.viewport.w + padding &&
       point.y >= point.viewport.y - padding &&
       point.y <= point.viewport.y + point.viewport.h + padding;
+  }
+
+  function isWorldCircleVisibleInActiveViewport(x, y, radius = 0, padding = 0) {
+    const viewport = state.activeViewport || getViewportForPlayer();
+    const dx = x - state.camera.x;
+    const dy = y - state.camera.y;
+    const cos = Math.cos(state.camera.rotation);
+    const sin = Math.sin(state.camera.rotation);
+    const rx = dx * cos - dy * sin;
+    const ry = dx * sin + dy * cos;
+    const screenX = viewport.x + viewport.w / 2 + rx * state.camera.zoom;
+    const screenY = viewport.y + viewport.h / 2 + ry * state.camera.zoom;
+    const screenRadius = (radius + padding) * state.camera.zoom;
+    return screenX + screenRadius >= viewport.x &&
+      screenX - screenRadius <= viewport.x + viewport.w &&
+      screenY + screenRadius >= viewport.y &&
+      screenY - screenRadius <= viewport.y + viewport.h;
   }
 
   function getAudioPerspective(x = null, y = null) {
@@ -1123,10 +1370,112 @@
       const targetMix = player ? Math.max(rawPresence, bus.sustain > 0 ? Math.min(0.72, bus.sustain * 0.55) : 0) : 0;
       const targetLevel = activeOwners.has(owner) ? baseLevel : 0;
       bus.battleMix = moveToward(bus.battleMix, targetMix, dt * (targetMix > bus.battleMix ? 1.05 : 0.72));
-      bus.level = moveToward(bus.level, targetLevel, dt * 0.9);
+      bus.level = moveToward(bus.level, targetLevel * clampSettingPercent(state.settings.musicVolume, 1), dt * 0.9);
       bus.calmEl.volume = Math.max(0, Math.min(1, bus.level * (1 - bus.battleMix)));
       bus.battleEl.volume = Math.max(0, Math.min(1, bus.level * bus.battleMix));
     }
+  }
+
+  function applyColorMode() {
+    const palette = OWNER_COLOR_PALETTES[sanitizeColorMode(state.settings.colorMode)] || OWNER_COLOR_PALETTES.default;
+    for (const [key, value] of Object.entries(palette)) ownerColors[key] = value;
+  }
+
+  function applySettingsToRuntime() {
+    state.settings.graphicsQuality = sanitizeGraphicsQuality(state.settings.graphicsQuality);
+    state.settings.fontScale = sanitizeFontScale(state.settings.fontScale);
+    state.settings.colorMode = sanitizeColorMode(state.settings.colorMode);
+    state.settings.sfxVolume = clampSettingPercent(state.settings.sfxVolume, 0.68);
+    state.settings.musicVolume = clampSettingPercent(state.settings.musicVolume, 1);
+    state.settings.keybinds = sanitizeKeybinds(state.settings.keybinds);
+    applyColorMode();
+    document.documentElement.style.setProperty("--ui-font-scale", String(state.settings.fontScale));
+    if (audioState.sfxGain) audioState.sfxGain.gain.value = state.settings.sfxVolume;
+  }
+
+  function isSettingsOverlayOpen() {
+    return Boolean(settingsOverlay && !settingsOverlay.classList.contains("hidden"));
+  }
+
+  function syncSettingsUi() {
+    if (graphicsQualitySelect) graphicsQualitySelect.value = sanitizeGraphicsQuality(state.settings.graphicsQuality);
+    if (colorModeSelect) colorModeSelect.value = sanitizeColorMode(state.settings.colorMode);
+    if (fontScaleInput) fontScaleInput.value = String(Math.round(state.settings.fontScale * 100));
+    if (fontScaleValue) fontScaleValue.textContent = `${Math.round(state.settings.fontScale * 100)}%`;
+    if (sfxVolumeInput) sfxVolumeInput.value = String(Math.round(state.settings.sfxVolume * 100));
+    if (sfxVolumeValue) sfxVolumeValue.textContent = `${Math.round(state.settings.sfxVolume * 100)}%`;
+    if (musicVolumeInput) musicVolumeInput.value = String(Math.round(state.settings.musicVolume * 100));
+    if (musicVolumeValue) musicVolumeValue.textContent = `${Math.round(state.settings.musicVolume * 100)}%`;
+    for (const button of keybindButtons) {
+      const action = button.dataset.keybindAction;
+      if (!action) continue;
+      const listening = state.settingsUi.listeningAction === action;
+      button.classList.toggle("listening", listening);
+      const label = KEYBIND_LABELS[action] || action;
+      button.textContent = `${label}: ${listening ? "Press Key..." : formatKeybindLabel(getKeybind(action))}`;
+    }
+    if (keybindStatus) {
+      keybindStatus.textContent = state.settingsUi.listeningAction
+        ? `Listening for ${KEYBIND_LABELS[state.settingsUi.listeningAction] || state.settingsUi.listeningAction}. Press Escape to cancel.`
+        : "Click an action, then press a key to rebind it. Press Escape to cancel.";
+    }
+  }
+
+  function commitSettings() {
+    applySettingsToRuntime();
+    syncSettingsUi();
+    syncLiveControls();
+    saveSettings();
+  }
+
+  function openSettingsOverlay() {
+    if (!settingsOverlay) return;
+    if (document.pointerLockElement === canvas && document.exitPointerLock) document.exitPointerLock();
+    state.input.leftDown = false;
+    state.input.rightDown = false;
+    state.input.middleDown = false;
+    state.input.actionSource = null;
+    state.input.draggingSelection = false;
+    state.ui.selectionBox = null;
+    state.keys.forward = false;
+    state.keys.back = false;
+    state.keys.left = false;
+    state.keys.right = false;
+    state.keys.sprint = false;
+    const fpPlayer = getFirstPersonActivePlayer();
+    if (fpPlayer && fpPlayer.firstPerson) {
+      fpPlayer.firstPerson.fireHeld = false;
+      fpPlayer.firstPerson.aiming = false;
+    }
+    if (state.admin.slashOpen) closeSlashCommand();
+    if (state.admin.panelOpen) closeAdminPanel();
+    state.settingsUi.listeningAction = null;
+    settingsOverlay.classList.remove("hidden");
+    syncSettingsUi();
+  }
+
+  function closeSettingsOverlay() {
+    if (!settingsOverlay) return;
+    state.settingsUi.listeningAction = null;
+    settingsOverlay.classList.add("hidden");
+    syncSettingsUi();
+  }
+
+  function beginKeybindCapture(action) {
+    if (!action || !DEFAULT_KEYBINDS[action]) return;
+    state.settingsUi.listeningAction = action;
+    syncSettingsUi();
+  }
+
+  function setActionKeybind(action, key) {
+    const normalized = normalizeKeybindKey(key);
+    if (!action || !normalized) return;
+    const currentKey = getKeybind(action);
+    const conflictAction = Object.keys(state.settings.keybinds).find((candidate) => candidate !== action && getKeybind(candidate) === normalized);
+    state.settings.keybinds[action] = normalized;
+    if (conflictAction) state.settings.keybinds[conflictAction] = currentKey || DEFAULT_KEYBINDS[conflictAction];
+    state.settingsUi.listeningAction = null;
+    commitSettings();
   }
 
   function cloneQuickSlots() {
@@ -1637,13 +1986,27 @@
 
   function syncLiveControls() {
     if (liveControls) liveControls.classList.toggle("hidden", state.mode !== "playing");
+    const primary = getPrimaryPlayer();
+    const primaryHelp = getPlayerHelpState(primary);
     const difficultyLabel = state.difficulty.mode === "easy" ? "Easy" : state.difficulty.mode === "hard" ? "Hard" : "Normal";
-    if (difficultyBtn) difficultyBtn.textContent = `Difficulty: ${difficultyLabel}`;
+    if (difficultyBtn) difficultyBtn.textContent = `Difficulty: ${difficultyLabel} (${formatKeybindLabel(getKeybind("toggleDifficulty"))})`;
     if (ceasefireBtn) ceasefireBtn.textContent = isCeasefireActive() ? `Ceasefire ${Math.ceil(state.difficulty.ceasefireTimer)}s` : "Ceasefire (Esc)";
+    if (helpBtn) {
+      const completedCount = primaryHelp ? TUTORIAL_STEP_ORDER.filter((step) => primaryHelp.steps[step]).length : 0;
+      const helpKey = formatKeybindLabel(getKeybind("help"));
+      helpBtn.textContent = primaryHelp && primaryHelp.open
+        ? `Hide Guide (${helpKey})`
+        : `Help / Tutorial ${completedCount ? `(${completedCount}/${TUTORIAL_STEP_ORDER.length})` : `(${helpKey})`}`;
+    }
+    if (liveSettingsBtn) liveSettingsBtn.textContent = `Settings (${formatKeybindLabel(getKeybind("openSettings"))})`;
     const assistControlsDisabled = !hasLocalAssistAuthority();
     const speedDisabled = isLanMatch();
     if (difficultyBtn) difficultyBtn.disabled = assistControlsDisabled;
     if (ceasefireBtn) ceasefireBtn.disabled = assistControlsDisabled;
+    if (speedSlowBtn) speedSlowBtn.textContent = `0.5x (${formatKeybindLabel(getKeybind("speedSlow"))})`;
+    if (speedNormalBtn) speedNormalBtn.textContent = `1x (${formatKeybindLabel(getKeybind("speedNormal"))})`;
+    if (speedFastBtn) speedFastBtn.textContent = `2x (${formatKeybindLabel(getKeybind("speedFast"))})`;
+    if (speedUltraBtn) speedUltraBtn.textContent = `5x (${formatKeybindLabel(getKeybind("speedUltra"))})`;
     if (speedSlowBtn) speedSlowBtn.disabled = speedDisabled || state.speed.multiplier === 0.5;
     if (speedNormalBtn) speedNormalBtn.disabled = speedDisabled || state.speed.multiplier === 1;
     if (speedFastBtn) speedFastBtn.disabled = speedDisabled || state.speed.multiplier === 2;
@@ -1956,6 +2319,7 @@
     const ids = Array.isArray(selectedIds) ? new Set(selectedIds) : selectedIds;
     const selectedUnits = state.world.units.filter((unit) => unit.owner === owner && ids.has(unit.id));
     if (!selectedUnits.length) return false;
+    const ownerPlayer = getPlayerState(owner);
     const targetEntity = findNearest([...state.world.units, ...state.world.buildings, ...state.world.animals, ...state.world.trees, ...state.world.rocks, ...state.world.civilians], worldPos.x, worldPos.y, (entity) => {
       if (isResourceNode(entity)) return Math.hypot(entity.x - worldPos.x, entity.y - worldPos.y) < entity.radius + 16;
       if (isNeutralEconomyTarget(entity)) return Math.hypot(entity.x - worldPos.x, entity.y - worldPos.y) < (entity.radius || 12) + 18;
@@ -1981,6 +2345,7 @@
       issueMoveOrder(selectedUnits, worldPos);
       playWorldSound("orderMove", worldPos.x, worldPos.y, { cooldown: 0.06, volume: 0.66 });
     }
+    if (ownerPlayer) markTutorialStep(ownerPlayer, "command");
     return true;
   }
 
@@ -1994,12 +2359,21 @@
     }
     if (command.type === "deployPlacement") {
       const item = itemIndex.get(command.itemId);
-      if (item) deployPlacement(item, command.worldPos.x, command.worldPos.y, command.owner);
+      const relocateBuilding = command.relocateBuildingId ? state.world.buildings.find((building) => building.id === command.relocateBuildingId) || null : null;
+      if (item) deployPlacement(item, command.worldPos.x, command.worldPos.y, command.owner, {
+        angle: command.angle || 0,
+        relocateBuilding,
+      });
       return;
     }
     if (command.type === "worldCommand") {
       remotePlayer.selectedIds = new Set(command.selectedIds || []);
       applyWorldCommand(command.owner, remotePlayer.selectedIds, command.worldPos, command.hoveredEnemyIds || []);
+      return;
+    }
+    if (command.type === "demolishBuilding") {
+      const building = state.world.buildings.find((entry) => entry.id === command.buildingId && entry.owner === command.owner);
+      if (building) demolishSelectedBuilding(remotePlayer, building);
     }
   }
 
@@ -2248,14 +2622,21 @@
       ui: {
         openPanel: null,
         activePlacementId: null,
+        placementAngle: 0,
+        relocatingBuildingId: null,
         hoveredSlot: null,
         draggingItemId: null,
         dragSource: null,
         panelScroll: { assets: 0, weapons: 0 },
+        panelSearch: { assets: "", weapons: "" },
+        panelCategory: { assets: "all", weapons: "all" },
+        panelCollapsed: { assets: false, weapons: false },
+        panelSearchFocus: null,
         selectionBox: null,
         hoveredEnemyIds: [],
         hoverMessage: "",
         recentMessage: "Build, tax, and conquer the rival nations.",
+        help: createHelpState(),
       },
       selectedIds: new Set(),
       quickSlots: cloneQuickSlots(),
@@ -2552,6 +2933,104 @@
     if (!player || !player.ui) return;
     if (!player.ui.panelScroll) player.ui.panelScroll = { assets: 0, weapons: 0 };
     player.ui.panelScroll[type] = Math.max(0, value || 0);
+  }
+
+  function getPanelSearch(type, player = getActivePlayerState()) {
+    if (!player || !player.ui || !player.ui.panelSearch) return "";
+    return String(player.ui.panelSearch[type] || "");
+  }
+
+  function setPanelSearch(type, value, player = getActivePlayerState()) {
+    if (!player || !player.ui) return "";
+    if (!player.ui.panelSearch) player.ui.panelSearch = { assets: "", weapons: "" };
+    player.ui.panelSearch[type] = String(value || "");
+    setPanelScroll(type, 0, player);
+    return player.ui.panelSearch[type];
+  }
+
+  function getPanelCategory(type, player = getActivePlayerState()) {
+    if (!player || !player.ui || !player.ui.panelCategory) return "all";
+    return player.ui.panelCategory[type] || "all";
+  }
+
+  function setPanelCategory(type, value, player = getActivePlayerState()) {
+    if (!player || !player.ui) return "all";
+    if (!player.ui.panelCategory) player.ui.panelCategory = { assets: "all", weapons: "all" };
+    player.ui.panelCategory[type] = value || "all";
+    setPanelScroll(type, 0, player);
+    return player.ui.panelCategory[type];
+  }
+
+  function isPanelCollapsed(type, player = getActivePlayerState()) {
+    if (!player || !player.ui || !player.ui.panelCollapsed) return false;
+    return Boolean(player.ui.panelCollapsed[type]);
+  }
+
+  function setPanelCollapsed(type, collapsed, player = getActivePlayerState()) {
+    if (!player || !player.ui) return false;
+    if (!player.ui.panelCollapsed) player.ui.panelCollapsed = { assets: false, weapons: false };
+    player.ui.panelCollapsed[type] = Boolean(collapsed);
+    if (collapsed && player.ui.panelSearchFocus === type) player.ui.panelSearchFocus = null;
+    return player.ui.panelCollapsed[type];
+  }
+
+  function setPanelSearchFocus(type = null, player = getActivePlayerState()) {
+    if (!player || !player.ui) return null;
+    player.ui.panelSearchFocus = type || null;
+    return player.ui.panelSearchFocus;
+  }
+
+  function getPlayerHelpState(player = getActivePlayerState()) {
+    if (!player || !player.ui) return null;
+    if (!player.ui.help) player.ui.help = createHelpState();
+    return player.ui.help;
+  }
+
+  function hasCompletedTutorial(player = getActivePlayerState()) {
+    const help = getPlayerHelpState(player);
+    return Boolean(help && TUTORIAL_STEP_ORDER.every((step) => help.steps[step]));
+  }
+
+  function getNextTutorialStep(player = getActivePlayerState()) {
+    const help = getPlayerHelpState(player);
+    if (!help) return null;
+    return TUTORIAL_STEP_ORDER.find((step) => !help.steps[step]) || null;
+  }
+
+  function markTutorialStep(player, step) {
+    const help = getPlayerHelpState(player);
+    if (!help || !TUTORIAL_STEP_COPY[step] || help.steps[step]) return false;
+    help.steps[step] = true;
+    help.lastCompletedStep = step;
+    help.lastCompletedAt = state.time;
+    const nextStep = getNextTutorialStep(player);
+    if (nextStep) {
+      player.ui.recentMessage = `Tutorial: ${TUTORIAL_STEP_COPY[step].label} learned. Next: ${TUTORIAL_STEP_COPY[nextStep].label}.`;
+    } else {
+      player.ui.recentMessage = `Tutorial complete. Press ${formatKeybindLabel(getKeybind("help"))} at any time to reopen the field guide.`;
+      help.open = false;
+    }
+    syncLiveControls();
+    return true;
+  }
+
+  function togglePlayerHelp(player = getPrimaryPlayer(), force = null) {
+    if (!player) return false;
+    const help = getPlayerHelpState(player);
+    if (!help) return false;
+    help.open = typeof force === "boolean" ? force : !help.open;
+    syncLiveControls();
+    return help.open;
+  }
+
+  function getTutorialStepInstruction(step, player = getActivePlayerState()) {
+    const copy = TUTORIAL_STEP_COPY[step];
+    if (!copy) return "";
+    if (player && player.inputMode === "controller") return copy.controller;
+    if (step === "catalog") {
+      return `Open assets with ${formatKeybindLabel(getKeybind("openAssets"))} or weapons with ${formatKeybindLabel(getKeybind("openWeapons"))}.`;
+    }
+    return copy.mouse;
   }
 
   function getViewportForPlayer(player = getActivePlayerState()) {
@@ -3228,6 +3707,196 @@
     return { x: dx / d, y: dy / d, d };
   }
 
+  function getPointToSegmentInfo(px, py, ax, ay, bx, by) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lengthSq = dx * dx + dy * dy;
+    if (!lengthSq) {
+      const distance = Math.hypot(px - ax, py - ay);
+      return { x: ax, y: ay, t: 0, distance };
+    }
+    const t = clamp(((px - ax) * dx + (py - ay) * dy) / lengthSq, 0, 1);
+    const x = ax + dx * t;
+    const y = ay + dy * t;
+    return { x, y, t, distance: Math.hypot(px - x, py - y) };
+  }
+
+  function forEachMovementObstacle(unit, callback) {
+    if (!unit || unit.airborne || unit.hover) return;
+    for (const tree of state.world.trees) callback(tree, 10);
+    for (const rock of state.world.rocks) callback(rock, 9);
+    for (const building of state.world.buildings) {
+      callback(building, building.def && (building.def.style === "wall" || building.def.style === "capital-wall" || building.def.style === "gate") ? 16 : 20);
+    }
+  }
+
+  function nudgeMoveTargetFromObstacles(unit, target, padding = 0) {
+    if (!unit || !target || unit.airborne || unit.hover) return target ? { x: target.x, y: target.y } : null;
+    const adjusted = { x: target.x, y: target.y };
+    forEachMovementObstacle(unit, (obstacle, extraPadding) => {
+      const dx = adjusted.x - obstacle.x;
+      const dy = adjusted.y - obstacle.y;
+      const d = Math.hypot(dx, dy) || 0.001;
+      const clearance = (obstacle.radius || 0) + unit.radius + padding + extraPadding * 0.35;
+      if (d >= clearance) return;
+      adjusted.x += (dx / d) * (clearance - d);
+      adjusted.y += (dy / d) * (clearance - d);
+    });
+    adjusted.x = clamp(adjusted.x, -HALF_WORLD + 60, HALF_WORLD - 60);
+    adjusted.y = clamp(adjusted.y, -HALF_WORLD + 60, HALF_WORLD - 60);
+    return adjusted;
+  }
+
+  function getPathObstacle(unit, target) {
+    if (!unit || !target || unit.airborne || unit.hover) return null;
+    const startX = unit.x;
+    const startY = unit.y;
+    const pathLength = Math.hypot(target.x - startX, target.y - startY);
+    if (pathLength < 46) return null;
+    let best = null;
+    forEachMovementObstacle(unit, (obstacle, extraPadding) => {
+      if (!obstacle || obstacle.id === unit.id || obstacle.id === unit.targetId || obstacle.id === unit.interactTargetId) return;
+      const targetDistance = Math.hypot(target.x - obstacle.x, target.y - obstacle.y);
+      const clearance = (obstacle.radius || 0) + unit.radius + extraPadding;
+      if (targetDistance <= clearance * 0.78) return;
+      const segment = getPointToSegmentInfo(obstacle.x, obstacle.y, startX, startY, target.x, target.y);
+      if (segment.t <= 0.06 || segment.t >= 0.96 || segment.distance >= clearance) return;
+      const score = segment.t * pathLength + segment.distance * 0.35;
+      if (!best || score < best.score) {
+        best = {
+          obstacle,
+          clearance,
+          score,
+          segment,
+        };
+      }
+    });
+    return best;
+  }
+
+  function getObstacleAvoidanceWaypoint(unit, target, preferredSide = 0) {
+    const blocker = getPathObstacle(unit, target);
+    if (!blocker) return null;
+    const dir = normalize(target.x - unit.x, target.y - unit.y);
+    const normal = { x: -dir.y, y: dir.x };
+    const signs = preferredSide ? [preferredSide, -preferredSide] : [1, -1];
+    let best = null;
+    for (const side of signs) {
+      const candidate = nudgeMoveTargetFromObstacles(unit, {
+        x: blocker.segment.x + normal.x * side * (blocker.clearance + 14),
+        y: blocker.segment.y + normal.y * side * (blocker.clearance + 14),
+      }, 8);
+      const candidateBlocker = getPathObstacle(unit, candidate);
+      const score = Math.hypot(candidate.x - target.x, candidate.y - target.y) + (candidateBlocker ? 180 : 0);
+      if (!best || score < best.score) best = { ...candidate, side, score };
+    }
+    return best;
+  }
+
+  function resetUnitPathState(unit) {
+    if (!unit) return;
+    unit.pathWaypoint = null;
+    unit.pathRepathTimer = 0;
+    unit.pathStuckTimer = 0;
+    unit.pathLastDistance = null;
+  }
+
+  function clearUnitFormation(unit) {
+    if (!unit) return;
+    unit.formationMoveId = null;
+    unit.formationSlot = null;
+    unit.formationIndex = -1;
+  }
+
+  function clearUnitNavigation(unit) {
+    clearUnitFormation(unit);
+    resetUnitPathState(unit);
+  }
+
+  function resolveUnitSteeringTarget(unit, dt) {
+    if (!unit.moveTarget) {
+      resetUnitPathState(unit);
+      return null;
+    }
+    if (unit.airborne || unit.hover) {
+      unit.pathWaypoint = null;
+      unit.pathRepathTimer = 0;
+      return unit.moveTarget;
+    }
+    unit.pathRepathTimer = Math.max(0, (unit.pathRepathTimer || 0) - dt);
+    if (unit.pathWaypoint && Math.hypot(unit.pathWaypoint.x - unit.x, unit.pathWaypoint.y - unit.y) <= unit.radius + 12) {
+      unit.pathWaypoint = null;
+    }
+    const stuck = (unit.pathStuckTimer || 0) > 0.55;
+    if (unit.pathWaypoint && !stuck && !getPathObstacle(unit, unit.moveTarget)) {
+      unit.pathWaypoint = null;
+    }
+    if (unit.pathRepathTimer <= 0 || stuck) {
+      unit.pathRepathTimer = stuck ? 0.08 : 0.18;
+      const preferredSide = stuck ? (unit.pathAvoidanceSide === 1 ? -1 : 1) : unit.pathAvoidanceSide || 0;
+      const waypoint = getObstacleAvoidanceWaypoint(unit, unit.moveTarget, preferredSide);
+      if (waypoint) {
+        unit.pathWaypoint = { x: waypoint.x, y: waypoint.y };
+        unit.pathAvoidanceSide = waypoint.side;
+        if (stuck) unit.pathStuckTimer = 0;
+      } else {
+        unit.pathWaypoint = null;
+      }
+    }
+    return unit.pathWaypoint || unit.moveTarget;
+  }
+
+  function getFormationMoveTargets(selectedUnits, worldPos) {
+    if (!selectedUnits.length) return [];
+    if (selectedUnits.length === 1) {
+      return [{
+        unit: selectedUnits[0],
+        target: nudgeMoveTargetFromObstacles(selectedUnits[0], worldPos, 10),
+        index: 0,
+      }];
+    }
+    const center = selectedUnits.reduce((sum, unit) => ({ x: sum.x + unit.x, y: sum.y + unit.y }), { x: 0, y: 0 });
+    center.x /= selectedUnits.length;
+    center.y /= selectedUnits.length;
+    let dir = normalize(worldPos.x - center.x, worldPos.y - center.y);
+    if (dir.d < 12) dir = { x: Math.cos(selectedUnits[0].angle || 0), y: Math.sin(selectedUnits[0].angle || 0), d: 1 };
+    const normal = { x: -dir.y, y: dir.x };
+    const maxRadius = Math.max(...selectedUnits.map((unit) => unit.radius || 12));
+    const spacingX = clamp(maxRadius * 2.7 + 8, 28, 46);
+    const spacingY = clamp(maxRadius * 2.45 + 10, 30, 50);
+    const maxCols = selectedUnits.length <= 4 ? selectedUnits.length : Math.min(6, Math.max(3, Math.ceil(Math.sqrt(selectedUnits.length))));
+    const speedSorted = [...selectedUnits].sort((a, b) => (a.speed || 0) - (b.speed || 0) || (b.radius || 0) - (a.radius || 0));
+    const assignments = [];
+    let offset = 0;
+    let row = 0;
+    while (offset < speedSorted.length) {
+      const rowCount = Math.min(maxCols, speedSorted.length - offset);
+      const rowUnits = speedSorted
+        .slice(offset, offset + rowCount)
+        .sort((a, b) => ((a.x - center.x) * normal.x + (a.y - center.y) * normal.y) - ((b.x - center.x) * normal.x + (b.y - center.y) * normal.y));
+      const rowSlots = [];
+      for (let i = 0; i < rowCount; i += 1) {
+        const lateral = (i - (rowCount - 1) * 0.5) * spacingX;
+        rowSlots.push({
+          x: worldPos.x - dir.x * row * spacingY + normal.x * lateral,
+          y: worldPos.y - dir.y * row * spacingY + normal.y * lateral,
+          lateral,
+        });
+      }
+      rowSlots.sort((a, b) => a.lateral - b.lateral);
+      rowUnits.forEach((unit, index) => {
+        assignments.push({
+          unit,
+          target: nudgeMoveTargetFromObstacles(unit, rowSlots[index], 10),
+          index: assignments.length,
+        });
+      });
+      offset += rowCount;
+      row += 1;
+    }
+    return assignments;
+  }
+
   function angleLerp(a, b, t) {
     let diff = ((b - a + Math.PI) % TAU) - Math.PI;
     if (diff < -Math.PI) diff += TAU;
@@ -3575,6 +4244,14 @@
       pickupWeapon: null,
       focusMove: false,
       orderStamp: 0,
+      pathWaypoint: null,
+      pathRepathTimer: 0,
+      pathStuckTimer: 0,
+      pathLastDistance: null,
+      pathAvoidanceSide: 0,
+      formationMoveId: null,
+      formationSlot: null,
+      formationIndex: -1,
     };
     if (role === "repair") {
       unit.damage = 0;
@@ -3616,7 +4293,9 @@
   }
 
   function spawnEffect(type, x, y, radius, tint, ttl = 0.6) {
-    const shardCount = type === "nuke" ? 18 : type === "blast" ? 10 : type === "impact" ? 6 : type === "muzzle" ? 3 : 0;
+    const quality = getGraphicsPreset();
+    const density = quality.effectDensity;
+    const shardCount = Math.round((type === "nuke" ? 18 : type === "blast" ? 10 : type === "impact" ? 6 : type === "muzzle" ? 3 : 0) * density);
     const shards = [];
     for (let i = 0; i < shardCount; i += 1) {
       const angle = (i / Math.max(1, shardCount)) * TAU + randomRange(x + y + i, -0.28, 0.28);
@@ -3628,6 +4307,9 @@
         vy: Math.sin(angle) * speed,
         size: type === "nuke" ? randomRange(i * 9 + x, 9, 16) : randomRange(i * 7 + y, 3, 8),
       });
+    }
+    if (state.world.effects.length >= quality.effectLimit) {
+      state.world.effects.splice(0, Math.max(1, state.world.effects.length - quality.effectLimit + 1));
     }
     state.world.effects.push({
       id: createId("effect"),
@@ -3645,6 +4327,9 @@
   }
 
   function spawnDamageText(x, y, damage, tint = "#ffe29a") {
+    const quality = getGraphicsPreset();
+    const damageTextCount = state.world.effects.filter((effect) => effect.type === "damageText").length;
+    if (damageTextCount >= quality.damageTextLimit) return;
     state.world.effects.push({
       id: createId("effect"),
       type: "damageText",
@@ -3809,10 +4494,10 @@
       const unit = selectedUnits[i];
       const offsetAngle = (i / Math.max(1, selectedUnits.length)) * TAU;
       const standoff = (targetEntity.radius || 16) + unit.radius + 12 + Math.sqrt(i) * 12;
-      unit.moveTarget = {
+      unit.moveTarget = nudgeMoveTargetFromObstacles(unit, {
         x: targetEntity.x + Math.cos(offsetAngle) * standoff,
         y: targetEntity.y + Math.sin(offsetAngle) * standoff,
-      };
+      }, 8);
       unit.targetId = null;
       unit.focusMove = true;
       unit.interactTargetId = targetEntity.id;
@@ -3820,25 +4505,28 @@
       unit.interactCooldown = randomRange(unit.x + unit.y + i, 0.08, 0.26);
       unit.order = interactionKind === "resource" ? "harvest" : "collect";
       unit.orderStamp = state.time;
+      clearUnitFormation(unit);
+      resetUnitPathState(unit);
     }
     return true;
   }
 
   function issueMoveOrder(selectedUnits, worldPos) {
-    for (let i = 0; i < selectedUnits.length; i += 1) {
-      const unit = selectedUnits[i];
-      const offsetAngle = (i / Math.max(1, selectedUnits.length)) * TAU;
-      const offsetRadius = Math.sqrt(i) * 16;
-      unit.moveTarget = {
-        x: worldPos.x + Math.cos(offsetAngle) * offsetRadius,
-        y: worldPos.y + Math.sin(offsetAngle) * offsetRadius,
-      };
+    const formationId = createId("formation");
+    const assignments = getFormationMoveTargets(selectedUnits, worldPos);
+    assignments.forEach(({ unit, target, index }) => {
+      unit.moveTarget = target;
       unit.targetId = null;
       clearInteractionOrder(unit);
       unit.focusMove = true;
       unit.order = "move";
       unit.orderStamp = state.time;
-    }
+      resetUnitPathState(unit);
+      unit.formationMoveId = formationId;
+      unit.formationSlot = { x: target.x, y: target.y };
+      unit.formationIndex = index;
+      unit.pathAvoidanceSide = index % 2 === 0 ? 1 : -1;
+    });
   }
 
   function issueAttackOrder(selectedUnits, targets) {
@@ -3853,6 +4541,8 @@
       unit.focusMove = false;
       unit.order = "attack";
       unit.orderStamp = state.time;
+      clearUnitFormation(unit);
+      resetUnitPathState(unit);
     }
     return true;
   }
@@ -4603,13 +5293,14 @@
 
   function getUiScale() {
     const viewport = state.activeViewport || getViewportForPlayer();
-    return Math.max(0.64, Math.min(1.04, Math.min(viewport.w / 760, viewport.h / 560)));
+    const baseScale = Math.max(0.64, Math.min(1.04, Math.min(viewport.w / 760, viewport.h / 560)));
+    return baseScale * sanitizeFontScale(state.settings.fontScale);
   }
 
   function getViewportUiProfile(viewport = state.activeViewport || getViewportForPlayer()) {
     const split = isSplitScreenMatch();
     const playerCount = split ? getHumanPlayers().length : 1;
-    const scale = Math.max(0.64, Math.min(1.04, Math.min(viewport.w / 760, viewport.h / 560)));
+    const scale = Math.max(0.64, Math.min(1.04, Math.min(viewport.w / 760, viewport.h / 560))) * sanitizeFontScale(state.settings.fontScale);
     const compact = split || viewport.w < 820 || viewport.h < 620;
     const tight = playerCount >= 3 || viewport.w < 620 || viewport.h < 430;
     const ultra = playerCount >= 4 || viewport.w < 540 || viewport.h < 360;
@@ -4782,28 +5473,200 @@
     return { x, y, slotSize, gap, slots };
   }
 
+  function getCatalogCategoryDefs(type) {
+    return type === "assets"
+      ? [
+        { id: "all", label: "All" },
+        { id: "economy", label: "Economy" },
+        { id: "military", label: "Military" },
+        { id: "defense", label: "Defense" },
+        { id: "support", label: "Support" },
+      ]
+      : [
+        { id: "all", label: "All" },
+        { id: "infantry", label: "Infantry" },
+        { id: "armor", label: "Armor" },
+        { id: "air", label: "Air" },
+        { id: "support", label: "Support" },
+        { id: "strikes", label: "Strikes" },
+      ];
+  }
+
+  function getCatalogItemCategory(type, item) {
+    if (!item) return "all";
+    if (type === "assets") {
+      if (item.attack || item.style === "wall" || item.style === "capital-wall" || item.style === "gate" || item.style === "bunker" || item.style === "cannon" || item.style === "mortar" || item.style === "tower") return "defense";
+      if (item.spawnRole || item.style === "barracks" || item.style === "archery" || item.style === "stable" || item.style === "academy" || item.style === "workshop" || item.style === "dock" || item.style === "keep") return "military";
+      if (item.gather || item.tax || item.taxBoost || item.style === "farm" || item.style === "market" || item.style === "lumber" || item.style === "quarry" || item.style === "granary" || item.style === "refinery" || item.style === "plant") return "economy";
+      return "support";
+    }
+    if (item.type === "ability") return "strikes";
+    if (item.type === "deployable" || healerRoles.has(item.role)) return "support";
+    if (airborneRoles.has(item.role)) return "air";
+    if (item.type === "vehicle") return "armor";
+    return "infantry";
+  }
+
+  function matchesCatalogSearch(item, query) {
+    if (!query) return true;
+    const haystack = [
+      item.name,
+      item.desc,
+      item.role,
+      item.style,
+      item.era,
+      item.type,
+      item.spawnRole,
+      item.attack,
+      item.gather,
+      item.armor,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(query);
+  }
+
+  function getFilteredCatalogItems(type, player = getActivePlayerState()) {
+    const allItems = type === "assets" ? assetCatalog : weaponCatalog;
+    const activeCategory = getPanelCategory(type, player);
+    const searchQuery = getPanelSearch(type, player).trim().toLowerCase();
+    return allItems.filter((item) => {
+      if (activeCategory !== "all" && getCatalogItemCategory(type, item) !== activeCategory) return false;
+      return matchesCatalogSearch(item, searchQuery);
+    });
+  }
+
   function getPanelLayout(type) {
+    const player = getActivePlayerState();
     const viewport = state.activeViewport || getViewportForPlayer();
-    const scale = getUiScale();
-    const padding = 24 * scale;
-    const cardGap = 8 * scale;
-    const w = Math.min(viewport.w - 40 * scale, viewport.w * 0.94);
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const padding = (profile.tight ? 16 : 20) * scale;
+    const cardGap = (profile.tight ? 8 : 10) * scale;
+    const rowGap = (profile.tight ? 8 : 10) * scale;
+    const w = Math.min(viewport.w - 28 * scale, viewport.w * (profile.tight ? 0.98 : 0.94));
     const x = viewport.x + (viewport.w - w) / 2;
-    const cols = viewport.w < 820 ? 4 : 5;
-    const items = type === "assets" ? assetCatalog : weaponCatalog;
-    const rows = Math.ceil(items.length / cols);
-    const cellW = (w - padding * 2) / cols;
-    const cellH = 86 * scale;
-    const headerH = 68 * scale;
-    const footerH = 28 * scale;
-    const bodyH = Math.min(rows * cellH, Math.max(170 * scale, viewport.h - 280 * scale));
+    const cols = viewport.w < 680 ? 3 : viewport.w < 980 ? 4 : 5;
+    const allItems = type === "assets" ? assetCatalog : weaponCatalog;
+    const items = getFilteredCatalogItems(type, player);
+    const activeCategory = getPanelCategory(type, player);
+    const searchQuery = getPanelSearch(type, player);
+    const collapsed = isPanelCollapsed(type, player);
+    const searchFocused = Boolean(player && player.ui && player.ui.panelSearchFocus === type);
+    const categories = getCatalogCategoryDefs(type).map((category) => ({
+      ...category,
+      count: category.id === "all" ? allItems.length : allItems.filter((item) => getCatalogItemCategory(type, item) === category.id).length,
+    }));
+    const collapseRect = {
+      x: x + w - padding - 34 * scale,
+      y: 0,
+      w: 34 * scale,
+      h: 24 * scale,
+    };
+    const searchRect = collapsed
+      ? null
+      : {
+        x: x + padding,
+        y: 0,
+        w: Math.max(132 * scale, w - padding * 2 - 46 * scale),
+        h: 28 * scale,
+      };
+    const categoryChips = [];
+    let headerH = collapsed ? 72 * scale : 114 * scale;
+    if (!collapsed) {
+      ctx.save();
+      ctx.font = `700 ${Math.round(10 * scale)}px Cambria`;
+      let chipX = x + padding;
+      let chipY = 0;
+      const chipH = 22 * scale;
+      for (const category of categories) {
+        const chipLabel = `${category.label} ${category.count}`;
+        const chipW = Math.min(w - padding * 2, ctx.measureText(chipLabel).width + 18 * scale);
+        if (categoryChips.length && chipX + chipW > x + w - padding) {
+          chipX = x + padding;
+          chipY += chipH + 8 * scale;
+        }
+        categoryChips.push({
+          ...category,
+          text: chipLabel,
+          x: chipX,
+          y: chipY,
+          w: chipW,
+          h: chipH,
+        });
+        chipX += chipW + 8 * scale;
+      }
+      const chipRows = categoryChips.length ? Math.floor((categoryChips[categoryChips.length - 1].y - categoryChips[0].y) / (chipH + 8 * scale)) + 1 : 0;
+      headerH = 90 * scale + chipRows * (chipH + 8 * scale);
+      ctx.restore();
+    }
+    const cardW = (w - padding * 2 - Math.max(0, cols - 1) * cardGap) / cols;
+    const cardH = (profile.tight ? 108 : 116) * scale;
+    const cellH = cardH + rowGap;
+    const rows = collapsed ? 0 : Math.ceil(items.length / cols);
+    const footerH = collapsed ? 24 * scale : 30 * scale;
+    const bodyH = collapsed ? 0 : Math.min(rows * cellH, Math.max(134 * scale, viewport.h - headerH - 194 * scale));
     const h = headerH + bodyH + footerH;
-    const y = Math.max(viewport.y + 94 * scale, viewport.y + viewport.h - h - 120 * scale);
+    const y = Math.max(viewport.y + 84 * scale, viewport.y + viewport.h - h - 118 * scale);
+    collapseRect.y = y + 18 * scale;
+    let clearSearchRect = null;
+    if (searchRect) {
+      searchRect.y = y + 50 * scale;
+      if (searchQuery) {
+        clearSearchRect = {
+          x: searchRect.x + searchRect.w - 22 * scale,
+          y: searchRect.y + 5 * scale,
+          w: 16 * scale,
+          h: 16 * scale,
+        };
+      }
+      const firstChipY = searchRect.y + searchRect.h + 10 * scale;
+      const chipOffset = firstChipY - (categoryChips.length ? categoryChips[0].y : 0);
+      categoryChips.forEach((chip) => {
+        chip.y += chipOffset;
+      });
+      if (categoryChips.length) headerH = categoryChips[categoryChips.length - 1].y + categoryChips[categoryChips.length - 1].h + 14 * scale - y;
+    }
     const scrollMax = Math.max(0, rows * cellH - bodyH);
     const scroll = clamp(getPanelScroll(type), 0, scrollMax);
     const listX = x + padding;
     const listY = y + headerH;
-    return { type, x, y, w, h, cols, cellW, cellH, items, scale, headerH, footerH, bodyH, listX, listY, padding, cardGap, scroll, scrollMax };
+    return {
+      type,
+      x,
+      y,
+      w,
+      h,
+      cols,
+      rows,
+      cardW,
+      cardH,
+      cellH,
+      items,
+      allItems,
+      categories,
+      categoryChips,
+      activeCategory,
+      searchQuery,
+      searchFocused,
+      collapsed,
+      scale,
+      profile,
+      headerH,
+      footerH,
+      bodyH,
+      listX,
+      listY,
+      padding,
+      cardGap,
+      rowGap,
+      scroll,
+      scrollMax,
+      searchRect,
+      clearSearchRect,
+      collapseRect,
+    };
   }
 
   function isInsideRect(px, py, rect) {
@@ -4813,19 +5676,73 @@
   function getItemCardAt(px, py) {
     if (!state.ui.openPanel) return null;
     const layout = getPanelLayout(state.ui.openPanel);
+    if (layout.collapsed) return null;
     for (let i = 0; i < layout.items.length; i += 1) {
       const col = i % layout.cols;
       const row = Math.floor(i / layout.cols);
       const rect = {
-        x: layout.listX + col * layout.cellW,
+        x: layout.listX + col * (layout.cardW + layout.cardGap),
         y: layout.listY + row * layout.cellH - layout.scroll,
-        w: layout.cellW - layout.cardGap,
-        h: layout.cellH - 10 * layout.scale,
+        w: layout.cardW,
+        h: layout.cardH,
       };
       if (rect.y + rect.h < layout.listY || rect.y > layout.listY + layout.bodyH) continue;
       if (isInsideRect(px, py, rect)) return { item: layout.items[i], rect };
     }
     return null;
+  }
+
+  function getPanelControlAt(px, py) {
+    if (!state.ui.openPanel) return null;
+    const layout = getPanelLayout(state.ui.openPanel);
+    if (!isInsideRect(px, py, layout)) return null;
+    if (layout.collapseRect && isInsideRect(px, py, layout.collapseRect)) return { kind: "collapse", type: layout.type };
+    if (!layout.collapsed && layout.clearSearchRect && isInsideRect(px, py, layout.clearSearchRect)) return { kind: "clearSearch", type: layout.type };
+    if (!layout.collapsed && layout.searchRect && isInsideRect(px, py, layout.searchRect)) return { kind: "search", type: layout.type };
+    for (const chip of layout.categoryChips) {
+      if (isInsideRect(px, py, chip)) return { kind: "category", type: layout.type, value: chip.id, label: chip.label };
+    }
+    return null;
+  }
+
+  function getPanelControlHoverMessage(control) {
+    if (!control) return "";
+    if (control.kind === "collapse") return "Minimize or reopen the catalog.";
+    if (control.kind === "search") return "Type to filter by name, role, era, or description. Press Esc to leave search.";
+    if (control.kind === "clearSearch") return "Clear the current catalog search.";
+    if (control.kind === "category") return `Filter this catalog to ${control.label.toLowerCase()} entries.`;
+    return "";
+  }
+
+  function cyclePanelCategory(type, direction = 1, player = getActivePlayerState()) {
+    const categories = getCatalogCategoryDefs(type);
+    const current = getPanelCategory(type, player);
+    const index = Math.max(0, categories.findIndex((category) => category.id === current));
+    const nextIndex = (index + direction + categories.length) % categories.length;
+    return setPanelCategory(type, categories[nextIndex].id, player);
+  }
+
+  function activatePanelControl(player, control) {
+    if (!player || !control) return false;
+    if (control.kind === "collapse") {
+      setPanelCollapsed(control.type, !isPanelCollapsed(control.type, player), player);
+      return true;
+    }
+    if (control.kind === "search") {
+      if (isPanelCollapsed(control.type, player)) setPanelCollapsed(control.type, false, player);
+      setPanelSearchFocus(control.type, player);
+      return true;
+    }
+    if (control.kind === "clearSearch") {
+      setPanelSearch(control.type, "", player);
+      setPanelSearchFocus(control.type, player);
+      return true;
+    }
+    if (control.kind === "category") {
+      setPanelCategory(control.type, control.value, player);
+      return true;
+    }
+    return false;
   }
 
   function getQuickSlotAt(px, py) {
@@ -4837,40 +5754,138 @@
     if (player) player.quickSlots[slot.side][slot.index] = itemId;
   }
 
+  function normalizePlacementAngle(angle = 0) {
+    const snapped = Math.round((Number(angle) || 0) / (Math.PI / 4)) * (Math.PI / 4);
+    return ((snapped % TAU) + TAU) % TAU;
+  }
+
+  function getSelectedOwnedBuilding(player = getActivePlayerState()) {
+    if (!player || state.selectedIds.size !== 1) return null;
+    const building = state.world.buildings.find((entry) => state.selectedIds.has(entry.id)) || null;
+    return building && building.owner === player.owner ? building : null;
+  }
+
+  function clearBuildingRelocation(player = getActivePlayerState(), options = {}) {
+    if (!player || !player.ui) return;
+    player.ui.relocatingBuildingId = null;
+    if (options.clearPlacement !== false) player.ui.activePlacementId = null;
+    if (options.resetAngle) player.ui.placementAngle = 0;
+  }
+
+  function getPlacementAction(player = getActivePlayerState()) {
+    if (!player || !player.ui) return null;
+    if (player.ui.relocatingBuildingId) {
+      const relocatingBuilding = state.world.buildings.find((building) => building.id === player.ui.relocatingBuildingId) || null;
+      if (!relocatingBuilding) {
+        player.ui.relocatingBuildingId = null;
+        player.ui.activePlacementId = null;
+        return null;
+      }
+      return {
+        mode: "relocate",
+        owner: player.owner,
+        item: relocatingBuilding.def || itemIndex.get(relocatingBuilding.itemId),
+        building: relocatingBuilding,
+        angle: normalizePlacementAngle(player.ui.placementAngle ?? relocatingBuilding.angle ?? 0),
+      };
+    }
+    const item = player.ui.activePlacementId ? itemIndex.get(player.ui.activePlacementId) : null;
+    if (!item) return null;
+    return {
+      mode: "deploy",
+      owner: player.owner,
+      item,
+      building: null,
+      angle: normalizePlacementAngle(player.ui.placementAngle || 0),
+    };
+  }
+
   function getActivePlacement() {
-    return state.ui.activePlacementId ? itemIndex.get(state.ui.activePlacementId) : null;
+    const action = getPlacementAction();
+    return action ? action.item : null;
+  }
+
+  function beginBuildingRelocation(player = getActivePlayerState()) {
+    const building = getSelectedOwnedBuilding(player);
+    if (!building) return false;
+    if (building.itemId === "royal_keep") {
+      notify("The capital keep cannot be moved.", "#ffb484");
+      return false;
+    }
+    setPlayerOpenPanel(player, null);
+    player.ui.activePlacementId = building.itemId;
+    player.ui.relocatingBuildingId = building.id;
+    player.ui.placementAngle = normalizePlacementAngle(building.angle || 0);
+    notify(`${building.def.name} ready to move. Rotate with ${formatKeybindLabel(getKeybind("rotatePlacement"))}. Click a new position to confirm.`, "#8fd8ff");
+    return true;
+  }
+
+  function rotatePlacement(player = getActivePlayerState(), direction = 1) {
+    const action = getPlacementAction(player);
+    if (!action || !assetCatalog.includes(action.item)) return false;
+    player.ui.placementAngle = normalizePlacementAngle((player.ui.placementAngle || 0) + direction * Math.PI / 4);
+    const label = action.mode === "relocate" ? `Moving ${action.item.name}` : `${action.item.name} preview`;
+    notify(`${label}: facing ${Math.round((player.ui.placementAngle / Math.PI) * 180)} deg`, "#8fd8ff");
+    playUiSound("uiClick", { volume: 0.38, cooldown: 0.03 });
+    return true;
+  }
+
+  function getDemolitionRefund(building) {
+    if (!building || !building.def || !building.def.cost) return 0;
+    const integrity = clamp(building.hp / Math.max(1, building.maxHp || building.hp || 1), 0.35, 1);
+    return Math.max(0, Math.round(building.def.cost * 0.6 * integrity));
+  }
+
+  function demolishSelectedBuilding(player = getActivePlayerState(), explicitBuilding = null) {
+    const building = explicitBuilding || getSelectedOwnedBuilding(player);
+    if (!building) return false;
+    if (building.itemId === "royal_keep") {
+      notify("The capital keep cannot be demolished.", "#ffb484");
+      return false;
+    }
+    const refund = getDemolitionRefund(building);
+    addCoins(player.owner, refund);
+    notify(`${building.def.name} demolished. Refund: +${refund} coins.`, "#ffd889");
+    spawnEffect("debris", building.x, building.y, building.radius * 1.1, ownerColors[building.owner] || "#d5d5d5", 0.7);
+    spawnEffect("smoke", building.x, building.y, building.radius * 1.3, "rgba(45,50,58,0.56)", 1);
+    playWorldSound("impactBlast", building.x, building.y, { cooldown: 0.08, volume: 0.68 });
+    removeEntity(building);
+    state.selectedIds.delete(building.id);
+    if (player && player.selectedIds) player.selectedIds.delete(building.id);
+    if (!explicitBuilding || player === getActivePlayerState()) clearBuildingRelocation(player, { clearPlacement: true });
+    return true;
   }
 
   function isTroopPlacementItem(item) {
     return Boolean(item) && !assetCatalog.includes(item) && item.type !== "ability";
   }
 
-  function getPlacedBuildings(owner) {
-    return state.world.buildings.filter((building) => building.owner === owner && building.manualPlacement);
+  function getPlacedBuildings(owner, excludeBuildingId = null) {
+    return state.world.buildings.filter((building) => building.owner === owner && building.manualPlacement && building.id !== excludeBuildingId);
   }
 
-  function getOwnedBuildings(owner) {
-    return state.world.buildings.filter((building) => building.owner === owner);
+  function getOwnedBuildings(owner, excludeBuildingId = null) {
+    return state.world.buildings.filter((building) => building.owner === owner && building.id !== excludeBuildingId);
   }
 
-  function getHomeBuilding(owner) {
-    return state.world.buildings.find((building) => building.owner === owner && building.itemId === "royal_keep") ||
-      state.world.buildings.find((building) => building.owner === owner) ||
+  function getHomeBuilding(owner, excludeBuildingId = null) {
+    return state.world.buildings.find((building) => building.owner === owner && building.itemId === "royal_keep" && building.id !== excludeBuildingId) ||
+      state.world.buildings.find((building) => building.owner === owner && building.id !== excludeBuildingId) ||
       null;
   }
 
-  function getLatestPlacedBuilding(owner) {
-    const placedBuildings = getPlacedBuildings(owner);
+  function getLatestPlacedBuilding(owner, excludeBuildingId = null) {
+    const placedBuildings = getPlacedBuildings(owner, excludeBuildingId);
     if (placedBuildings.length) {
       return placedBuildings.reduce((best, building) => (building.placementIndex || 0) > (best.placementIndex || 0) ? building : best, placedBuildings[0]);
     }
-    return getHomeBuilding(owner);
+    return getHomeBuilding(owner, excludeBuildingId);
   }
 
-  function getFurthestOwnedBuilding(owner) {
-    const home = getHomeBuilding(owner);
-    const candidateBuildings = getPlacedBuildings(owner);
-    const anchorPool = candidateBuildings.length ? candidateBuildings : getOwnedBuildings(owner);
+  function getFurthestOwnedBuilding(owner, excludeBuildingId = null) {
+    const home = getHomeBuilding(owner, excludeBuildingId);
+    const candidateBuildings = getPlacedBuildings(owner, excludeBuildingId);
+    const anchorPool = candidateBuildings.length ? candidateBuildings : getOwnedBuildings(owner, excludeBuildingId);
     if (!anchorPool.length) return null;
     if (!home) return anchorPool[0];
     return anchorPool.reduce((best, building) => {
@@ -4880,10 +5895,10 @@
     }, anchorPool[0]);
   }
 
-  function getPlacementConstraint(item, owner) {
+  function getPlacementConstraint(item, owner, options = {}) {
     if (!item || !owner) return null;
     if (assetCatalog.includes(item)) {
-      const anchor = getLatestPlacedBuilding(owner);
+      const anchor = getLatestPlacedBuilding(owner, options.excludeBuildingId || null);
       return anchor ? {
         anchor,
         radius: TILE_SIZE * 10 + (anchor.radius || 0),
@@ -4891,7 +5906,7 @@
       } : null;
     }
     if (isTroopPlacementItem(item)) {
-      const anchor = getFurthestOwnedBuilding(owner);
+      const anchor = getFurthestOwnedBuilding(owner, options.excludeBuildingId || null);
       return anchor ? {
         anchor,
         radius: TILE_SIZE * 8 + (anchor.radius || 0),
@@ -4901,10 +5916,11 @@
     return null;
   }
 
-  function getPlacementBlockReason(item, x, y, owner = getActivePlayerState() && getActivePlayerState().owner) {
+  function getPlacementBlockReason(item, x, y, owner = getActivePlayerState() && getActivePlayerState().owner, options = {}) {
     if (!item) return "Choose a unit or structure first.";
     if (assetCatalog.includes(item)) {
       for (const building of state.world.buildings) {
+        if (building.id === options.ignoreBuildingId) continue;
         if (Math.hypot(building.x - x, building.y - y) < building.radius + TILE_SIZE * item.footprint * 0.4) return "That structure overlaps another building.";
       }
       const terrainSamples = sampleTerrainUnderFootprint(x, y, TILE_SIZE * item.footprint * 0.5);
@@ -4915,7 +5931,7 @@
       if (item.id === "farm" && terrainSamples.some((terrain) => terrain.label === "Deadlands" || terrain.label === "Desert" || terrain.label === "Canyon")) return "Farms need gentler ground than desert, canyon, or deadlands.";
       if ((item.id === "village_house" || item.id === "market" || item.id === "chapel") && terrainSamples.some((terrain) => terrain.label === "Canyon")) return "Settlements cannot be placed inside canyon terrain.";
     }
-    const constraint = getPlacementConstraint(item, owner);
+    const constraint = getPlacementConstraint(item, owner, { excludeBuildingId: options.ignoreBuildingId || null });
     if (constraint && Math.hypot(x - constraint.anchor.x, y - constraint.anchor.y) > constraint.radius) return constraint.reason;
     return null;
   }
@@ -5414,21 +6430,37 @@
     playWorldSound("impactBlast", x, y, { cooldown: 0.14, volume: item.id === "bunker_buster" ? 1.02 : 0.92 });
   }
 
-  function deployPlacement(item, x, y, owner = "player") {
-    if (!item || !canAfford(item.id, owner)) {
+  function deployPlacement(item, x, y, owner = "player", options = {}) {
+    const relocationBuilding = options.relocateBuilding || null;
+    const isRelocation = Boolean(relocationBuilding);
+    const angle = normalizePlacementAngle(options.angle || 0);
+    if (!item || (!isRelocation && !canAfford(item.id, owner))) {
       notify("Not enough coins for that deployment.", "#ff8e85");
       playUiSound("error", { volume: 0.72, cooldown: 0.08 });
       return false;
     }
-    const blockReason = item.type === "ability" ? null : getPlacementBlockReason(item, x, y, owner);
+    const blockReason = item.type === "ability"
+      ? null
+      : getPlacementBlockReason(item, x, y, owner, { ignoreBuildingId: relocationBuilding && relocationBuilding.id });
     if (blockReason) {
       notify(blockReason, "#ff8e85");
       playUiSound("error", { volume: 0.72, cooldown: 0.08 });
       return false;
     }
+    if (isRelocation && relocationBuilding) {
+      relocationBuilding.x = x;
+      relocationBuilding.y = y;
+      relocationBuilding.angle = angle;
+      relocationBuilding.manualPlacement = true;
+      state.ids += 1;
+      relocationBuilding.placementIndex = state.ids;
+      notify(`${item.name} repositioned.`, "#7df2ab");
+      playWorldSound("deployStructure", x, y, { cooldown: 0.08, volume: 0.78 });
+      return true;
+    }
     if (assetCatalog.includes(item)) {
       spendCoins(item.cost, owner);
-      spawnBuilding(owner, item.id, x, y, 0, { manualPlacement: true });
+      spawnBuilding(owner, item.id, x, y, angle, { manualPlacement: true });
       incrementQuest("build", 1);
       notify(`${item.name} deployed.`, "#7df2ab");
       playWorldSound("deployStructure", x, y, { cooldown: 0.08, volume: 0.82 });
@@ -5443,7 +6475,7 @@
     }
     if (item.type === "deployable" && item.id === "machine_gun") {
       spendCoins(item.cost, owner);
-      const bunker = spawnBuilding(owner, "bunker", x, y);
+      const bunker = spawnBuilding(owner, "bunker", x, y, angle);
       bunker.hp = item.hp;
       bunker.maxHp = item.hp;
       bunker.armor = item.armor;
@@ -5690,6 +6722,7 @@
         unit.moveTarget = null;
         unit.focusMove = false;
         unit.order = "idle";
+        clearUnitNavigation(unit);
       }
       unit.aiTimer -= dt;
       if (unit.aiTimer <= 0) {
@@ -5700,6 +6733,8 @@
           if (target && Math.hypot(target.x - unit.x, target.y - unit.y) < aggroRange) {
             unit.targetId = target.id;
             unit.order = "attack";
+            clearUnitFormation(unit);
+            resetUnitPathState(unit);
           } else if (!unit.moveTarget) {
             if (isEasyModeActive()) {
               const home = getEnemyAiHome(unit.owner);
@@ -5707,6 +6742,7 @@
                 unit.moveTarget = { x: home.x + randomRange(unit.x, -80, 80), y: home.y + randomRange(unit.y, -80, 80) };
                 unit.order = "move";
                 unit.focusMove = false;
+                resetUnitPathState(unit);
               }
             } else {
               const enemyBase = getNearestHostileBase(unit.owner, unit.x, unit.y);
@@ -5714,6 +6750,7 @@
                 unit.moveTarget = { x: enemyBase.x + randomRange(unit.x, -120, 120), y: enemyBase.y + randomRange(unit.y, -120, 120) };
                 unit.order = "move";
                 unit.focusMove = true;
+                resetUnitPathState(unit);
               }
             }
           }
@@ -5737,6 +6774,8 @@
           spawnEffect("repair", ally.x, ally.y, ally.radius * 0.6, "#8affd9", 0.16);
         } else {
           unit.moveTarget = { x: ally.x, y: ally.y };
+          clearUnitFormation(unit);
+          resetUnitPathState(unit);
         }
       }
     }
@@ -5771,6 +6810,7 @@
           unit.moveTarget = { x: interactionTarget.x, y: interactionTarget.y };
           unit.focusMove = true;
           unit.order = unit.interactKind === "resource" ? "harvest" : "collect";
+          resetUnitPathState(unit);
         }
       }
     }
@@ -5783,41 +6823,53 @@
       } else {
         const attackRange = getAttackRange(unit) * getTerrainAttackRangeBonus(unit);
         const d = Math.hypot(target.x - unit.x, target.y - unit.y);
-          if (d <= attackRange + target.radius + 6) {
+        if (d <= attackRange + target.radius + 6) {
           unit.vx *= 0.84;
           unit.vy *= 0.84;
           unit.moveTarget = null;
           unit.focusMove = false;
-            if (unit.attackCooldown <= 0) {
-              unit.angle = Math.atan2(target.y - unit.y, target.x - unit.x);
-              unit.attackCooldown = unit.cooldown || 0.8;
-              if (unit.projectile) {
-                spawnProjectile(unit, target, unit.projectile, getAttackDamage(unit), unit.splash || 0, unit.projectile === "rocket" ? 280 : 380);
-                spawnEffect("muzzle", unit.x, unit.y, unit.radius * 0.95, "#ffd6a7", 0.18);
-              } else {
-                applyDamage(target, getAttackDamage(unit), "melee", unit.owner);
-                spawnEffect("slash", target.x, target.y, target.radius, ownerColors[unit.owner], 0.2);
-                playWorldSound("meleeHit", target.x, target.y, { cooldown: 0.06, volume: 0.72 });
-              }
+          clearUnitNavigation(unit);
+          if (unit.attackCooldown <= 0) {
+            unit.angle = Math.atan2(target.y - unit.y, target.x - unit.x);
+            unit.attackCooldown = unit.cooldown || 0.8;
+            if (unit.projectile) {
+              spawnProjectile(unit, target, unit.projectile, getAttackDamage(unit), unit.splash || 0, unit.projectile === "rocket" ? 280 : 380);
+              spawnEffect("muzzle", unit.x, unit.y, unit.radius * 0.95, "#ffd6a7", 0.18);
+            } else {
+              applyDamage(target, getAttackDamage(unit), "melee", unit.owner);
+              spawnEffect("slash", target.x, target.y, target.radius, ownerColors[unit.owner], 0.2);
+              playWorldSound("meleeHit", target.x, target.y, { cooldown: 0.06, volume: 0.72 });
             }
+          }
         } else {
           unit.moveTarget = { x: target.x, y: target.y };
           unit.focusMove = false;
+          clearUnitFormation(unit);
+          resetUnitPathState(unit);
         }
       }
     }
 
     if (unit.moveTarget) {
-      const n = normalize(unit.moveTarget.x - unit.x, unit.moveTarget.y - unit.y);
+      const steeringTarget = resolveUnitSteeringTarget(unit, dt);
+      const n = normalize(steeringTarget.x - unit.x, steeringTarget.y - unit.y);
       const desiredSpeed = unit.speed * terrainMove * (unit.empTimer > 0 ? 0.55 : 1);
       unit.vx += n.x * desiredSpeed * dt * 4.2;
       unit.vy += n.y * desiredSpeed * dt * 4.2;
       unit.angle = angleLerp(unit.angle, Math.atan2(n.y, n.x), 0.12);
-      if (n.d < 22) {
-        unit.moveTarget = null;
-        unit.focusMove = false;
-        if (!unit.targetId) unit.order = "idle";
+      if (n.d < (unit.pathWaypoint ? 16 : 22)) {
+        if (unit.pathWaypoint) {
+          unit.pathWaypoint = null;
+          unit.pathRepathTimer = 0;
+        } else {
+          unit.moveTarget = null;
+          unit.focusMove = false;
+          clearUnitNavigation(unit);
+          if (!unit.targetId) unit.order = "idle";
+        }
       }
+    } else {
+      resetUnitPathState(unit);
     }
 
     for (const other of state.world.units) {
@@ -5858,6 +6910,21 @@
       const padding = building.def.style === "wall" || building.def.style === "capital-wall" || building.def.style === "gate" ? 12 : 4;
       pushUnitFromCircle(unit, building, padding);
     }
+    if (unit.moveTarget) {
+      const distanceToGoal = Math.hypot(unit.moveTarget.x - unit.x, unit.moveTarget.y - unit.y);
+      const speed = Math.hypot(unit.vx, unit.vy);
+      if (Number.isFinite(unit.pathLastDistance)) {
+        const progress = unit.pathLastDistance - distanceToGoal;
+        if (progress < unit.speed * dt * 0.18 && speed < unit.speed * 0.42) unit.pathStuckTimer = Math.min(1.6, (unit.pathStuckTimer || 0) + dt);
+        else unit.pathStuckTimer = Math.max(0, (unit.pathStuckTimer || 0) - dt * 1.7);
+      } else {
+        unit.pathStuckTimer = 0;
+      }
+      unit.pathLastDistance = distanceToGoal;
+    } else {
+      unit.pathLastDistance = null;
+      unit.pathStuckTimer = 0;
+    }
     unit.vx *= 0.9;
     unit.vy *= 0.9;
 
@@ -5870,6 +6937,8 @@
       if (enemy) {
         unit.targetId = enemy.id;
         unit.order = "attack";
+        clearUnitFormation(unit);
+        resetUnitPathState(unit);
       }
     }
   }
@@ -7241,7 +8310,9 @@
   }
 
   function drawResources() {
+    const quality = getGraphicsPreset();
     for (const tree of state.world.trees) {
+      if (!isWorldCircleVisibleInActiveViewport(tree.x, tree.y, tree.radius || tree.baseRadius || 28, 100)) continue;
       const chunkRatio = ((tree.chunksRemaining - 1) + clamp((tree.chunkHp || tree.chunkMaxHp) / Math.max(1, tree.chunkMaxHp || 1), 0, 1)) / Math.max(1, tree.maxChunks || tree.chunksRemaining || 1);
       const canopyRadius = (tree.baseRadius || tree.radius) * (0.58 + chunkRatio * 0.42);
       ctx.fillStyle = "rgba(0,0,0,0.24)";
@@ -7296,6 +8367,7 @@
       }
     }
     for (const rock of state.world.rocks) {
+      if (!isWorldCircleVisibleInActiveViewport(rock.x, rock.y, rock.radius || rock.baseRadius || 28, 100)) continue;
       const chunkRatio = ((rock.chunksRemaining - 1) + clamp((rock.chunkHp || rock.chunkMaxHp) / Math.max(1, rock.chunkMaxHp || 1), 0, 1)) / Math.max(1, rock.maxChunks || rock.chunksRemaining || 1);
       const rockRadius = (rock.baseRadius || rock.radius) * (0.58 + chunkRatio * 0.42);
       ctx.fillStyle = "rgba(0,0,0,0.22)";
@@ -7347,11 +8419,14 @@
         ctx.stroke();
       }
     }
-    for (const animal of state.world.animals) drawAnimal(animal);
-    for (const civilian of state.world.civilians) drawCivilian(civilian);
+    if (quality.drawAmbient) {
+      for (const animal of state.world.animals) drawAnimal(animal);
+      for (const civilian of state.world.civilians) drawCivilian(civilian);
+    }
   }
 
   function drawAnimal(animal) {
+    if (!isWorldCircleVisibleInActiveViewport(animal.x, animal.y, animal.radius || 12, 80)) return;
     if (drawSpriteFromGroup("units", animal.species, animal.x, animal.y, animal.radius * 3.2, animal.radius * 3.2, 0, 1)) {
       return;
     }
@@ -7383,6 +8458,7 @@
   }
 
   function drawCivilian(civilian) {
+    if (!isWorldCircleVisibleInActiveViewport(civilian.x, civilian.y, civilian.radius || 9, 80)) return;
     if (drawSpriteFromGroup("units", "civilian", civilian.x, civilian.y, 34, 34, 0, 1)) {
       if ((civilian.coinPouch || 0) > 1) {
         ctx.fillStyle = `rgba(255,216,137,${0.4 + clamp((civilian.coinPouch || 0) / Math.max(1, civilian.maxCoinPouch || 1), 0, 1) * 0.6})`;
@@ -7418,6 +8494,7 @@
 
   function drawDrops() {
     for (const drop of state.world.drops) {
+      if (!isWorldCircleVisibleInActiveViewport(drop.x, drop.y, drop.radius || 13, 72)) continue;
       const bobY = Math.sin(drop.bob) * 4;
       if (drawSpriteFromGroup("units", drop.def.id, drop.x, drop.y + bobY, 34, 34, 0, 1)) {
         const glow = ctx.createRadialGradient(drop.x, drop.y + bobY, 4, drop.x, drop.y + bobY, drop.radius * 2.2);
@@ -7509,20 +8586,24 @@
   }
 
   function drawBuildings() {
+    const quality = getGraphicsPreset();
     for (const building of state.world.buildings) {
+      if (!isWorldCircleVisibleInActiveViewport(building.x, building.y, building.radius, 140)) continue;
       ctx.save();
       ctx.translate(building.x, building.y);
       ctx.rotate(building.angle);
       const selected = state.selectedIds.has(building.id);
       const hit = building.lastHitTimer > 0;
       const ownerColor = ownerColors[building.owner] || "#d5d5d5";
-      ctx.fillStyle = "rgba(0,0,0,0.22)";
-      ctx.beginPath();
-      ctx.ellipse(0, building.radius * 0.55, building.radius * 0.94, building.radius * 0.42, 0, 0, TAU);
-      ctx.fill();
+      if (quality.drawShadows) {
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
+        ctx.beginPath();
+        ctx.ellipse(0, building.radius * 0.55, building.radius * 0.94, building.radius * 0.42, 0, 0, TAU);
+        ctx.fill();
+      }
       drawBuildingModel(building, ownerColor, hit);
-      drawHealthRing(building, selected);
-      if (building.owner === "neutral" && building.maxTaxReserve) {
+      if (quality.drawFullHealthBars || selected || hit) drawHealthRing(building, selected);
+      if ((quality.drawFullHealthBars || selected) && building.owner === "neutral" && building.maxTaxReserve) {
         const meterWidth = building.radius * 1.4;
         ctx.fillStyle = "rgba(8,12,14,0.55)";
         ctx.fillRect(-meterWidth / 2, -building.radius - 18, meterWidth, 5);
@@ -7660,25 +8741,60 @@
     ctx.stroke();
   }
 
+  function shouldDrawUnitHealth(unit) {
+    const quality = getGraphicsPreset();
+    if (quality.drawFullHealthBars) return true;
+    if (state.selectedIds.has(unit.id)) return true;
+    return (unit.lastHitTimer || 0) > 0.02;
+  }
+
   function drawUnits() {
+    const quality = getGraphicsPreset();
     for (const unit of state.world.units) {
+      if (!isWorldCircleVisibleInActiveViewport(unit.x, unit.y, unit.radius, 120)) continue;
       ctx.save();
       ctx.translate(unit.x, unit.y - unit.z);
       ctx.rotate(unit.angle || 0);
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
-      ctx.beginPath();
-      ctx.ellipse(0, unit.z + unit.radius * 0.9, unit.radius * 0.9, unit.radius * 0.46, 0, 0, TAU);
-      ctx.fill();
+      if (quality.drawShadows) {
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.beginPath();
+        ctx.ellipse(0, unit.z + unit.radius * 0.9, unit.radius * 0.9, unit.radius * 0.46, 0, 0, TAU);
+        ctx.fill();
+      }
       drawUnitModel(unit);
       if (state.selectedIds.has(unit.id)) drawSelectionHalo(unit);
-      drawFloatingHealth(unit);
+      if (shouldDrawUnitHealth(unit)) drawFloatingHealth(unit);
       ctx.restore();
     }
   }
 
   function drawUnitModel(unit) {
+    const quality = getGraphicsPreset();
     const color = ownerColors[unit.owner] || "#ffffff";
     const hitTint = unit.lastHitTimer > 0 ? "#fff1d5" : null;
+    if (quality.simplifyModels) {
+      if (unit.type === "vehicle" || unit.airborne) {
+        ctx.fillStyle = hitTint || "#60707a";
+        ctx.fillRect(-unit.radius * 0.9, -unit.radius * 0.5, unit.radius * 1.8, unit.radius);
+        ctx.fillStyle = "#2f383d";
+        ctx.fillRect(unit.radius * 0.08, -unit.radius * 0.08, unit.radius * 0.88, unit.radius * 0.16);
+      } else {
+        ctx.fillStyle = hitTint || "#eadcc5";
+        ctx.beginPath();
+        ctx.arc(0, -unit.radius * 0.46, unit.radius * 0.3, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4 / state.camera.zoom;
+        ctx.beginPath();
+        ctx.moveTo(0, -unit.radius * 0.1);
+        ctx.lineTo(0, unit.radius * 0.74);
+        ctx.moveTo(-unit.radius * 0.42, unit.radius * 0.08);
+        ctx.lineTo(unit.radius * 0.42, unit.radius * 0.08);
+        ctx.stroke();
+      }
+      drawBanner(color, -unit.radius * 0.76, -unit.radius * 1.04, unit.radius * 0.44);
+      return;
+    }
     const spriteKey = getUnitSpriteKey(unit);
     if (spriteKey) {
       const width = unit.type === "vehicle" ? unit.radius * 3.9 : unit.airborne ? unit.radius * 4.1 : unit.radius * 3.2;
@@ -7810,7 +8926,10 @@
   }
 
   function drawEffects() {
-    for (const effect of state.world.effects) {
+    const quality = getGraphicsPreset();
+    const effects = state.world.effects.slice(Math.max(0, state.world.effects.length - quality.effectLimit));
+    for (const effect of effects) {
+      if (!isWorldCircleVisibleInActiveViewport(effect.x, effect.y, effect.radius || 18, 160)) continue;
       const alpha = clamp(effect.ttl / effect.maxTtl, 0, 1);
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -7880,14 +8999,19 @@
   }
 
   function drawPlacementGhost() {
-    const item = getActivePlacement();
+    const action = getPlacementAction();
+    const item = action && action.item;
     if (!item) return;
     const viewport = state.activeViewport || getViewportForPlayer();
     if (state.input.mouseScreenY > viewport.y + viewport.h - 180) return;
-    const owner = getActivePlayerState() && getActivePlayerState().owner;
-    const blockReason = item.type === "ability" ? null : getPlacementBlockReason(item, state.input.mouseWorldX, state.input.mouseWorldY, owner);
+    const owner = action.owner;
+    const blockReason = item.type === "ability"
+      ? null
+      : getPlacementBlockReason(item, state.input.mouseWorldX, state.input.mouseWorldY, owner, {
+        ignoreBuildingId: action.building && action.building.id,
+      });
     const blocked = Boolean(blockReason);
-    const constraint = getPlacementConstraint(item, owner);
+    const constraint = getPlacementConstraint(item, owner, { excludeBuildingId: action.building && action.building.id });
     if (constraint) {
       ctx.save();
       ctx.setLineDash([18 / state.camera.zoom, 12 / state.camera.zoom]);
@@ -7905,14 +9029,41 @@
     }
     ctx.save();
     ctx.translate(state.input.mouseWorldX, state.input.mouseWorldY);
+    ctx.rotate(action.angle || 0);
     ctx.globalAlpha = 0.55;
     ctx.strokeStyle = blocked ? "#ff8a80" : "#7df2ab";
     ctx.fillStyle = blocked ? "rgba(255,138,128,0.18)" : "rgba(125,242,171,0.16)";
     const radius = (item.footprint ? TILE_SIZE * item.footprint : 100) * 0.45;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
+    if (assetCatalog.includes(item)) {
+      const ghost = {
+        def: item,
+        itemId: item.id,
+        radius,
+        angle: action.angle || 0,
+        placementIndex: 0,
+        spriteVariantSeed: 0,
+      };
+      const footprintW = Math.max(radius * 1.5, getAssetSpriteSize(ghost, radius * 1.9).w * 0.78);
+      const footprintH = Math.max(radius * 1.1, getAssetSpriteSize(ghost, radius * 1.9).h * 0.62);
+      roundRect(ctx, -footprintW * 0.5, -footprintH * 0.5, footprintW, footprintH, 10 / state.camera.zoom, blocked ? "rgba(255,138,128,0.16)" : "rgba(125,242,171,0.14)", blocked ? "rgba(255,138,128,0.58)" : "rgba(125,242,171,0.5)");
+      drawBuildingModel(ghost, ownerColors[owner] || "#d5d5d5", false);
+      ctx.lineWidth = 3 / state.camera.zoom;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(radius * 1.08, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(radius * 1.08, 0);
+      ctx.lineTo(radius * 0.84, -radius * 0.16);
+      ctx.lineTo(radius * 0.84, radius * 0.16);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -7973,6 +9124,7 @@
     drawTopHud(w);
     drawMinimap();
     drawQuestPanel(w);
+    drawHelpOverlay();
     drawSelectionHud(w, h);
     if (state.ui.openPanel) drawCatalogPanel(state.ui.openPanel);
     drawBottomBar();
@@ -8044,6 +9196,7 @@
   function drawMinimap() {
     const player = getActivePlayerState();
     if (!player || !player.fog) return;
+    const quality = getGraphicsPreset();
     const layout = getMinimapLayout();
     if (!layout) return;
     roundRect(ctx, layout.panelX, layout.panelY, layout.panelW, layout.panelH, 20 * layout.scale, "rgba(8,16,23,0.76)", "rgba(104,215,255,0.18)");
@@ -8061,7 +9214,9 @@
       const size = building.itemId === "royal_keep" ? 4.2 : building.def && (building.def.style === "wall" || building.def.style === "capital-wall") ? 2 : 3;
       ctx.fillRect(point.x - size * 0.5, point.y - size * 0.5, size, size);
     }
-    for (const unit of state.world.units) {
+    const minimapUnitStep = quality.id === "low" ? 3 : quality.id === "medium" ? 2 : 1;
+    for (let i = 0; i < state.world.units.length; i += minimapUnitStep) {
+      const unit = state.world.units[i];
       const point = worldToMinimap(unit.x, unit.y, { x: layout.mapX, y: layout.mapY, w: layout.mapW, h: layout.mapH });
       ctx.fillStyle = withAlpha(ownerColors[unit.owner] || "#ffffff", 0.8);
       ctx.fillRect(point.x - 1, point.y - 1, 2, 2);
@@ -8268,6 +9423,84 @@
     });
   }
 
+  function getHelpOverlayLayout(player = getActivePlayerState()) {
+    const viewport = state.activeViewport || getViewportForPlayer(player);
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const bottomBar = getBottomBarLayout();
+    const objective = getObjectivePanelLayout();
+    const help = getPlayerHelpState(player);
+    const open = Boolean(help && help.open);
+    const w = Math.min(viewport.w - 20 * scale, (open ? (profile.tight ? 244 : 324) : (profile.tight ? 218 : 292)) * scale);
+    const h = (open ? (profile.tight ? 112 : profile.compact ? 136 : 158) : (profile.tight ? 34 : 40)) * scale;
+    const x = viewport.x + viewport.w - w - 18 * scale;
+    const startY = (objective ? objective.y + objective.h : getTopHudLayout().y + getTopHudLayout().h) + 12 * scale;
+    const maxY = Math.max(viewport.y + 72 * scale, bottomBar.y - h - 10 * scale);
+    const y = Math.min(startY, maxY);
+    return { x, y, w, h, scale, profile, open };
+  }
+
+  function drawHelpOverlay() {
+    const player = getActivePlayerState();
+    if (!player) return;
+    const help = getPlayerHelpState(player);
+    if (!help) return;
+    const layout = getHelpOverlayLayout(player);
+    const completedCount = TUTORIAL_STEP_ORDER.filter((step) => help.steps[step]).length;
+    const nextStep = getNextTutorialStep(player);
+    const nextCopy = nextStep ? TUTORIAL_STEP_COPY[nextStep] : null;
+    const nextInstruction = nextStep ? getTutorialStepInstruction(nextStep, player) : "";
+    const accent = nextStep ? "#9fe8ff" : "#8df2b7";
+    roundRect(ctx, layout.x, layout.y, layout.w, layout.h, 18 * layout.scale, "rgba(7,14,20,0.82)", withAlpha(accent, 0.2));
+    if (!layout.open) {
+      const collapsedText = nextCopy
+        ? `Tutorial ${completedCount}/${TUTORIAL_STEP_ORDER.length} • Next: ${nextInstruction}`
+        : `${player.inputMode === "controller" ? "RS camera • X/B catalogs" : `RMB pan • MMB rotate • ${formatKeybindLabel(getKeybind("openWeapons"))}/${formatKeybindLabel(getKeybind("openAssets"))} catalogs`} • ${formatKeybindLabel(getKeybind("help"))} guide`;
+      ctx.fillStyle = accent;
+      ctx.font = `700 ${Math.round((layout.profile.tight ? 10 : 11) * layout.scale)}px Cambria`;
+      ctx.fillText(truncateTextToWidth(collapsedText, layout.w - 22 * layout.scale), layout.x + 12 * layout.scale, layout.y + 23 * layout.scale);
+      return;
+    }
+    ctx.fillStyle = accent;
+    ctx.font = `700 ${Math.round((layout.profile.tight ? 13 : 15) * layout.scale)}px Cambria`;
+    ctx.fillText("Field Guide", layout.x + 14 * layout.scale, layout.y + 20 * layout.scale);
+    drawLabelPill(`${completedCount}/${TUTORIAL_STEP_ORDER.length}`, layout.x + layout.w - 54 * layout.scale, layout.y + 10 * layout.scale, withAlpha(accent, 0.18), withAlpha(accent, 0.36), "#f4efe2", layout.scale, 40 * layout.scale);
+    ctx.fillStyle = "#f3eee2";
+    ctx.font = `${Math.round((layout.profile.tight ? 10 : 11) * layout.scale)}px Cambria`;
+    const summary = nextCopy
+      ? `Next: ${nextInstruction}`
+      : `Tutorial complete. Press ${formatKeybindLabel(getKeybind("help"))} to hide or reopen this guide.`;
+    ctx.fillText(truncateTextToWidth(summary, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + 37 * layout.scale);
+    const nextIndex = Math.max(0, TUTORIAL_STEP_ORDER.indexOf(nextStep));
+    const steps = layout.profile.tight
+      ? TUTORIAL_STEP_ORDER.slice(nextStep ? nextIndex : Math.max(0, TUTORIAL_STEP_ORDER.length - 3), nextStep ? nextIndex + 3 : TUTORIAL_STEP_ORDER.length)
+      : TUTORIAL_STEP_ORDER;
+    steps.forEach((step, index) => {
+      const done = help.steps[step];
+      const lineY = layout.y + (56 + index * (layout.profile.tight ? 16 : 18)) * layout.scale;
+      roundRect(ctx, layout.x + 14 * layout.scale, lineY - 10 * layout.scale, 11 * layout.scale, 11 * layout.scale, 3 * layout.scale, done ? "rgba(125,242,171,0.84)" : "rgba(8,14,20,0.6)", done ? "rgba(125,242,171,0.36)" : "rgba(255,255,255,0.14)");
+      ctx.fillStyle = done ? "#e8fff1" : step === nextStep ? accent : "#dce6eb";
+      ctx.font = `700 ${Math.round((layout.profile.tight ? 10 : 11) * layout.scale)}px Cambria`;
+      ctx.fillText(TUTORIAL_STEP_COPY[step].label, layout.x + 31 * layout.scale, lineY);
+      ctx.fillStyle = "#9db0ba";
+      ctx.font = `${Math.round((layout.profile.tight ? 9 : 10) * layout.scale)}px Cambria`;
+      const detail = done ? "Ready" : getTutorialStepInstruction(step, player);
+      ctx.fillText(truncateTextToWidth(detail, layout.w - 112 * layout.scale), layout.x + 98 * layout.scale, lineY);
+    });
+    ctx.fillStyle = "#9bb0bc";
+    ctx.font = `${Math.round((layout.profile.tight ? 9 : 10) * layout.scale)}px Cambria`;
+    const footer = player.inputMode === "controller"
+      ? "A select • X assets • B weapons • Y clear • H guide"
+      : `${formatKeybindLabel(getKeybind("openAssets"))} assets • ${formatKeybindLabel(getKeybind("openWeapons"))} weapons • ${formatKeybindLabel(getKeybind("rotatePlacement"))} rotate • ${formatKeybindLabel(getKeybind("moveBuilding"))} move • ${formatKeybindLabel(getKeybind("help"))} guide`;
+    ctx.fillText(truncateTextToWidth(footer, layout.w - 28 * layout.scale), layout.x + 14 * layout.scale, layout.y + layout.h - 10 * layout.scale);
+  }
+
+  function getHelpOverlayHitAt(x, y, player = getActivePlayerState()) {
+    if (!player || state.mode !== "playing") return null;
+    const layout = getHelpOverlayLayout(player);
+    return isInsideRect(x, y, layout) ? { kind: "help", player } : null;
+  }
+
   function getWrappedTextLines(text, maxWidth) {
     const words = String(text || "").split(" ");
     let line = "";
@@ -8298,6 +9531,14 @@
     let output = value;
     while (output.length > 1 && ctx.measureText(`${output}...`).width > maxWidth) output = output.slice(0, -1);
     return `${output}...`;
+  }
+
+  function getClampedTextLines(text, maxWidth, maxLines = 2) {
+    const lines = getWrappedTextLines(text, maxWidth);
+    if (lines.length <= maxLines) return lines;
+    const output = lines.slice(0, maxLines);
+    output[maxLines - 1] = truncateTextToWidth(lines.slice(maxLines - 1).join(" "), maxWidth);
+    return output;
   }
 
   function getItemVisualTheme(item) {
@@ -8666,54 +9907,138 @@
     ctx.fillRect(layout.x + 12 * layout.scale, layout.y + 12 * layout.scale, layout.w - 24 * layout.scale, 10 * layout.scale);
     ctx.fillStyle = panelAccent;
     ctx.font = `700 ${Math.round(24 * layout.scale)}px Cambria`;
-    ctx.fillText(type === "assets" ? "Assets Catalog [E]" : "Weapons Catalog [Q]", layout.x + layout.padding, layout.y + 30 * layout.scale);
+    ctx.fillText(
+      type === "assets"
+        ? `Assets Catalog [${formatKeybindLabel(getKeybind("openAssets"))}]`
+        : `Weapons Catalog [${formatKeybindLabel(getKeybind("openWeapons"))}]`,
+      layout.x + layout.padding,
+      layout.y + 30 * layout.scale,
+    );
     ctx.fillStyle = "#9bb0bc";
     ctx.font = `${Math.round(13 * layout.scale)}px Cambria`;
-    ctx.fillText("Drag cards into the quick bar. Scroll here to browse the expanded arsenal.", layout.x + layout.padding, layout.y + 50 * layout.scale);
-    drawLabelPill(`${layout.items.length} ready`, layout.x + layout.w - 96 * layout.scale, layout.y + 18 * layout.scale, withAlpha(panelAccent, 0.18), withAlpha(panelAccent, 0.42), "#f4efe2", layout.scale, 80 * layout.scale);
+    const subtitle = layout.collapsed
+      ? "Catalog minimized. Reopen it to browse, filter, or drag loadout cards."
+      : "Drag cards into the quick bar. Search, filter, or minimize the catalog without leaving the battlefield.";
+    ctx.fillText(truncateTextToWidth(subtitle, layout.w - layout.padding * 2 - 124 * layout.scale), layout.x + layout.padding, layout.y + 50 * layout.scale);
+    drawLabelPill(`${layout.items.length}/${layout.allItems.length}`, layout.collapseRect.x - 66 * layout.scale, layout.y + 19 * layout.scale, withAlpha(panelAccent, 0.18), withAlpha(panelAccent, 0.42), "#f4efe2", layout.scale, 58 * layout.scale);
+    roundRect(ctx, layout.collapseRect.x, layout.collapseRect.y, layout.collapseRect.w, layout.collapseRect.h, 12 * layout.scale, "rgba(12,22,30,0.9)", withAlpha(panelAccent, 0.36));
+    ctx.fillStyle = "#f4efe2";
+    ctx.font = `700 ${Math.round(16 * layout.scale)}px Cambria`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(layout.collapsed ? "+" : "-", layout.collapseRect.x + layout.collapseRect.w * 0.5, layout.collapseRect.y + layout.collapseRect.h * 0.5 + 0.5 * layout.scale);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    if (layout.collapsed) {
+      const collapsedSummary = `${layout.activeCategory === "all" ? "All categories" : layout.categories.find((entry) => entry.id === layout.activeCategory)?.label || "Filtered"}${layout.searchQuery ? ` • "${layout.searchQuery}"` : ""}`;
+      ctx.fillStyle = "#cfe0e8";
+      ctx.font = `${Math.round(12 * layout.scale)}px Cambria`;
+      ctx.fillText(truncateTextToWidth(collapsedSummary, layout.w - layout.padding * 2), layout.x + layout.padding, layout.y + layout.h - 10 * layout.scale);
+      return;
+    }
+    roundRect(
+      ctx,
+      layout.searchRect.x,
+      layout.searchRect.y,
+      layout.searchRect.w,
+      layout.searchRect.h,
+      14 * layout.scale,
+      layout.searchFocused ? "rgba(18,35,46,0.98)" : "rgba(9,16,22,0.9)",
+      layout.searchFocused ? withAlpha(panelAccent, 0.44) : "rgba(255,255,255,0.08)",
+    );
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fillRect(layout.searchRect.x + 8 * layout.scale, layout.searchRect.y + 6 * layout.scale, layout.searchRect.w - 16 * layout.scale, 3 * layout.scale);
+    ctx.fillStyle = "#a8bcc7";
+    ctx.font = `700 ${Math.round(11 * layout.scale)}px Cambria`;
+    ctx.fillText("SEARCH", layout.searchRect.x + 12 * layout.scale, layout.searchRect.y + 11 * layout.scale);
+    ctx.fillStyle = layout.searchQuery ? "#f5efe2" : "#9bb0bc";
+    ctx.font = `${Math.round(12 * layout.scale)}px Cambria`;
+    const searchValue = layout.searchQuery || (layout.searchFocused ? "Type to filter the catalog" : "Press / or click here");
+    const searchSuffix = layout.searchFocused && Math.floor(state.time * 2.5) % 2 === 0 ? "|" : "";
+    ctx.fillText(truncateTextToWidth(`${searchValue}${searchSuffix}`, layout.searchRect.w - 56 * layout.scale), layout.searchRect.x + 12 * layout.scale, layout.searchRect.y + 24 * layout.scale);
+    drawLabelPill("/", layout.searchRect.x + layout.searchRect.w - (layout.clearSearchRect ? 42 : 24) * layout.scale, layout.searchRect.y + 6 * layout.scale, withAlpha(panelAccent, 0.18), withAlpha(panelAccent, 0.3), "#f4efe2", layout.scale, 16 * layout.scale);
+    if (layout.clearSearchRect) {
+      roundRect(ctx, layout.clearSearchRect.x, layout.clearSearchRect.y, layout.clearSearchRect.w, layout.clearSearchRect.h, 8 * layout.scale, "rgba(56,22,20,0.92)", "rgba(255,138,128,0.44)");
+      ctx.fillStyle = "#ffd7d0";
+      ctx.font = `700 ${Math.round(12 * layout.scale)}px Cambria`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("x", layout.clearSearchRect.x + layout.clearSearchRect.w * 0.5, layout.clearSearchRect.y + layout.clearSearchRect.h * 0.5 + 0.3 * layout.scale);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+    }
+    layout.categoryChips.forEach((chip) => {
+      const active = chip.id === layout.activeCategory;
+      roundRect(
+        ctx,
+        chip.x,
+        chip.y,
+        chip.w,
+        chip.h,
+        10 * layout.scale,
+        active ? withAlpha(panelAccent, 0.22) : "rgba(10,18,25,0.84)",
+        active ? withAlpha(panelAccent, 0.48) : "rgba(255,255,255,0.08)",
+      );
+      ctx.fillStyle = active ? "#f4efe2" : "#b7c8d1";
+      ctx.font = `700 ${Math.round(10 * layout.scale)}px Cambria`;
+      ctx.fillText(chip.text.toUpperCase(), chip.x + 9 * layout.scale, chip.y + 14 * layout.scale);
+    });
     ctx.save();
     ctx.beginPath();
     ctx.rect(layout.listX, layout.listY, layout.w - layout.padding * 2, layout.bodyH);
     ctx.clip();
+    if (!layout.items.length) {
+      ctx.fillStyle = "#d4e1e8";
+      ctx.font = `700 ${Math.round(15 * layout.scale)}px Cambria`;
+      ctx.fillText("No catalog entries match this filter.", layout.listX + 4 * layout.scale, layout.listY + 28 * layout.scale);
+      ctx.fillStyle = "#99aeb9";
+      ctx.font = `${Math.round(12 * layout.scale)}px Cambria`;
+      ctx.fillText("Try a broader category or clear the search box.", layout.listX + 4 * layout.scale, layout.listY + 48 * layout.scale);
+    }
     layout.items.forEach((item, index) => {
       const col = index % layout.cols;
       const row = Math.floor(index / layout.cols);
-      const x = layout.listX + col * layout.cellW;
+      const x = layout.listX + col * (layout.cardW + layout.cardGap);
       const y = layout.listY + row * layout.cellH - layout.scroll;
-      const w = layout.cellW - layout.cardGap;
-      const h = layout.cellH - 10 * layout.scale;
+      const w = layout.cardW;
+      const h = layout.cardH;
       if (y + h < layout.listY - 4 || y > layout.listY + layout.bodyH + 4) return;
       const dragging = state.ui.draggingItemId === item.id;
       const affordable = canAfford(item.id);
       const theme = getItemVisualTheme(item);
       const cardFill = ctx.createLinearGradient(x, y, x + w, y + h);
-      cardFill.addColorStop(0, dragging ? withAlpha(theme.accentSoft, 0.26) : withAlpha(theme.accentSoft, 0.14));
-      cardFill.addColorStop(0.5, "rgba(17,24,31,0.94)");
+      cardFill.addColorStop(0, dragging ? withAlpha(theme.accentSoft, 0.28) : withAlpha(theme.accentSoft, 0.16));
+      cardFill.addColorStop(0.48, "rgba(16,23,31,0.95)");
       cardFill.addColorStop(1, "rgba(9,14,19,0.98)");
-      roundRect(ctx, x, y, w, h, 18 * layout.scale, cardFill, affordable ? withAlpha(theme.edge, 0.16) : "rgba(255,138,128,0.34)");
+      roundRect(ctx, x, y, w, h, 18 * layout.scale, cardFill, affordable ? withAlpha(theme.edge, 0.18) : "rgba(255,138,128,0.34)");
       ctx.fillStyle = "rgba(255,255,255,0.05)";
       ctx.fillRect(x + 4 * layout.scale, y + 4 * layout.scale, w - 8 * layout.scale, 4 * layout.scale);
+      const iconBoxSize = Math.min(56 * layout.scale, h - 28 * layout.scale);
       const iconBoxX = x + 10 * layout.scale;
-      const iconBoxY = y + 10 * layout.scale;
-      const iconBoxSize = 46 * layout.scale;
+      const iconBoxY = y + 12 * layout.scale;
       const iconWell = ctx.createLinearGradient(iconBoxX, iconBoxY, iconBoxX, iconBoxY + iconBoxSize);
-      iconWell.addColorStop(0, withAlpha(theme.accent, 0.16));
+      iconWell.addColorStop(0, withAlpha(theme.accent, 0.18));
       iconWell.addColorStop(1, "rgba(9,14,18,0.92)");
       roundRect(ctx, iconBoxX, iconBoxY, iconBoxSize, iconBoxSize, 12 * layout.scale, iconWell, withAlpha(theme.edge, 0.22));
-      drawItemGlyph(item, iconBoxX + 4 * layout.scale, iconBoxY + 4 * layout.scale, 38 * layout.scale, !affordable);
-      drawLabelPill(getItemBadgeText(item), x + 62 * layout.scale, y + 10 * layout.scale, theme.chipFill, withAlpha(theme.edge, 0.22), "#f6f0e3", layout.scale, w - 120 * layout.scale);
+      drawItemGlyph(item, iconBoxX + 4 * layout.scale, iconBoxY + 4 * layout.scale, iconBoxSize - 8 * layout.scale, !affordable);
+      const textX = iconBoxX + iconBoxSize + 12 * layout.scale;
+      const textW = Math.max(48 * layout.scale, w - (textX - x) - 12 * layout.scale);
+      drawLabelPill(getItemBadgeText(item), textX, y + 10 * layout.scale, theme.chipFill, withAlpha(theme.edge, 0.22), "#f6f0e3", layout.scale, textW - 52 * layout.scale);
       ctx.fillStyle = "#f5efe2";
       ctx.font = `700 ${Math.round(12 * layout.scale)}px Cambria`;
-      wrapText(item.name, x + 62 * layout.scale, y + 32 * layout.scale, w - 72 * layout.scale, 12 * layout.scale);
+      const nameLines = getClampedTextLines(item.name, textW - 6 * layout.scale, 2);
+      nameLines.forEach((line, lineIndex) => {
+        ctx.fillText(line, textX, y + (32 + lineIndex * 13) * layout.scale);
+      });
       ctx.fillStyle = dragging ? "#dfe9ef" : "#a8bcc7";
-      ctx.font = `${Math.round(11 * layout.scale)}px Cambria`;
-      ctx.fillText(getItemMetaText(item), x + 62 * layout.scale, y + 50 * layout.scale);
+      ctx.font = `${Math.round(10.5 * layout.scale)}px Cambria`;
+      ctx.fillText(truncateTextToWidth(getItemMetaText(item), textW), textX, y + 63 * layout.scale);
       ctx.fillStyle = "#c9d7de";
       ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
-      ctx.fillText(getItemStatText(item), x + 62 * layout.scale, y + 64 * layout.scale);
-      drawLabelPill(`${item.cost} C`, x + w - 58 * layout.scale, y + h - 22 * layout.scale, affordable ? withAlpha(theme.accent, 0.18) : "rgba(111,32,28,0.84)", affordable ? withAlpha(theme.edge, 0.34) : "rgba(255,138,128,0.62)", affordable ? "#ffe6b2" : "#ffd1cb", layout.scale, 48 * layout.scale);
+      ctx.fillText(truncateTextToWidth(getItemStatText(item), textW), textX, y + 77 * layout.scale);
+      drawLabelPill(`${item.cost} C`, x + w - 54 * layout.scale, y + h - 22 * layout.scale, affordable ? withAlpha(theme.accent, 0.18) : "rgba(111,32,28,0.84)", affordable ? withAlpha(theme.edge, 0.34) : "rgba(255,138,128,0.62)", affordable ? "#ffe6b2" : "#ffd1cb", layout.scale, 46 * layout.scale);
       ctx.fillStyle = withAlpha(theme.accent, affordable ? 0.86 : 0.38);
-      ctx.fillRect(x + w - 44 * layout.scale, y + 12 * layout.scale, 28 * layout.scale, 3 * layout.scale);
+      ctx.fillRect(x + w - 42 * layout.scale, y + 12 * layout.scale, 26 * layout.scale, 3 * layout.scale);
     });
     ctx.restore();
     if (layout.scrollMax > 0) {
@@ -8727,8 +10052,11 @@
     }
     ctx.fillStyle = "#8fa5b1";
     ctx.font = `${Math.round(11 * layout.scale)}px Cambria`;
-    ctx.fillText(`${layout.items.length} entries`, layout.x + layout.padding, layout.y + layout.h - 8 * layout.scale);
-    if (layout.scrollMax > 0) ctx.fillText("Wheel to scroll", layout.x + layout.w - 100 * layout.scale, layout.y + layout.h - 8 * layout.scale);
+    ctx.fillText(`${layout.items.length} filtered • Tab cycles categories`, layout.x + layout.padding, layout.y + layout.h - 8 * layout.scale);
+    const footerHint = layout.searchFocused ? "Esc exits search" : layout.scrollMax > 0 ? "Wheel to scroll • / to search" : "/ to search";
+    ctx.textAlign = "right";
+    ctx.fillText(truncateTextToWidth(footerHint, 132 * layout.scale), layout.x + layout.w - layout.padding, layout.y + layout.h - 8 * layout.scale);
+    ctx.textAlign = "left";
   }
 
   function drawBottomBar() {
@@ -8753,9 +10081,9 @@
     roundRect(ctx, frameX + frameW * 0.5 + 2, frameY + 10, assetsW, 22, 12, "rgba(43,28,18,0.56)", "rgba(255,207,141,0.16)");
     ctx.fillStyle = "#8fcf9b";
     ctx.font = "700 12px Cambria";
-    ctx.fillText("Assets [E]", layout.x, layout.y - 9);
+    ctx.fillText(`Assets [${formatKeybindLabel(getKeybind("openAssets"))}]`, layout.x, layout.y - 9);
     ctx.fillStyle = "#ffc986";
-    ctx.fillText("Weapons [Q]", layout.x + (layout.slotSize + layout.gap) * 4, layout.y - 9);
+    ctx.fillText(`Weapons [${formatKeybindLabel(getKeybind("openWeapons"))}]`, layout.x + (layout.slotSize + layout.gap) * 4, layout.y - 9);
     ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -8774,7 +10102,8 @@
       roundRect(ctx, slot.x, slot.y, slot.w, slot.h, 18, slotFill, hover ? withAlpha(theme.edge, 0.64) : active ? withAlpha(theme.edge, 0.52) : "rgba(255,255,255,0.12)");
       ctx.fillStyle = "rgba(255,255,255,0.06)";
       ctx.fillRect(slot.x + 4, slot.y + 4, slot.w - 8, 4);
-      drawLabelPill(`${slot.side === "assets" ? "E" : "Q"}${slot.index + 1}`, slot.x + 6, slot.y + 6, theme.chipFill, withAlpha(theme.edge, 0.18), "#f5efe3", 0.9, 30);
+      const slotKeyLabel = `${formatKeybindLabel(getKeybind(slot.side === "assets" ? "openAssets" : "openWeapons"))}${slot.index + 1}`;
+      drawLabelPill(slotKeyLabel, slot.x + 6, slot.y + 6, theme.chipFill, withAlpha(theme.edge, 0.18), "#f5efe3", 0.9, Math.max(34, 12 + slotKeyLabel.length * 6));
       if (!item) {
         ctx.fillStyle = withAlpha(theme.accent, 0.22);
         ctx.beginPath();
@@ -8922,6 +10251,8 @@
 
   function isPointerOverUiOverlay(x, y) {
     if (state.ui.openPanel && isInsideRect(x, y, getPanelLayout(state.ui.openPanel))) return true;
+    const helpOverlay = getHelpOverlayHitAt(x, y);
+    if (helpOverlay) return true;
     const bottom = getBottomBarLayout();
     const bottomFrame = {
       x: bottom.x - 22,
@@ -8954,8 +10285,16 @@
   function updateHoverMessage(player, x, y, worldPos) {
     setActivePlayerContext(player, getViewportForPlayer(player));
     let message = "";
-    const card = getItemCardAt(x, y);
-    if (card) {
+    const helpHit = getHelpOverlayHitAt(x, y, player);
+    const panelControl = getPanelControlAt(x, y);
+    const card = panelControl || helpHit ? null : getItemCardAt(x, y);
+    if (helpHit) {
+      message = helpHit.player.ui.help && helpHit.player.ui.help.open
+        ? "Click or press H to hide the field guide."
+        : "Click or press H to reopen the field guide.";
+    } else if (panelControl) {
+      message = getPanelControlHoverMessage(panelControl);
+    } else if (card) {
       message = getItemHoverMessage(card.item);
     } else {
       const selectionHit = getSelectionHudHitAt(x, y);
@@ -9189,9 +10528,11 @@
     if (profile.showSelectionHint) {
       ctx.fillStyle = "#9fb2bc";
       ctx.font = `${Math.round(10 * layout.scale)}px Cambria`;
-      const hintText = layout.overflowCount
-        ? `Showing ${layout.entities.length} of ${layout.totalEntities}. Click icon to remove.`
-        : "Click icon to remove. Eye enters first-person.";
+      const hintText = focusEntity.kind === "building" && focusEntity.owner === (getActivePlayerState() && getActivePlayerState().owner)
+        ? `Move ${formatKeybindLabel(getKeybind("moveBuilding"))} • Rotate ${formatKeybindLabel(getKeybind("rotatePlacement"))} • Demolish ${formatKeybindLabel(getKeybind("demolishBuilding"))}`
+        : layout.overflowCount
+          ? `Showing ${layout.entities.length} of ${layout.totalEntities}. Click icon to remove.`
+          : "Click icon to remove. Eye enters first-person.";
       ctx.fillText(truncateTextToWidth(hintText, layout.w - layout.padding * 2), layout.x + layout.padding, layout.y + layout.padding + 57 * layout.scale);
     }
     layout.slots.forEach((slot) => drawSelectionEntityIcon(
@@ -9234,7 +10575,11 @@
   function clearPlayerSelection(player, clearPlacement = true) {
     setActivePlayerContext(player, getViewportForPlayer(player));
     state.selectedIds.clear();
-    if (clearPlacement) state.ui.activePlacementId = null;
+    if (clearPlacement) {
+      state.ui.activePlacementId = null;
+      state.ui.relocatingBuildingId = null;
+      state.ui.placementAngle = 0;
+    }
     state.ui.draggingItemId = null;
     state.ui.dragSource = null;
     state.ui.hoveredEnemyIds = [];
@@ -9251,6 +10596,8 @@
       playUiSound(nextPanel ? "panelOpen" : "panelClose", { volume: 0.58, cooldown: 0.05 });
     }
     player.ui.openPanel = nextPanel;
+    if (player.ui.panelSearchFocus && player.ui.panelSearchFocus !== nextPanel) player.ui.panelSearchFocus = null;
+    if (nextPanel) markTutorialStep(player, "catalog");
     return nextPanel;
   }
 
@@ -9265,6 +10612,22 @@
     state.input.cursorX = x;
     state.input.cursorY = y;
     state.ui.selectionBox = null;
+    const helpHit = getHelpOverlayHitAt(x, y, player);
+    if (helpHit) {
+      togglePlayerHelp(player);
+      playUiSound("uiClick", { volume: 0.46, cooldown: 0.04 });
+      state.input.leftDown = false;
+      state.input.actionSource = "panel";
+      return;
+    }
+    const panelControl = getPanelControlAt(x, y);
+    if (panelControl) {
+      activatePanelControl(player, panelControl);
+      playUiSound("uiClick", { volume: 0.46, cooldown: 0.04 });
+      state.input.leftDown = false;
+      state.input.actionSource = "panel";
+      return;
+    }
     const card = getItemCardAt(x, y);
     if (card) {
       state.ui.draggingItemId = card.item.id;
@@ -9333,6 +10696,7 @@
     if (state.selectedIds.size) {
       notify(`${state.selectedIds.size} units selected.`, "#ffe29a");
       playUiSound("select", { volume: 0.58, cooldown: 0.04 });
+      markTutorialStep(player, "select");
     }
   }
 
@@ -9379,6 +10743,8 @@
       const quickSlots = getQuickSlots(player);
       const itemId = quickSlots[slot.side][slot.index];
       state.ui.activePlacementId = state.ui.activePlacementId === itemId ? null : itemId;
+      state.ui.relocatingBuildingId = null;
+      if (state.ui.activePlacementId) state.ui.placementAngle = 0;
       playUiSound("uiClick", { volume: 0.5, cooldown: 0.04 });
       state.input.leftDown = false;
       state.input.actionSource = null;
@@ -9389,18 +10755,27 @@
       state.input.actionSource = null;
       return;
     }
-    const placement = getActivePlacement();
+    const placementAction = getPlacementAction(player);
+    const placement = placementAction && placementAction.item;
     if (placement && y < viewport.y + viewport.h - 120) {
+      let placementApplied = false;
       if (isLanClient()) {
         queueLanCommand({
           type: "deployPlacement",
           owner: player.owner,
           itemId: placement.id,
+          angle: placementAction.angle || 0,
+          relocateBuildingId: placementAction.building ? placementAction.building.id : null,
           worldPos: { x: worldPos.x, y: worldPos.y },
         });
+        placementApplied = true;
       } else {
-        deployPlacement(placement, worldPos.x, worldPos.y, player.owner);
+        placementApplied = deployPlacement(placement, worldPos.x, worldPos.y, player.owner, {
+          angle: placementAction.angle || 0,
+          relocateBuilding: placementAction.building || null,
+        });
       }
+      if (placementApplied && placementAction.mode === "relocate" && !isLanClient()) clearBuildingRelocation(player, { clearPlacement: true });
       state.input.leftDown = false;
       state.input.actionSource = null;
       return;
@@ -9414,6 +10789,7 @@
         state.selectedIds.clear();
         state.selectedIds.add(clickedEntity.id);
         playUiSound("select", { volume: 0.56, cooldown: 0.04 });
+        markTutorialStep(player, "select");
       }
       state.input.leftDown = false;
       state.input.actionSource = null;
@@ -9452,12 +10828,14 @@
       state.camera.y = clamp(state.camera.y, -CAMERA_LIMIT, CAMERA_LIMIT);
       state.input.panAnchorX = x;
       state.input.panAnchorY = y;
+      markTutorialStep(player, "pan");
     }
     if (state.input.middleDown) {
       const dx = x - state.input.panAnchorX;
       state.camera.rotation += dx * 0.004;
       state.input.panAnchorX = x;
       state.input.panAnchorY = y;
+      if (Math.abs(dx) > 1) markTutorialStep(player, "rotate");
     }
     state.ui.hoveredSlot = getQuickSlotAt(x, y);
     state.ui.hoveredEnemyIds = getHoveredEnemyTargets(world.x, world.y, 4);
@@ -9465,6 +10843,7 @@
   }
 
   function onPointerMove(event) {
+    if (isSettingsOverlayOpen()) return;
     const fpPlayer = getFirstPersonActivePlayer();
     if (fpPlayer) {
       updateFirstPersonLook(fpPlayer, event.movementX || 0, event.movementY || 0);
@@ -9484,6 +10863,7 @@
   }
 
   function handleWheel(event) {
+    if (isSettingsOverlayOpen()) return;
     event.preventDefault();
     if (getFirstPersonActivePlayer()) return;
     const pointer = clientToCanvasPoint(event.clientX, event.clientY);
@@ -9498,6 +10878,7 @@
       }
     }
     state.camera.zoom = clamp(state.camera.zoom - event.deltaY * 0.0006, 0.36, 1.9);
+    markTutorialStep(player, "zoom");
   }
 
   async function toggleFullscreen() {
@@ -9586,9 +10967,11 @@
         player.camera.y += (cameraStick.x * sin + cameraStick.y * cos) * 320 * dt;
         player.camera.x = clamp(player.camera.x, -CAMERA_LIMIT, CAMERA_LIMIT);
         player.camera.y = clamp(player.camera.y, -CAMERA_LIMIT, CAMERA_LIMIT);
+        if (cameraStick.magnitude > 0.18) markTutorialStep(player, "pan");
         updatePlayerPointer(player, player.input.cursorX, player.input.cursorY);
       }
       player.camera.zoom = clamp(player.camera.zoom + (rbPressed ? 0.82 * dt : 0) - (lbPressed ? 0.82 * dt : 0), 0.36, 1.9);
+      if (lbPressed || rbPressed) markTutorialStep(player, "zoom");
 
       if (aPressed && !player.gamepadButtons.a) handleLeftDown(player, player.input.cursorX, player.input.cursorY, "controller");
       if (!aPressed && player.gamepadButtons.a) handleLeftUp(player, player.input.cursorX, player.input.cursorY, "controller");
@@ -9599,7 +10982,10 @@
         setPlayerOpenPanel(player, null);
         playUiSound("clear", { volume: 0.46, cooldown: 0.05 });
       }
-      if (r3Pressed && !player.gamepadButtons.r3) player.camera.rotation += Math.PI / 4;
+      if (r3Pressed && !player.gamepadButtons.r3) {
+        player.camera.rotation += Math.PI / 4;
+        markTutorialStep(player, "rotate");
+      }
 
       player.gamepadButtons.a = aPressed;
       player.gamepadButtons.b = bPressed;
@@ -9611,10 +10997,78 @@
     }
   }
 
+  function handleCatalogKeyInput(player, event, key) {
+    if (!player || !player.ui || !player.ui.openPanel) return false;
+    const panel = player.ui.openPanel;
+    const searchFocused = player.ui.panelSearchFocus === panel;
+    if (key === "/") {
+      event.preventDefault();
+      setPanelSearchFocus(panel, player);
+      return true;
+    }
+    if (key === "tab") {
+      event.preventDefault();
+      cyclePanelCategory(panel, event.shiftKey ? -1 : 1, player);
+      playUiSound("uiClick", { volume: 0.42, cooldown: 0.04 });
+      return true;
+    }
+    if (!searchFocused) return false;
+    if (key === "escape" || key === "enter") {
+      event.preventDefault();
+      setPanelSearchFocus(null, player);
+      return true;
+    }
+    if (key === "backspace") {
+      event.preventDefault();
+      setPanelSearch(panel, getPanelSearch(panel, player).slice(0, -1), player);
+      return true;
+    }
+    if (key === " ") {
+      event.preventDefault();
+      setPanelSearch(panel, `${getPanelSearch(panel, player)} `, player);
+      return true;
+    }
+    if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      setPanelSearch(panel, `${getPanelSearch(panel, player)}${event.key}`, player);
+      return true;
+    }
+    return false;
+  }
+
+  function handleSettingsOverlayKey(event, key, typingTarget) {
+    if (!isSettingsOverlayOpen()) return false;
+    if (state.settingsUi.listeningAction) {
+      event.preventDefault();
+      if (key === "escape") {
+        state.settingsUi.listeningAction = null;
+        syncSettingsUi();
+        return true;
+      }
+      if (["shift", "control", "alt", "meta"].includes(key)) return true;
+      setActionKeybind(state.settingsUi.listeningAction, key);
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      return true;
+    }
+    if (key === "escape" || eventMatchesAction(event, "openSettings")) {
+      event.preventDefault();
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      closeSettingsOverlay();
+      return true;
+    }
+    if (!typingTarget) {
+      event.preventDefault();
+      return true;
+    }
+    return false;
+  }
+
   function handleKey(event) {
     const key = event.key.toLowerCase();
+    const normalizedKey = normalizeKeybindKey(event.key);
     const fpPlayer = getFirstPersonActivePlayer();
     const typingTarget = isTextInputTarget(event.target);
+    if (handleSettingsOverlayKey(event, normalizedKey, typingTarget)) return;
     if (typingTarget) {
       if (state.admin.slashOpen && key === "enter") {
         event.preventDefault();
@@ -9634,6 +11088,9 @@
       }
       return;
     }
+    const primary = getPrimaryPlayer();
+    if (primary) setActivePlayerContext(primary, getViewportForPlayer(primary));
+    if (state.mode === "playing" && primary && handleCatalogKeyInput(primary, event, key)) return;
     if (state.mode === "playing" && key === "/" && !fpPlayer) {
       event.preventDefault();
       openSlashCommand("/");
@@ -9660,8 +11117,13 @@
       event.preventDefault();
       return;
     }
-    const primary = getPrimaryPlayer();
-    setActivePlayerContext(primary, getViewportForPlayer(primary));
+    if (eventMatchesAction(event, "openSettings")) {
+      event.preventDefault();
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      if (isSettingsOverlayOpen()) closeSettingsOverlay();
+      else openSettingsOverlay();
+      return;
+    }
     if (key === "escape") {
       if (fpPlayer) {
         event.preventDefault();
@@ -9683,18 +11145,63 @@
       event.preventDefault();
       return;
     }
-    if (key === "q") setPlayerOpenPanel(primary, state.ui.openPanel === "weapons" ? null : "weapons");
-    else if (key === "e") setPlayerOpenPanel(primary, state.ui.openPanel === "assets" ? null : "assets");
-    else if (key === "d") toggleDifficultyMode();
-    else if (key === "-") setGameSpeed(0.5);
-    else if (key === "1") setGameSpeed(1);
-    else if (key === "2") setGameSpeed(2);
-    else if (key === "5") setGameSpeed(5);
-    else if (key === "x") {
+    if (!primary) return;
+    if (eventMatchesAction(event, "help")) {
+      event.preventDefault();
+      togglePlayerHelp(primary);
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      return;
+    }
+    if (eventMatchesAction(event, "openWeapons")) {
+      setPlayerOpenPanel(primary, state.ui.openPanel === "weapons" ? null : "weapons");
+    } else if (eventMatchesAction(event, "openAssets")) {
+      setPlayerOpenPanel(primary, state.ui.openPanel === "assets" ? null : "assets");
+    } else if (eventMatchesAction(event, "toggleDifficulty")) {
+      toggleDifficultyMode();
+    } else if (eventMatchesAction(event, "speedSlow")) {
+      setGameSpeed(0.5);
+    } else if (eventMatchesAction(event, "speedNormal")) {
+      setGameSpeed(1);
+    } else if (eventMatchesAction(event, "speedFast")) {
+      setGameSpeed(2);
+    } else if (eventMatchesAction(event, "speedUltra")) {
+      setGameSpeed(5);
+    } else if (eventMatchesAction(event, "clearSelection")) {
       clearPlayerSelection(primary, true);
       notify("Selection cleared.");
       playUiSound("clear", { volume: 0.46, cooldown: 0.05 });
-    } else if (key === "f") {
+    } else if (eventMatchesAction(event, "rotatePlacement")) {
+      event.preventDefault();
+      rotatePlacement(primary);
+      return;
+    } else if (eventMatchesAction(event, "moveBuilding")) {
+      event.preventDefault();
+      if (state.ui.relocatingBuildingId) {
+        clearBuildingRelocation(primary, { clearPlacement: true });
+        notify("Building move cancelled.", "#ffb484");
+      } else if (!beginBuildingRelocation(primary)) {
+        playUiSound("error", { volume: 0.46, cooldown: 0.04 });
+      } else {
+        playUiSound("panelOpen", { volume: 0.44, cooldown: 0.04 });
+      }
+      return;
+    } else if (eventMatchesAction(event, "demolishBuilding")) {
+      event.preventDefault();
+      const selectedBuilding = getSelectedOwnedBuilding(primary);
+      if (!selectedBuilding) {
+        notify("Select one of your buildings to demolish it.", "#ffb484");
+        playUiSound("error", { volume: 0.46, cooldown: 0.04 });
+      } else if (isLanClient()) {
+        queueLanCommand({
+          type: "demolishBuilding",
+          owner: primary.owner,
+          buildingId: selectedBuilding.id,
+        });
+      } else if (demolishSelectedBuilding(primary)) {
+        playUiSound("clear", { volume: 0.42, cooldown: 0.04 });
+      }
+      return;
+    } else if (eventMatchesAction(event, "fullscreen")) {
       toggleFullscreen().catch(() => {});
     }
   }
@@ -9710,6 +11217,7 @@
 
   function startMatch(matchType = "single", playerCount = 2) {
     exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
+    closeSettingsOverlay();
     if (matchType !== "lan" && matchType !== "lan-coop") resetLanSessionState();
     initializePlayers(matchType, playerCount);
     state.world.preset = sanitizeMapPreset(state.mapPreset);
@@ -9737,6 +11245,11 @@
     addAdminLog("Loaded battlefield.", { extra: getMapPresetDef(state.world.preset).label });
     if (isHardModeActive()) applyHardDifficultyPressure();
     updateFogOfWar();
+    for (const player of getHumanPlayers()) {
+      const help = getPlayerHelpState(player);
+      if (help) help.open = state.matchType === "single" && player.viewportIndex === 0;
+      player.ui.panelSearchFocus = null;
+    }
     overlay.classList.add("hidden");
     syncLiveControls();
     if (isLanHost()) pushLanSnapshot();
@@ -10074,6 +11587,71 @@
     playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
     setGameSpeed(5);
   });
+  if (helpBtn) {
+    helpBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      togglePlayerHelp(getPrimaryPlayer());
+    });
+  }
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      openSettingsOverlay();
+    });
+  }
+  if (liveSettingsBtn) {
+    liveSettingsBtn.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      openSettingsOverlay();
+    });
+  }
+  if (settingsCloseBtn) {
+    settingsCloseBtn.addEventListener("click", () => {
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      closeSettingsOverlay();
+    });
+  }
+  if (graphicsQualitySelect) {
+    graphicsQualitySelect.addEventListener("change", () => {
+      state.settings.graphicsQuality = sanitizeGraphicsQuality(graphicsQualitySelect.value);
+      commitSettings();
+    });
+  }
+  if (fontScaleInput) {
+    fontScaleInput.addEventListener("input", () => {
+      state.settings.fontScale = sanitizeFontScale(Number(fontScaleInput.value) / 100);
+      commitSettings();
+    });
+  }
+  if (colorModeSelect) {
+    colorModeSelect.addEventListener("change", () => {
+      state.settings.colorMode = sanitizeColorMode(colorModeSelect.value);
+      commitSettings();
+    });
+  }
+  if (sfxVolumeInput) {
+    sfxVolumeInput.addEventListener("input", () => {
+      state.settings.sfxVolume = clampSettingPercent(Number(sfxVolumeInput.value) / 100, 0.68);
+      commitSettings();
+    });
+  }
+  if (musicVolumeInput) {
+    musicVolumeInput.addEventListener("input", () => {
+      state.settings.musicVolume = clampSettingPercent(Number(musicVolumeInput.value) / 100, 1);
+      commitSettings();
+    });
+  }
+  keybindButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      playUiSound("uiClick", { volume: 0.44, cooldown: 0.04 });
+      beginKeybindCapture(button.dataset.keybindAction);
+    });
+  });
+  if (settingsOverlay) {
+    settingsOverlay.addEventListener("pointerdown", (event) => {
+      if (event.target === settingsOverlay) closeSettingsOverlay();
+    });
+  }
   if (lanCodeInput) {
     lanCodeInput.addEventListener("input", () => {
       lanCodeInput.value = sanitizeRoomCode(lanCodeInput.value);
@@ -10136,6 +11714,8 @@
   window.advanceTime = advanceTime;
 
   resize();
+  applySettingsToRuntime();
+  syncSettingsUi();
   syncMapPresetUi();
   resetLanSessionState();
   syncAdminUi();
