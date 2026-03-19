@@ -8,6 +8,16 @@
   </head>
   <body>
     <canvas id="game" aria-label="Top Knights"></canvas>
+    <div id="loading-overlay" class="loading-overlay hidden" aria-live="polite" aria-label="Loading screen">
+      <div class="loading-panel">
+        <p id="loading-title" class="controller-title">Loading Battlefield</p>
+        <p id="loading-copy" class="loading-copy">Preparing map art, unit sprites, and interface textures.</p>
+        <div class="loading-track" aria-hidden="true">
+          <div id="loading-progress-fill" class="loading-progress-fill"></div>
+        </div>
+        <p id="loading-status" class="loading-status">Loading assets...</p>
+      </div>
+    </div>
     <div id="menu-overlay" class="overlay" data-menu-screen="root" data-menu-result="off">
       <div class="menu-panel main-menu-shell">
         <div class="menu-title-block">

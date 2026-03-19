@@ -3,6 +3,11 @@
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
+  const loadingOverlay = document.getElementById("loading-overlay");
+  const loadingTitle = document.getElementById("loading-title");
+  const loadingCopy = document.getElementById("loading-copy");
+  const loadingProgressFill = document.getElementById("loading-progress-fill");
+  const loadingStatus = document.getElementById("loading-status");
   const overlay = document.getElementById("menu-overlay");
   const menuTitle = overlay ? overlay.querySelector("h1") : null;
   const menuIntro = overlay ? overlay.querySelector(".intro") : null;
@@ -86,9 +91,16 @@
   const SOLO_SAVE_STORAGE_KEY = "top-knights-solo-save-v1";
   const DEFAULT_MENU_TITLE = menuTitle ? menuTitle.textContent : "Top Knights";
   const DEFAULT_MENU_INTRO = menuIntro ? menuIntro.textContent : "";
+  const trackedImageEntries = [];
+  const trackedImageSet = new WeakSet();
+  const loadingRuntime = {
+    matchStartPending: false,
+    copy: "Preparing map art, unit sprites, and interface textures.",
+  };
 
   const WORLD_SIZE = 4600;
   const TILE_SIZE = 92;
+  const AUTO_RESOURCE_SCAN_RADIUS = TILE_SIZE * 2;
   const HALF_WORLD = WORLD_SIZE / 2;
   const GRID_COUNT = Math.ceil(WORLD_SIZE / TILE_SIZE);
   const CAMERA_LIMIT = WORLD_SIZE * 0.38;
@@ -925,6 +937,9 @@
     units: loadExternalSpriteMap(externalSpriteSources.units),
     resources: loadExternalSpriteMap(externalSpriteSources.resources),
   };
+  Array.from(document.querySelectorAll(".menu-art-image, .map-card img")).forEach((image) => {
+    trackImageAsset(image, image.getAttribute("src") || image.currentSrc || "menu-image");
+  });
 
   const mapCanvas = document.createElement("canvas");
   const mapCtx = mapCanvas.getContext("2d");
@@ -949,19 +964,52 @@
     };
   }
 
+  function trackImageAsset(image, label = "asset") {
+    if (!image || trackedImageSet.has(image)) return image;
+    trackedImageSet.add(image);
+    const entry = {
+      image,
+      label,
+      settled: false,
+      ready: false,
+      failed: false,
+      promise: null,
+    };
+    entry.promise = new Promise((resolve) => {
+      const finalize = (status) => {
+        if (entry.settled) return;
+        entry.settled = true;
+        entry.ready = status === "load" && isImageReady(image);
+        entry.failed = !entry.ready;
+        refreshLoadingOverlay();
+        resolve(entry);
+      };
+      if (isImageReady(image)) {
+        finalize("load");
+        return;
+      }
+      if (image.complete && image.naturalWidth === 0) {
+        finalize("error");
+        return;
+      }
+      image.addEventListener("load", () => finalize("load"), { once: true });
+      image.addEventListener("error", () => finalize("error"), { once: true });
+    });
+    trackedImageEntries.push(entry);
+    return image;
+  }
+
   function loadImage(src) {
     const img = new Image();
     img.src = src;
-    return img;
+    return trackImageAsset(img, src);
   }
 
   function loadSpriteMap(entries) {
     const map = new Map();
     if (!entries) return map;
     for (const [key, src] of Object.entries(entries)) {
-      const img = new Image();
-      img.src = src;
-      map.set(key, img);
+      map.set(key, loadImage(src));
     }
     return map;
   }
@@ -981,6 +1029,58 @@
 
   function isImageReady(image) {
     return Boolean(image && image.complete && image.naturalWidth > 0);
+  }
+
+  function getAssetLoadStats() {
+    const total = trackedImageEntries.length;
+    let loaded = 0;
+    let failed = 0;
+    for (const entry of trackedImageEntries) {
+      if (entry.ready) loaded += 1;
+      else if (entry.failed) failed += 1;
+    }
+    return {
+      total,
+      loaded,
+      failed,
+      settled: loaded + failed,
+      pending: Math.max(0, total - loaded - failed),
+      progress: total ? (loaded + failed) / total : 1,
+    };
+  }
+
+  function refreshLoadingOverlay() {
+    if (!loadingOverlay || loadingOverlay.classList.contains("hidden")) return;
+    const stats = getAssetLoadStats();
+    if (loadingProgressFill) loadingProgressFill.style.width = `${Math.round(stats.progress * 100)}%`;
+    if (loadingCopy) loadingCopy.textContent = loadingRuntime.copy;
+    if (loadingStatus) {
+      loadingStatus.textContent = stats.pending > 0
+        ? `Loading ${stats.settled}/${stats.total} textures...`
+        : stats.failed > 0
+          ? `${stats.loaded}/${stats.total} textures loaded. ${stats.failed} missing asset${stats.failed === 1 ? "" : "s"} will use fallback rendering.`
+          : `Loaded ${stats.loaded}/${stats.total} textures.`;
+    }
+  }
+
+  function showLoadingOverlay(title = "Loading Battlefield", copy = "Preparing map art, unit sprites, and interface textures.") {
+    if (!loadingOverlay) return;
+    loadingRuntime.copy = copy;
+    if (loadingTitle) loadingTitle.textContent = title;
+    loadingOverlay.classList.remove("hidden");
+    refreshLoadingOverlay();
+  }
+
+  function hideLoadingOverlay() {
+    if (!loadingOverlay) return;
+    loadingOverlay.classList.add("hidden");
+  }
+
+  async function ensureGameAssetsReady(title = "Loading Battlefield", copy = "Preparing map art, unit sprites, and interface textures.") {
+    showLoadingOverlay(title, copy);
+    await Promise.all(trackedImageEntries.map((entry) => entry.promise));
+    refreshLoadingOverlay();
+    return getAssetLoadStats();
   }
 
   function getSpriteEntry(group, key, variantSeed = 0) {
@@ -2132,15 +2232,21 @@
     state.menu.selectedMapPreset = sanitizeMapPreset(preset);
     state.menu.lanArmed = false;
     if (state.menu.pendingMode === "single") {
-      startMatch("single", 1);
+      startMatchWithLoading("single", 1).catch((error) => {
+        setLanStatus(`Unable to start this mode: ${error.message}`);
+      });
       return;
     }
     if (state.menu.pendingMode === "versus") {
-      startMatch("versus", state.menu.pendingPlayerCount || 2);
+      startMatchWithLoading("versus", state.menu.pendingPlayerCount || 2).catch((error) => {
+        setLanStatus(`Unable to start this mode: ${error.message}`);
+      });
       return;
     }
     if (state.menu.pendingMode === "coop") {
-      startMatch("coop", state.menu.pendingPlayerCount || 2);
+      startMatchWithLoading("coop", state.menu.pendingPlayerCount || 2).catch((error) => {
+        setLanStatus(`Unable to start this mode: ${error.message}`);
+      });
       return;
     }
     state.menu.lanArmed = true;
@@ -2889,7 +2995,9 @@
     state.lan.startedAt = startedAt || Date.now();
     syncMenuButtons();
     if (state.mode === "playing" && state.matchType === state.lan.roomMatchType) return;
-    startMatch(state.lan.roomMatchType);
+    startMatchWithLoading(state.lan.roomMatchType).catch((error) => {
+      setLanStatus(`Unable to start the LAN match: ${error.message}`);
+    });
   }
 
   async function requestLanRoomStart() {
@@ -4814,6 +4922,7 @@
       formationMoveId: null,
       formationSlot: null,
       formationIndex: -1,
+      arrivalTask: null,
     };
     if (role === "repair") {
       unit.damage = 0;
@@ -5068,6 +5177,7 @@
       unit.interactCooldown = randomRange(unit.x + unit.y + i, 0.08, 0.26);
       unit.order = interactionKind === "resource" ? "harvest" : "collect";
       unit.orderStamp = state.time;
+      unit.arrivalTask = null;
       clearUnitFormation(unit);
       resetUnitPathState(unit);
     }
@@ -5090,6 +5200,11 @@
       unit.formationSlot = { x: target.x, y: target.y };
       unit.formationIndex = index;
       unit.pathAvoidanceSide = groupAvoidanceSide;
+      unit.arrivalTask = {
+        x: target.x,
+        y: target.y,
+        radius: AUTO_RESOURCE_SCAN_RADIUS,
+      };
     });
   }
 
@@ -5105,6 +5220,7 @@
       unit.focusMove = false;
       unit.order = "attack";
       unit.orderStamp = state.time;
+      unit.arrivalTask = null;
       clearUnitFormation(unit);
       resetUnitPathState(unit);
     }
@@ -6457,8 +6573,7 @@
 
   function getDemolitionRefund(building) {
     if (!building || !building.def || !building.def.cost) return 0;
-    const integrity = clamp(building.hp / Math.max(1, building.maxHp || building.hp || 1), 0.35, 1);
-    return Math.max(0, Math.round(building.def.cost * 0.65 * integrity));
+    return Math.max(0, Math.round(building.def.cost * 0.5));
   }
 
   function demolishSelectedBuilding(player = getActivePlayerState(), explicitBuilding = null) {
@@ -6471,7 +6586,7 @@
     const refund = getDemolitionRefund(building);
     addCoins(player.owner, refund);
     if (refund > 0) spawnDamageText(building.x, building.y - building.radius * 0.6, `+${refund}`, "#ffd889");
-    notify(`${building.def.name} demolished. Refund: +${refund} coins.`, "#ffd889");
+    notify(`${building.def.name} scrapped. Refund: +${refund} coins.`, "#ffd889");
     spawnEffect("debris", building.x, building.y, building.radius * 1.1, ownerColors[building.owner] || "#d5d5d5", 0.7);
     spawnEffect("smoke", building.x, building.y, building.radius * 1.3, "rgba(45,50,58,0.56)", 1);
     playWorldSound("impactBlast", building.x, building.y, { cooldown: 0.08, volume: 0.68 });
@@ -7260,6 +7375,100 @@
     return a && b && a.owner && b.owner && a.owner !== "neutral" && b.owner !== "neutral" && !areOwnersAllied(a.owner, b.owner);
   }
 
+  function isAttackableTarget(attacker, target) {
+    if (!attacker || !target || attacker.id === target.id) return false;
+    if (target.kind === "animal") return true;
+    return isEnemy(attacker, target);
+  }
+
+  function isAutoResourceWorker(unit) {
+    return !!unit && unit.type === "worker";
+  }
+
+  function canUnitFight(unit) {
+    return !!unit && (((unit.damage || 0) > 0) || Boolean(unit.projectile));
+  }
+
+  function setUnitInteractionOrder(unit, targetEntity, interactionKind) {
+    if (!unit || !targetEntity) return false;
+    const standoff = (targetEntity.radius || 16) + unit.radius + 12;
+    unit.moveTarget = nudgeMoveTargetFromObstacles(unit, { x: targetEntity.x, y: targetEntity.y }, Math.max(8, standoff * 0.2));
+    unit.targetId = null;
+    unit.focusMove = true;
+    unit.interactTargetId = targetEntity.id;
+    unit.interactKind = interactionKind;
+    unit.interactCooldown = randomRange(unit.x + unit.y + state.time, 0.08, 0.24);
+    unit.order = interactionKind === "resource" ? "harvest" : "collect";
+    unit.orderStamp = state.time;
+    unit.arrivalTask = null;
+    clearUnitFormation(unit);
+    resetUnitPathState(unit);
+    return true;
+  }
+
+  function setUnitAttackOrder(unit, targetEntity) {
+    if (!unit || !targetEntity) return false;
+    unit.targetId = targetEntity.id;
+    unit.moveTarget = { x: targetEntity.x, y: targetEntity.y };
+    clearInteractionOrder(unit);
+    unit.focusMove = false;
+    unit.order = "attack";
+    unit.orderStamp = state.time;
+    unit.arrivalTask = null;
+    clearUnitFormation(unit);
+    resetUnitPathState(unit);
+    return true;
+  }
+
+  function tryAssignPriorityTask(unit, origin = null, radius = AUTO_RESOURCE_SCAN_RADIUS, options = {}) {
+    if (!unit || unit.targetId || unit.interactTargetId) return false;
+    const searchX = origin && Number.isFinite(origin.x) ? origin.x : unit.x;
+    const searchY = origin && Number.isFinite(origin.y) ? origin.y : unit.y;
+    const searchRadius = Number.isFinite(radius) ? radius : AUTO_RESOURCE_SCAN_RADIUS;
+    const allowResources = options.allowResources !== false;
+    const inRange = (entity, padding = 0) => Math.hypot(entity.x - searchX, entity.y - searchY) <= searchRadius + (entity.radius || 0) + padding;
+
+    if (canUnitFight(unit)) {
+      const enemyUnit = findNearest(
+        state.world.units,
+        searchX,
+        searchY,
+        (entity) => entity.id !== unit.id && isAttackableTarget(unit, entity) && inRange(entity, 10),
+      );
+      if (enemyUnit) return setUnitAttackOrder(unit, enemyUnit);
+
+      const hostileBuilding = findNearest(
+        state.world.buildings,
+        searchX,
+        searchY,
+        (entity) => isEnemy(unit, entity) && inRange(entity, 12),
+      );
+      if (hostileBuilding) return setUnitAttackOrder(unit, hostileBuilding);
+    }
+
+    if (allowResources && isAutoResourceWorker(unit)) {
+      const resource = findNearest(
+        [...state.world.trees, ...state.world.rocks],
+        searchX,
+        searchY,
+        (entity) => inRange(entity, 18),
+      );
+      if (resource) return setUnitInteractionOrder(unit, resource, "resource");
+    }
+
+    if (canUnitFight(unit)) {
+      const animal = findNearest(
+        state.world.animals,
+        searchX,
+        searchY,
+        (entity) => inRange(entity, 18),
+      );
+      if (animal) return setUnitAttackOrder(unit, animal);
+    }
+
+    return false;
+  }
+
   function updateCivilian(civilian, dt) {
     civilian.lastTaxedTimer = Math.max(0, (civilian.lastTaxedTimer || 0) - dt);
     civilian.coinPouch = Math.min(civilian.maxCoinPouch || 0, (civilian.coinPouch || 0) + dt * 0.95);
@@ -7535,7 +7744,7 @@
 
     if (unit.targetId) {
       const target = getEntityById(unit.targetId);
-      if (!target || !isEnemy(unit, target) || (shouldEnemyStandDown(unit) && isHumanOwner(target.owner)) || (isEasyModeActive() && !isHumanOwner(unit.owner) && isHumanOwner(target.owner))) {
+      if (!target || !isAttackableTarget(unit, target) || (shouldEnemyStandDown(unit) && isHumanOwner(target.owner)) || (isEasyModeActive() && !isHumanOwner(unit.owner) && isHumanOwner(target.owner))) {
         unit.targetId = null;
         unit.order = unit.moveTarget ? "move" : "idle";
       } else {
@@ -7580,10 +7789,16 @@
           unit.pathWaypoint = null;
           unit.pathRepathTimer = 0;
         } else {
+          const arrivalTask = unit.arrivalTask ? { ...unit.arrivalTask } : null;
           unit.moveTarget = null;
           unit.focusMove = false;
           clearUnitNavigation(unit);
-          if (!unit.targetId) unit.order = "idle";
+          unit.arrivalTask = null;
+          if (!unit.targetId && !unit.interactTargetId && arrivalTask && tryAssignPriorityTask(unit, arrivalTask, arrivalTask.radius)) {
+            unit.order = unit.interactKind === "resource" ? "harvest" : "attack";
+          } else if (!unit.targetId && !unit.interactTargetId) {
+            unit.order = "idle";
+          }
         }
       }
     } else {
@@ -7648,16 +7863,7 @@
 
     if (isHumanOwner(unit.owner) && !unit.targetId && !unit.focusMove && !unit.interactTargetId) {
       const autoRange = getAttackRange(unit) + 120;
-      const enemy = findNearest([...state.world.units, ...state.world.buildings, ...state.world.animals], unit.x, unit.y, (entity) => {
-        if (entity.kind === "animal") return Math.hypot(entity.x - unit.x, entity.y - unit.y) < autoRange * 0.8;
-        return isEnemy(unit, entity) && Math.hypot(entity.x - unit.x, entity.y - unit.y) < autoRange;
-      });
-      if (enemy) {
-        unit.targetId = enemy.id;
-        unit.order = "attack";
-        clearUnitFormation(unit);
-        resetUnitPathState(unit);
-      }
+      tryAssignPriorityTask(unit, { x: unit.x, y: unit.y }, autoRange, { allowResources: false });
     }
   }
 
@@ -7673,7 +7879,12 @@
         const splashHits = damageCircle(projectile.x, projectile.y, projectile.splash, projectile.damage, projectile.owner, projectile.projectileType);
         for (const hit of splashHits) registerFirstPersonHit(projectile.owner, hit.entity, hit.damage, projectile.projectileType);
       } else {
-        const target = findNearest([...state.world.units, ...state.world.buildings], projectile.x, projectile.y, (entity) => entity.owner !== projectile.owner);
+        const target = findNearest(
+          [...state.world.units, ...state.world.buildings, ...state.world.animals],
+          projectile.x,
+          projectile.y,
+          (entity) => isAttackableTarget({ id: projectile.id, owner: projectile.owner }, entity),
+        );
         if (target && Math.hypot(target.x - projectile.x, target.y - projectile.y) < target.radius + 24) {
           const dealt = applyDamage(target, projectile.damage, projectile.projectileType, projectile.owner);
           const n = normalize(projectile.vx, projectile.vy);
@@ -8864,24 +9075,39 @@
     const fp = getFirstPersonState(player);
     syncFirstPersonCamera(player, unit);
     const motion = getFirstPersonMotionProfile(unit, fp);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(viewport.x, viewport.y, viewport.w, viewport.h);
-    ctx.clip();
-    drawFirstPersonBackdrop(viewport, unit, fp, motion);
-    drawFirstPersonGround(viewport, unit, fp, motion);
-    drawFirstPersonWorldObjects(viewport, unit, fp, motion);
-    drawFirstPersonWeaponOverlay(viewport, unit, fp, motion);
-    drawFirstPersonPostEffects(viewport, unit, fp, motion);
-    if (fp.muzzle > 0) {
-      const flash = ctx.createRadialGradient(viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, 18, viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, viewport.w * 0.28);
-      flash.addColorStop(0, `rgba(255,255,228,${0.18 * fp.muzzle / 0.08})`);
-      flash.addColorStop(1, "rgba(255,210,150,0)");
-      ctx.fillStyle = flash;
-      ctx.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
+    try {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(viewport.x, viewport.y, viewport.w, viewport.h);
+      ctx.clip();
+      drawFirstPersonBackdrop(viewport, unit, fp, motion);
+      drawFirstPersonGround(viewport, unit, fp, motion);
+      drawFirstPersonWorldObjects(viewport, unit, fp, motion);
+      drawFirstPersonWeaponOverlay(viewport, unit, fp, motion);
+      drawFirstPersonPostEffects(viewport, unit, fp, motion);
+      if (fp.muzzle > 0) {
+        const flash = ctx.createRadialGradient(viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, 18, viewport.x + viewport.w * 0.72, viewport.y + viewport.h * 0.74, viewport.w * 0.28);
+        flash.addColorStop(0, `rgba(255,255,228,${0.18 * fp.muzzle / 0.08})`);
+        flash.addColorStop(1, "rgba(255,210,150,0)");
+        ctx.fillStyle = flash;
+        ctx.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
+      }
+      drawFirstPersonHud(viewport, unit, fp, motion);
+      ctx.restore();
+    } catch (error) {
+      try {
+        ctx.restore();
+      } catch (_restoreError) {
+        // Ignore unmatched restore when recovering from a first-person draw failure.
+      }
+      console.error("First-person render failed.", error);
+      exitFirstPerson(player, { silent: true });
+      notify("First-person view failed and was closed.", "#ffb48a");
+      drawBackdrop(viewport.w, viewport.h, viewport.x, viewport.y);
+      drawWorld();
+      drawUi(viewport.w, viewport.h);
+      drawControllerCursor(player);
     }
-    drawFirstPersonHud(viewport, unit, fp, motion);
-    ctx.restore();
   }
 
   function drawEnvironmentShaders() {
@@ -9883,6 +10109,7 @@
     drawMinimap();
     drawQuestPanel(w);
     drawHelpOverlay();
+    drawBuildingActionMenu();
     drawSelectionHud(w, h);
     if (state.ui.openPanel) drawCatalogPanel(state.ui.openPanel);
     drawBottomBar();
@@ -11025,6 +11252,8 @@
     if (state.ui.openPanel && isInsideRect(x, y, getPanelLayout(state.ui.openPanel))) return true;
     const helpOverlay = getHelpOverlayHitAt(x, y);
     if (helpOverlay) return true;
+    const buildingAction = getBuildingActionMenuLayout();
+    if (buildingAction && isInsideRect(x, y, buildingAction)) return true;
     const bottom = getBottomBarLayout();
     const bottomFrame = {
       x: bottom.x - 22,
@@ -11069,6 +11298,20 @@
     } else if (card) {
       message = getItemHoverMessage(card.item);
     } else {
+      const buildingActionHit = getBuildingActionHitAt(x, y, player);
+      if (buildingActionHit) {
+        if (buildingActionHit.action.id === "scrap") {
+          message = buildingActionHit.action.disabled
+            ? "The capital keep cannot be scrapped."
+            : `Scrap this building for +${getDemolitionRefund(buildingActionHit.layout.building)} coins.`;
+        } else if (buildingActionHit.action.id === "move") {
+          message = buildingActionHit.action.disabled
+            ? "The capital keep cannot be moved."
+            : `Relocate this building with ${formatKeybindLabel(getKeybind("moveBuilding"))} or click here.`;
+        } else {
+          message = "Close this building action menu.";
+        }
+      } else {
       const selectionHit = getSelectionHudHitAt(x, y);
       if (selectionHit) {
         const actionText = selectionHit.action === "eye"
@@ -11086,6 +11329,7 @@
           if (hoveredEntity) message = getEntityHoverMessage(hoveredEntity);
         }
       }
+    }
     }
     state.ui.hoverMessage = message;
   }
@@ -11159,6 +11403,153 @@
       return { slot, action: "dismiss" };
     }
     return null;
+  }
+
+  function getBuildingActionMenuLayout(player = getActivePlayerState()) {
+    if (state.mode !== "playing" || !player || isFirstPersonActive(player) || getPlacementAction(player)) return null;
+    const building = getSelectedOwnedBuilding(player);
+    if (!building) return null;
+    const viewport = state.activeViewport || getViewportForPlayer(player);
+    const profile = getViewportUiProfile(viewport);
+    const scale = profile.scale;
+    const anchor = worldToScreen(building.x, building.y - building.radius * 1.1);
+    const buttonGap = 8 * scale;
+    const buttonH = 28 * scale;
+    const buttonPad = 12 * scale;
+    const panelPad = 8 * scale;
+    const actions = [
+      {
+        id: "scrap",
+        label: `Scrap +${getDemolitionRefund(building)}c`,
+        disabled: building.itemId === "royal_keep",
+        fill: "rgba(81, 33, 26, 0.94)",
+        edge: "rgba(255, 138, 128, 0.44)",
+        text: "#ffe0d7",
+      },
+      {
+        id: "move",
+        label: "Move",
+        disabled: building.itemId === "royal_keep",
+        fill: "rgba(22, 46, 58, 0.94)",
+        edge: "rgba(143, 216, 255, 0.34)",
+        text: "#d9f2ff",
+      },
+      {
+        id: "cancel",
+        label: "Cancel",
+        disabled: false,
+        fill: "rgba(14, 22, 30, 0.94)",
+        edge: "rgba(255, 255, 255, 0.14)",
+        text: "#e5edf1",
+      },
+    ];
+    ctx.save();
+    ctx.font = `700 ${Math.round(12 * scale)}px Cambria`;
+    actions.forEach((action) => {
+      action.w = Math.max(64 * scale, Math.ceil(ctx.measureText(action.label).width + buttonPad * 2));
+    });
+    ctx.restore();
+    const panelW = actions.reduce((sum, action) => sum + action.w, 0) + Math.max(0, actions.length - 1) * buttonGap + panelPad * 2;
+    const panelH = buttonH + panelPad * 2;
+    const x = clamp(anchor.x - panelW * 0.5, viewport.x + 12 * scale, viewport.x + viewport.w - panelW - 12 * scale);
+    const y = clamp(anchor.y - panelH - 18 * scale, viewport.y + 12 * scale, viewport.y + viewport.h - panelH - 120 * scale);
+    let cursorX = x + panelPad;
+    actions.forEach((action) => {
+      action.x = cursorX;
+      action.y = y + panelPad;
+      action.h = buttonH;
+      cursorX += action.w + buttonGap;
+    });
+    return {
+      building,
+      x,
+      y,
+      w: panelW,
+      h: panelH,
+      scale,
+      anchorX: clamp(anchor.x, x + 18 * scale, x + panelW - 18 * scale),
+      anchorY: y + panelH,
+      actions,
+    };
+  }
+
+  function getBuildingActionHitAt(px, py, player = getActivePlayerState()) {
+    const layout = getBuildingActionMenuLayout(player);
+    if (!layout) return null;
+    for (const action of layout.actions) {
+      if (isInsideRect(px, py, action)) return { layout, action };
+    }
+    return null;
+  }
+
+  function clearOwnedBuildingSelection(player = getActivePlayerState()) {
+    if (!player) return;
+    state.selectedIds.clear();
+    if (player.selectedIds) player.selectedIds.clear();
+  }
+
+  function activateBuildingAction(player, actionId) {
+    const building = getSelectedOwnedBuilding(player);
+    if (!building) return false;
+    if (actionId === "cancel") {
+      clearOwnedBuildingSelection(player);
+      playUiSound("panelClose", { volume: 0.42, cooldown: 0.04 });
+      notify("Building action cancelled.", "#94a9b5", { lowPriority: true });
+      return true;
+    }
+    if (actionId === "move") return beginBuildingRelocation(player);
+    if (actionId === "scrap") {
+      if (isLanClient()) {
+        queueLanCommand({
+          type: "demolishBuilding",
+          owner: player.owner,
+          buildingId: building.id,
+        });
+        clearOwnedBuildingSelection(player);
+        notify(`${building.def.name} sent to salvage.`, "#ffd889");
+        return true;
+      }
+      return demolishSelectedBuilding(player, building);
+    }
+    return false;
+  }
+
+  function drawBuildingActionMenu() {
+    const layout = getBuildingActionMenuLayout();
+    if (!layout) return;
+    const hoveredAction = getBuildingActionHitAt(state.input.mouseScreenX, state.input.mouseScreenY);
+    ctx.save();
+    roundRect(ctx, layout.x, layout.y, layout.w, layout.h, 16 * layout.scale, "rgba(7,14,20,0.88)", "rgba(255,226,154,0.18)");
+    ctx.fillStyle = "rgba(7,14,20,0.88)";
+    ctx.beginPath();
+    ctx.moveTo(layout.anchorX - 8 * layout.scale, layout.anchorY - 1);
+    ctx.lineTo(layout.anchorX + 8 * layout.scale, layout.anchorY - 1);
+    ctx.lineTo(layout.anchorX, layout.anchorY + 10 * layout.scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,226,154,0.18)";
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+    layout.actions.forEach((action) => {
+      const hovered = hoveredAction && hoveredAction.action.id === action.id;
+      const fill = action.disabled
+        ? "rgba(30,36,42,0.82)"
+        : hovered
+          ? withAlpha(action.fill, 0.98)
+          : action.fill;
+      const edge = action.disabled
+        ? "rgba(255,255,255,0.08)"
+        : hovered
+          ? withAlpha(action.edge, 1)
+          : action.edge;
+      roundRect(ctx, action.x, action.y, action.w, action.h, 10 * layout.scale, fill, edge);
+      ctx.fillStyle = action.disabled ? "rgba(173,183,188,0.58)" : action.text;
+      ctx.font = `700 ${Math.round(12 * layout.scale)}px Cambria`;
+      ctx.textAlign = "center";
+      ctx.fillText(action.label, action.x + action.w * 0.5, action.y + action.h * 0.66);
+    });
+    ctx.textAlign = "left";
+    ctx.restore();
   }
 
   function drawSelectionEntityIcon(slot, hovered = false, eyeHovered = false) {
@@ -11411,6 +11802,17 @@
       state.input.actionSource = "panel";
       return;
     }
+    const buildingActionHit = getBuildingActionHitAt(x, y, player);
+    if (buildingActionHit) {
+      if (!buildingActionHit.action.disabled && activateBuildingAction(player, buildingActionHit.action.id)) {
+        playUiSound("uiClick", { volume: 0.5, cooldown: 0.04 });
+      } else if (buildingActionHit.action.disabled) {
+        notify(buildingActionHit.action.id === "move" ? "The capital keep cannot be moved." : "The capital keep cannot be scrapped.", "#ffb484");
+      }
+      state.input.leftDown = false;
+      state.input.actionSource = "panel";
+      return;
+    }
     const selectionHit = getSelectionHudHitAt(x, y);
     if (selectionHit) {
       if (selectionHit.action === "eye") {
@@ -11555,8 +11957,12 @@
     const clickedEntity = findNearest([...state.world.units, ...state.world.buildings], worldPos.x, worldPos.y, (entity) => Math.hypot(entity.x - worldPos.x, entity.y - worldPos.y) <= entity.radius + 18);
     if (clickedEntity && clickedEntity.owner === player.owner && (clickedEntity.kind === "unit" || clickedEntity.kind === "building")) {
       if (state.selectedIds.size === 1 && state.selectedIds.has(clickedEntity.id)) {
-        state.selectedIds.clear();
-        playUiSound("clear", { volume: 0.45, cooldown: 0.04 });
+        if (clickedEntity.kind === "building") {
+          playUiSound("uiClick", { volume: 0.42, cooldown: 0.04 });
+        } else {
+          state.selectedIds.clear();
+          playUiSound("clear", { volume: 0.45, cooldown: 0.04 });
+        }
       } else {
         state.selectedIds.clear();
         state.selectedIds.add(clickedEntity.id);
@@ -12018,6 +12424,23 @@
     else if (key === "shift") state.keys.sprint = false;
   }
 
+  async function startMatchWithLoading(matchType = "single", playerCount = 2) {
+    if (loadingRuntime.matchStartPending) return false;
+    loadingRuntime.matchStartPending = true;
+    try {
+      const stats = await ensureGameAssetsReady("Loading Battlefield", `Preparing ${getMapPresetDef(state.mapPreset).label} and battle textures.`);
+      startMatch(matchType, playerCount);
+      hideLoadingOverlay();
+      if (stats.failed > 0) {
+        notify(`${stats.failed} texture${stats.failed === 1 ? "" : "s"} failed to load. Fallback visuals are active for missing art.`, "#ffb484");
+      }
+      return true;
+    } finally {
+      if (state.mode !== "playing") hideLoadingOverlay();
+      loadingRuntime.matchStartPending = false;
+    }
+  }
+
   function startMatch(matchType = "single", playerCount = 2) {
     exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
     closeSettingsOverlay();
@@ -12324,6 +12747,14 @@
   document.addEventListener("fullscreenchange", () => {
     resize();
     for (const player of getHumanPlayers()) clampCursorToViewport(player);
+    draw();
+  });
+  document.addEventListener("pointerlockchange", () => {
+    const fpPlayer = getFirstPersonActivePlayer();
+    if (!fpPlayer) return;
+    if (document.pointerLockElement === canvas) return;
+    if (state.mode !== "playing" || isSettingsOverlayOpen()) return;
+    exitFirstPerson(fpPlayer, { silent: true });
     draw();
   });
   startBtn.addEventListener("click", () => {

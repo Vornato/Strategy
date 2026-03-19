@@ -39,6 +39,68 @@ body {
   cursor: crosshair;
 }
 
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at center, rgba(214, 174, 99, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(4, 8, 12, 0.7), rgba(4, 8, 12, 0.94));
+  backdrop-filter: blur(10px);
+}
+
+.loading-panel {
+  width: min(460px, calc(100vw - 32px));
+  padding: 28px 28px 24px;
+  border: 1px solid rgba(214, 174, 99, 0.28);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(159, 216, 255, 0.08), transparent 32%),
+    linear-gradient(160deg, rgba(10, 25, 37, 0.95), rgba(7, 16, 24, 0.92));
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  text-align: center;
+}
+
+.loading-copy,
+.loading-status {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.loading-copy {
+  margin-top: 10px;
+}
+
+.loading-track {
+  margin-top: 18px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.loading-progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b98a37, #f3d486 65%, #fff0bc);
+  box-shadow:
+    0 0 22px rgba(243, 212, 134, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  transition: width 140ms ease;
+}
+
+.loading-status {
+  margin-top: 12px;
+  font-size: 0.92rem;
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -989,30 +1051,30 @@ h1 {
 
 .root-menu-btn-single {
   left: 34.8%;
-  top: 24.8%;
+  top: 29.2%;
   width: 30.2%;
-  height: 7.4%;
+  height: 6.6%;
 }
 
 .root-menu-btn-multiplayer {
   left: 34.8%;
-  top: 34.1%;
+  top: 40.0%;
   width: 30.2%;
-  height: 7.4%;
+  height: 6.6%;
 }
 
 .root-menu-btn-settings {
   left: 34.8%;
-  top: 43.3%;
+  top: 50.8%;
   width: 30.2%;
-  height: 7.4%;
+  height: 6.6%;
 }
 
 .root-menu-btn-quit {
   left: 34.8%;
-  top: 52.6%;
+  top: 61.6%;
   width: 30.2%;
-  height: 7.4%;
+  height: 6.6%;
 }
 
 .mp-btn-versus-2 {
