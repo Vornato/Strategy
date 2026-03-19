@@ -616,6 +616,19 @@
     desert: { id: "desert", label: "Desert", shortLabel: "Desert", desc: "Expansive desert pressure, oasis rivers, and more attrition-heavy routes." },
     ocean: { id: "ocean", label: "Ocean", shortLabel: "Ocean", desc: "Coastal mainland with ocean edges, marsh coves, and shipping lanes." },
   };
+  const mapPresetBackgroundPaths = {
+    green: "assets/environment/maps/green map.png",
+    canyon: "assets/environment/maps/Canyon.png",
+    desert: "assets/environment/maps/Desert.png",
+    ocean: "assets/environment/maps/ocean.png",
+  };
+  const mapPresetBackgroundImages = new Map(Object.entries(mapPresetBackgroundPaths).map(([preset, src]) => {
+    const image = loadImage(src);
+    image.addEventListener("load", () => {
+      if (state.world && state.world.tiles.length) renderTerrainCache();
+    });
+    return [preset, image];
+  }));
   const homelandAnchorZones = [
     { x: -1180, y: 980, radius: 330 },
     { x: -1180, y: 1500, radius: 340 },
@@ -5551,242 +5564,245 @@
 
   function renderTerrainCache() {
     mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-    for (const tile of state.world.tiles) {
-      const sx = tile.x + HALF_WORLD - TILE_SIZE / 2;
-      const sy = tile.y + HALF_WORLD - TILE_SIZE / 2;
-      const north = getTileByGrid(tile.gx, tile.gy - 1);
-      const south = getTileByGrid(tile.gx, tile.gy + 1);
-      const west = getTileByGrid(tile.gx - 1, tile.gy);
-      const east = getTileByGrid(tile.gx + 1, tile.gy);
-      const neighbors = [
-        ["north", north],
-        ["south", south],
-        ["west", west],
-        ["east", east],
-      ];
-      const palette = terrainPalette[tile.biome];
-      const grad = mapCtx.createLinearGradient(sx, sy, sx + TILE_SIZE, sy + TILE_SIZE);
-      grad.addColorStop(0, palette[0]);
-      grad.addColorStop(0.5, palette[1]);
-      grad.addColorStop(1, palette[2]);
-      mapCtx.fillStyle = grad;
-      mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-      if (!wetBiomes.has(tile.biome)) {
-        const shoreColor = tile.biome === "desert"
-          ? "rgba(248,228,176,0.18)"
-          : tile.biome === "canyon"
-            ? "rgba(236,194,154,0.14)"
-            : "rgba(214,234,196,0.12)";
-        for (const [side, neighbor] of neighbors) {
-          if (!neighbor || !wetBiomes.has(neighbor.biome)) continue;
-          paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, shoreColor, "rgba(0,0,0,0)", TILE_SIZE * 0.18);
-        }
-      } else {
-        for (const [side, neighbor] of neighbors) {
-          if (neighbor && wetBiomes.has(neighbor.biome)) continue;
-          const bankShade = tile.biome === "ocean"
-            ? "rgba(6,31,48,0.18)"
-            : tile.biome === "river"
-              ? "rgba(10,41,66,0.12)"
-              : "rgba(23,40,28,0.1)";
-          const bankGlow = tile.biome === "ocean"
-            ? "rgba(214,245,255,0.12)"
-            : tile.biome === "river"
-              ? "rgba(214,245,255,0.08)"
-              : "rgba(192,222,170,0.06)";
-          paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, bankShade, "rgba(0,0,0,0)", TILE_SIZE * 0.14);
-          paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, bankGlow, "rgba(0,0,0,0)", TILE_SIZE * 0.08);
-        }
-      }
-      const underGlow = mapCtx.createRadialGradient(sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.38, 6, sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.38, TILE_SIZE * 0.72);
-      underGlow.addColorStop(0, tile.biome === "ocean" ? "rgba(198,236,255,0.14)" : tile.biome === "river" ? "rgba(210,239,255,0.1)" : tile.biome === "desert" ? "rgba(255,232,173,0.08)" : tile.biome === "deadlands" ? "rgba(136,88,116,0.08)" : "rgba(255,255,255,0.04)");
-      underGlow.addColorStop(1, "rgba(0,0,0,0)");
-      mapCtx.fillStyle = underGlow;
-      mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-      mapCtx.fillStyle = tile.biome === "ocean" ? "rgba(255,255,255,0.08)" : tile.biome === "river" ? "rgba(255,255,255,0.06)" : tile.biome === "desert" ? "rgba(255,243,214,0.03)" : "rgba(255,255,255,0.018)";
-      for (let i = 0; i < 8; i += 1) {
-        const px = sx + randomRange(tile.gx * 37 + tile.gy * 19 + i, 6, TILE_SIZE - 10);
-        const py = sy + randomRange(tile.gx * 31 + tile.gy * 27 + i, 6, TILE_SIZE - 10);
-        if (tile.biome === "ocean") {
-          mapCtx.fillRect(px, py, 14, 1.8);
-        } else if (tile.biome === "river") {
-          mapCtx.fillRect(px, py, 12, 1.6);
-        } else if (tile.biome === "desert") {
-          mapCtx.fillRect(px, py, 10, 1.2);
-        } else if (tile.biome === "deadlands") {
-          mapCtx.fillRect(px, py, 5, 5);
-        } else if (tile.biome === "road") {
-          mapCtx.fillRect(px, py, 7, 2.2);
+    const usedPresetBackdrop = drawSelectedMapBackdrop();
+    if (!usedPresetBackdrop) {
+      for (const tile of state.world.tiles) {
+        const sx = tile.x + HALF_WORLD - TILE_SIZE / 2;
+        const sy = tile.y + HALF_WORLD - TILE_SIZE / 2;
+        const north = getTileByGrid(tile.gx, tile.gy - 1);
+        const south = getTileByGrid(tile.gx, tile.gy + 1);
+        const west = getTileByGrid(tile.gx - 1, tile.gy);
+        const east = getTileByGrid(tile.gx + 1, tile.gy);
+        const neighbors = [
+          ["north", north],
+          ["south", south],
+          ["west", west],
+          ["east", east],
+        ];
+        const palette = terrainPalette[tile.biome];
+        const grad = mapCtx.createLinearGradient(sx, sy, sx + TILE_SIZE, sy + TILE_SIZE);
+        grad.addColorStop(0, palette[0]);
+        grad.addColorStop(0.5, palette[1]);
+        grad.addColorStop(1, palette[2]);
+        mapCtx.fillStyle = grad;
+        mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+        if (!wetBiomes.has(tile.biome)) {
+          const shoreColor = tile.biome === "desert"
+            ? "rgba(248,228,176,0.18)"
+            : tile.biome === "canyon"
+              ? "rgba(236,194,154,0.14)"
+              : "rgba(214,234,196,0.12)";
+          for (const [side, neighbor] of neighbors) {
+            if (!neighbor || !wetBiomes.has(neighbor.biome)) continue;
+            paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, shoreColor, "rgba(0,0,0,0)", TILE_SIZE * 0.18);
+          }
         } else {
+          for (const [side, neighbor] of neighbors) {
+            if (neighbor && wetBiomes.has(neighbor.biome)) continue;
+            const bankShade = tile.biome === "ocean"
+              ? "rgba(6,31,48,0.18)"
+              : tile.biome === "river"
+                ? "rgba(10,41,66,0.12)"
+                : "rgba(23,40,28,0.1)";
+            const bankGlow = tile.biome === "ocean"
+              ? "rgba(214,245,255,0.12)"
+              : tile.biome === "river"
+                ? "rgba(214,245,255,0.08)"
+                : "rgba(192,222,170,0.06)";
+            paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, bankShade, "rgba(0,0,0,0)", TILE_SIZE * 0.14);
+            paintTileEdgeGradient(mapCtx, sx, sy, TILE_SIZE, side, bankGlow, "rgba(0,0,0,0)", TILE_SIZE * 0.08);
+          }
+        }
+        const underGlow = mapCtx.createRadialGradient(sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.38, 6, sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.38, TILE_SIZE * 0.72);
+        underGlow.addColorStop(0, tile.biome === "ocean" ? "rgba(198,236,255,0.14)" : tile.biome === "river" ? "rgba(210,239,255,0.1)" : tile.biome === "desert" ? "rgba(255,232,173,0.08)" : tile.biome === "deadlands" ? "rgba(136,88,116,0.08)" : "rgba(255,255,255,0.04)");
+        underGlow.addColorStop(1, "rgba(0,0,0,0)");
+        mapCtx.fillStyle = underGlow;
+        mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+        mapCtx.fillStyle = tile.biome === "ocean" ? "rgba(255,255,255,0.08)" : tile.biome === "river" ? "rgba(255,255,255,0.06)" : tile.biome === "desert" ? "rgba(255,243,214,0.03)" : "rgba(255,255,255,0.018)";
+        for (let i = 0; i < 8; i += 1) {
+          const px = sx + randomRange(tile.gx * 37 + tile.gy * 19 + i, 6, TILE_SIZE - 10);
+          const py = sy + randomRange(tile.gx * 31 + tile.gy * 27 + i, 6, TILE_SIZE - 10);
+          if (tile.biome === "ocean") {
+            mapCtx.fillRect(px, py, 14, 1.8);
+          } else if (tile.biome === "river") {
+            mapCtx.fillRect(px, py, 12, 1.6);
+          } else if (tile.biome === "desert") {
+            mapCtx.fillRect(px, py, 10, 1.2);
+          } else if (tile.biome === "deadlands") {
+            mapCtx.fillRect(px, py, 5, 5);
+          } else if (tile.biome === "road") {
+            mapCtx.fillRect(px, py, 7, 2.2);
+          } else {
+            mapCtx.beginPath();
+            mapCtx.arc(px, py, randomRange(tile.gx * 73 + tile.gy * 11 + i, 1, 3.5), 0, TAU);
+            mapCtx.fill();
+          }
+        }
+        if (tile.biome === "meadow" || tile.biome === "marsh") {
+          mapCtx.strokeStyle = tile.biome === "marsh" ? "rgba(181,198,151,0.08)" : "rgba(208,223,168,0.09)";
+          mapCtx.lineWidth = 1;
+          for (let i = 0; i < 4; i += 1) {
+            const px = sx + randomRange(tile.gx * 89 + tile.gy * 41 + i, 8, TILE_SIZE - 8);
+            const py = sy + randomRange(tile.gx * 91 + tile.gy * 37 + i, 10, TILE_SIZE - 8);
+            mapCtx.beginPath();
+            mapCtx.moveTo(px, py + 3);
+            mapCtx.lineTo(px + 2, py - 4);
+            mapCtx.stroke();
+          }
+        }
+        if (tile.biome === "meadow") {
+          mapCtx.fillStyle = "rgba(255,232,176,0.05)";
+          for (let i = 0; i < 3; i += 1) {
+            const px = sx + randomRange(tile.gx * 47 + tile.gy * 53 + i, 12, TILE_SIZE - 12);
+            const py = sy + randomRange(tile.gx * 63 + tile.gy * 43 + i, 10, TILE_SIZE - 10);
+            mapCtx.fillRect(px, py, 2.5, 2.5);
+          }
+        }
+        if (tile.biome === "hill") {
+          mapCtx.strokeStyle = "rgba(255,240,208,0.08)";
+          mapCtx.lineWidth = 1.1;
           mapCtx.beginPath();
-          mapCtx.arc(px, py, randomRange(tile.gx * 73 + tile.gy * 11 + i, 1, 3.5), 0, TAU);
+          mapCtx.arc(sx + TILE_SIZE * 0.45, sy + TILE_SIZE * 0.52, TILE_SIZE * 0.22, Math.PI * 0.1, Math.PI * 1.8);
+          mapCtx.stroke();
+        }
+        if (tile.biome === "forest") {
+          mapCtx.fillStyle = "rgba(16,28,18,0.09)";
+          mapCtx.beginPath();
+          mapCtx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.54, TILE_SIZE * 0.28, 0, TAU);
+          mapCtx.fill();
+          mapCtx.strokeStyle = "rgba(72,108,74,0.16)";
+          mapCtx.lineWidth = 1;
+          mapCtx.beginPath();
+          mapCtx.moveTo(sx + 10, sy + TILE_SIZE * 0.72);
+          mapCtx.quadraticCurveTo(sx + TILE_SIZE * 0.38, sy + TILE_SIZE * 0.34, sx + TILE_SIZE - 10, sy + TILE_SIZE * 0.66);
+          mapCtx.stroke();
+          mapCtx.fillStyle = "rgba(124,166,110,0.06)";
+          mapCtx.beginPath();
+          mapCtx.ellipse(sx + TILE_SIZE * 0.54, sy + TILE_SIZE * 0.36, TILE_SIZE * 0.22, TILE_SIZE * 0.1, -0.4, 0, TAU);
           mapCtx.fill();
         }
-      }
-      if (tile.biome === "meadow" || tile.biome === "marsh") {
-        mapCtx.strokeStyle = tile.biome === "marsh" ? "rgba(181,198,151,0.08)" : "rgba(208,223,168,0.09)";
-        mapCtx.lineWidth = 1;
-        for (let i = 0; i < 4; i += 1) {
-          const px = sx + randomRange(tile.gx * 89 + tile.gy * 41 + i, 8, TILE_SIZE - 8);
-          const py = sy + randomRange(tile.gx * 91 + tile.gy * 37 + i, 10, TILE_SIZE - 8);
+        if (tile.biome === "desert") {
+          mapCtx.strokeStyle = "rgba(247,227,178,0.14)";
+          mapCtx.lineWidth = 1;
+          for (let i = 0; i < 3; i += 1) {
+            const waveY = sy + TILE_SIZE * (0.24 + i * 0.19);
+            mapCtx.beginPath();
+            mapCtx.moveTo(sx + 8, waveY);
+            mapCtx.bezierCurveTo(sx + 22, waveY - 4, sx + 54, waveY + 6, sx + TILE_SIZE - 8, waveY);
+            mapCtx.stroke();
+          }
+        }
+        if (tile.biome === "marsh") {
+          mapCtx.fillStyle = "rgba(18,44,32,0.13)";
           mapCtx.beginPath();
-          mapCtx.moveTo(px, py + 3);
-          mapCtx.lineTo(px + 2, py - 4);
+          mapCtx.ellipse(sx + TILE_SIZE * 0.36, sy + TILE_SIZE * 0.58, TILE_SIZE * 0.14, TILE_SIZE * 0.08, 0.2, 0, TAU);
+          mapCtx.fill();
+          mapCtx.beginPath();
+          mapCtx.ellipse(sx + TILE_SIZE * 0.66, sy + TILE_SIZE * 0.34, TILE_SIZE * 0.12, TILE_SIZE * 0.07, -0.4, 0, TAU);
+          mapCtx.fill();
+        }
+        if (tile.biome === "canyon") {
+          const canyonShade = mapCtx.createLinearGradient(sx, sy, sx + TILE_SIZE, sy + TILE_SIZE);
+          canyonShade.addColorStop(0, "rgba(77,34,18,0.12)");
+          canyonShade.addColorStop(1, "rgba(255,180,126,0.05)");
+          mapCtx.fillStyle = canyonShade;
+          mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+          mapCtx.strokeStyle = "rgba(52,23,12,0.34)";
+          mapCtx.lineWidth = 4;
+          mapCtx.beginPath();
+          mapCtx.moveTo(sx + TILE_SIZE * 0.16, sy + TILE_SIZE * 0.08);
+          mapCtx.lineTo(sx + TILE_SIZE * 0.34, sy + TILE_SIZE * 0.36);
+          mapCtx.lineTo(sx + TILE_SIZE * 0.52, sy + TILE_SIZE * 0.46);
+          mapCtx.lineTo(sx + TILE_SIZE * 0.72, sy + TILE_SIZE * 0.82);
+          mapCtx.stroke();
+          mapCtx.strokeStyle = "rgba(206,135,96,0.22)";
+          mapCtx.lineWidth = 2;
+          mapCtx.stroke();
+          mapCtx.fillStyle = "rgba(255,214,186,0.06)";
+          mapCtx.fillRect(sx + TILE_SIZE * 0.16, sy + TILE_SIZE * 0.18, TILE_SIZE * 0.2, TILE_SIZE * 0.1);
+        }
+        if (tile.biome === "deadlands") {
+          mapCtx.fillStyle = "rgba(18,10,14,0.18)";
+          mapCtx.beginPath();
+          mapCtx.arc(sx + TILE_SIZE * 0.48, sy + TILE_SIZE * 0.5, TILE_SIZE * 0.32, 0, TAU);
+          mapCtx.fill();
+          mapCtx.strokeStyle = "rgba(147,109,126,0.14)";
+          mapCtx.lineWidth = 1.2;
+          mapCtx.beginPath();
+          mapCtx.moveTo(sx + TILE_SIZE * 0.2, sy + TILE_SIZE * 0.2);
+          mapCtx.lineTo(sx + TILE_SIZE * 0.82, sy + TILE_SIZE * 0.74);
+          mapCtx.moveTo(sx + TILE_SIZE * 0.22, sy + TILE_SIZE * 0.76);
+          mapCtx.lineTo(sx + TILE_SIZE * 0.72, sy + TILE_SIZE * 0.3);
           mapCtx.stroke();
         }
-      }
-      if (tile.biome === "meadow") {
-        mapCtx.fillStyle = "rgba(255,232,176,0.05)";
-        for (let i = 0; i < 3; i += 1) {
-          const px = sx + randomRange(tile.gx * 47 + tile.gy * 53 + i, 12, TILE_SIZE - 12);
-          const py = sy + randomRange(tile.gx * 63 + tile.gy * 43 + i, 10, TILE_SIZE - 10);
-          mapCtx.fillRect(px, py, 2.5, 2.5);
-        }
-      }
-      if (tile.biome === "hill") {
-        mapCtx.strokeStyle = "rgba(255,240,208,0.08)";
-        mapCtx.lineWidth = 1.1;
-        mapCtx.beginPath();
-        mapCtx.arc(sx + TILE_SIZE * 0.45, sy + TILE_SIZE * 0.52, TILE_SIZE * 0.22, Math.PI * 0.1, Math.PI * 1.8);
-        mapCtx.stroke();
-      }
-      if (tile.biome === "forest") {
-        mapCtx.fillStyle = "rgba(16,28,18,0.09)";
-        mapCtx.beginPath();
-        mapCtx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.54, TILE_SIZE * 0.28, 0, TAU);
-        mapCtx.fill();
-        mapCtx.strokeStyle = "rgba(72,108,74,0.16)";
-        mapCtx.lineWidth = 1;
-        mapCtx.beginPath();
-        mapCtx.moveTo(sx + 10, sy + TILE_SIZE * 0.72);
-        mapCtx.quadraticCurveTo(sx + TILE_SIZE * 0.38, sy + TILE_SIZE * 0.34, sx + TILE_SIZE - 10, sy + TILE_SIZE * 0.66);
-        mapCtx.stroke();
-        mapCtx.fillStyle = "rgba(124,166,110,0.06)";
-        mapCtx.beginPath();
-        mapCtx.ellipse(sx + TILE_SIZE * 0.54, sy + TILE_SIZE * 0.36, TILE_SIZE * 0.22, TILE_SIZE * 0.1, -0.4, 0, TAU);
-        mapCtx.fill();
-      }
-      if (tile.biome === "desert") {
-        mapCtx.strokeStyle = "rgba(247,227,178,0.14)";
-        mapCtx.lineWidth = 1;
-        for (let i = 0; i < 3; i += 1) {
-          const waveY = sy + TILE_SIZE * (0.24 + i * 0.19);
+        if (tile.biome === "river") {
+          mapCtx.strokeStyle = "rgba(176,229,255,0.15)";
+          mapCtx.lineWidth = 1.4;
           mapCtx.beginPath();
-          mapCtx.moveTo(sx + 8, waveY);
-          mapCtx.bezierCurveTo(sx + 22, waveY - 4, sx + 54, waveY + 6, sx + TILE_SIZE - 8, waveY);
+          mapCtx.moveTo(sx + 8, sy + TILE_SIZE * 0.24);
+          mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.34, sy + TILE_SIZE * 0.18, sx + TILE_SIZE * 0.66, sy + TILE_SIZE * 0.38, sx + TILE_SIZE - 8, sy + TILE_SIZE * 0.3);
+          mapCtx.moveTo(sx + 6, sy + TILE_SIZE * 0.62);
+          mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.28, sy + TILE_SIZE * 0.54, sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.78, sx + TILE_SIZE - 10, sy + TILE_SIZE * 0.68);
           mapCtx.stroke();
         }
-      }
-      if (tile.biome === "marsh") {
-        mapCtx.fillStyle = "rgba(18,44,32,0.13)";
-        mapCtx.beginPath();
-        mapCtx.ellipse(sx + TILE_SIZE * 0.36, sy + TILE_SIZE * 0.58, TILE_SIZE * 0.14, TILE_SIZE * 0.08, 0.2, 0, TAU);
-        mapCtx.fill();
-        mapCtx.beginPath();
-        mapCtx.ellipse(sx + TILE_SIZE * 0.66, sy + TILE_SIZE * 0.34, TILE_SIZE * 0.12, TILE_SIZE * 0.07, -0.4, 0, TAU);
-        mapCtx.fill();
-      }
-      if (tile.biome === "canyon") {
-        const canyonShade = mapCtx.createLinearGradient(sx, sy, sx + TILE_SIZE, sy + TILE_SIZE);
-        canyonShade.addColorStop(0, "rgba(77,34,18,0.12)");
-        canyonShade.addColorStop(1, "rgba(255,180,126,0.05)");
-        mapCtx.fillStyle = canyonShade;
+        if (tile.biome === "ocean") {
+          mapCtx.strokeStyle = "rgba(205,240,255,0.18)";
+          mapCtx.lineWidth = 1.6;
+          for (let i = 0; i < 2; i += 1) {
+            const foamY = sy + TILE_SIZE * (0.28 + i * 0.28);
+            mapCtx.beginPath();
+            mapCtx.moveTo(sx + 10, foamY);
+            mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.32, foamY - 5, sx + TILE_SIZE * 0.62, foamY + 7, sx + TILE_SIZE - 10, foamY);
+            mapCtx.stroke();
+          }
+        }
+        if (tile.biome === "road") {
+          mapCtx.fillStyle = "rgba(255,228,162,0.05)";
+          mapCtx.fillRect(sx + TILE_SIZE * 0.26, sy + 4, TILE_SIZE * 0.08, TILE_SIZE - 8);
+          mapCtx.fillRect(sx + TILE_SIZE * 0.66, sy + 4, TILE_SIZE * 0.08, TILE_SIZE - 8);
+          mapCtx.strokeStyle = "rgba(72,56,38,0.12)";
+          mapCtx.lineWidth = 1.1;
+          mapCtx.beginPath();
+          mapCtx.moveTo(sx + TILE_SIZE * 0.22, sy + 4);
+          mapCtx.lineTo(sx + TILE_SIZE * 0.22, sy + TILE_SIZE - 4);
+          mapCtx.moveTo(sx + TILE_SIZE * 0.78, sy + 4);
+          mapCtx.lineTo(sx + TILE_SIZE * 0.78, sy + TILE_SIZE - 4);
+          mapCtx.stroke();
+        }
+        mapCtx.strokeStyle = "rgba(11, 24, 28, 0.2)";
+        mapCtx.lineWidth = 1;
+        mapCtx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
+        const shade = mapCtx.createLinearGradient(sx, sy, sx, sy + TILE_SIZE);
+        shade.addColorStop(0, "rgba(255,255,255,0.02)");
+        shade.addColorStop(1, "rgba(0,0,0,0.08)");
+        mapCtx.fillStyle = shade;
         mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-        mapCtx.strokeStyle = "rgba(52,23,12,0.34)";
-        mapCtx.lineWidth = 4;
-        mapCtx.beginPath();
-        mapCtx.moveTo(sx + TILE_SIZE * 0.16, sy + TILE_SIZE * 0.08);
-        mapCtx.lineTo(sx + TILE_SIZE * 0.34, sy + TILE_SIZE * 0.36);
-        mapCtx.lineTo(sx + TILE_SIZE * 0.52, sy + TILE_SIZE * 0.46);
-        mapCtx.lineTo(sx + TILE_SIZE * 0.72, sy + TILE_SIZE * 0.82);
-        mapCtx.stroke();
-        mapCtx.strokeStyle = "rgba(206,135,96,0.22)";
-        mapCtx.lineWidth = 2;
-        mapCtx.stroke();
-        mapCtx.fillStyle = "rgba(255,214,186,0.06)";
-        mapCtx.fillRect(sx + TILE_SIZE * 0.16, sy + TILE_SIZE * 0.18, TILE_SIZE * 0.2, TILE_SIZE * 0.1);
       }
-      if (tile.biome === "deadlands") {
-        mapCtx.fillStyle = "rgba(18,10,14,0.18)";
-        mapCtx.beginPath();
-        mapCtx.arc(sx + TILE_SIZE * 0.48, sy + TILE_SIZE * 0.5, TILE_SIZE * 0.32, 0, TAU);
-        mapCtx.fill();
-        mapCtx.strokeStyle = "rgba(147,109,126,0.14)";
-        mapCtx.lineWidth = 1.2;
-        mapCtx.beginPath();
-        mapCtx.moveTo(sx + TILE_SIZE * 0.2, sy + TILE_SIZE * 0.2);
-        mapCtx.lineTo(sx + TILE_SIZE * 0.82, sy + TILE_SIZE * 0.74);
-        mapCtx.moveTo(sx + TILE_SIZE * 0.22, sy + TILE_SIZE * 0.76);
-        mapCtx.lineTo(sx + TILE_SIZE * 0.72, sy + TILE_SIZE * 0.3);
-        mapCtx.stroke();
-      }
-      if (tile.biome === "river") {
-        mapCtx.strokeStyle = "rgba(176,229,255,0.15)";
-        mapCtx.lineWidth = 1.4;
-        mapCtx.beginPath();
-        mapCtx.moveTo(sx + 8, sy + TILE_SIZE * 0.24);
-        mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.34, sy + TILE_SIZE * 0.18, sx + TILE_SIZE * 0.66, sy + TILE_SIZE * 0.38, sx + TILE_SIZE - 8, sy + TILE_SIZE * 0.3);
-        mapCtx.moveTo(sx + 6, sy + TILE_SIZE * 0.62);
-        mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.28, sy + TILE_SIZE * 0.54, sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.78, sx + TILE_SIZE - 10, sy + TILE_SIZE * 0.68);
-        mapCtx.stroke();
-      }
-      if (tile.biome === "ocean") {
-        mapCtx.strokeStyle = "rgba(205,240,255,0.18)";
-        mapCtx.lineWidth = 1.6;
-        for (let i = 0; i < 2; i += 1) {
-          const foamY = sy + TILE_SIZE * (0.28 + i * 0.28);
-          mapCtx.beginPath();
-          mapCtx.moveTo(sx + 10, foamY);
-          mapCtx.bezierCurveTo(sx + TILE_SIZE * 0.32, foamY - 5, sx + TILE_SIZE * 0.62, foamY + 7, sx + TILE_SIZE - 10, foamY);
-          mapCtx.stroke();
-        }
-      }
-      if (tile.biome === "road") {
-        mapCtx.fillStyle = "rgba(255,228,162,0.05)";
-        mapCtx.fillRect(sx + TILE_SIZE * 0.26, sy + 4, TILE_SIZE * 0.08, TILE_SIZE - 8);
-        mapCtx.fillRect(sx + TILE_SIZE * 0.66, sy + 4, TILE_SIZE * 0.08, TILE_SIZE - 8);
-        mapCtx.strokeStyle = "rgba(72,56,38,0.12)";
-        mapCtx.lineWidth = 1.1;
-        mapCtx.beginPath();
-        mapCtx.moveTo(sx + TILE_SIZE * 0.22, sy + 4);
-        mapCtx.lineTo(sx + TILE_SIZE * 0.22, sy + TILE_SIZE - 4);
-        mapCtx.moveTo(sx + TILE_SIZE * 0.78, sy + 4);
-        mapCtx.lineTo(sx + TILE_SIZE * 0.78, sy + TILE_SIZE - 4);
-        mapCtx.stroke();
-      }
-      mapCtx.strokeStyle = "rgba(11, 24, 28, 0.2)";
-      mapCtx.lineWidth = 1;
-      mapCtx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
-      const shade = mapCtx.createLinearGradient(sx, sy, sx, sy + TILE_SIZE);
-      shade.addColorStop(0, "rgba(255,255,255,0.02)");
-      shade.addColorStop(1, "rgba(0,0,0,0.08)");
-      mapCtx.fillStyle = shade;
-      mapCtx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-    }
 
-    mapCtx.save();
-    mapCtx.globalAlpha = 0.24;
-    mapCtx.fillStyle = "#1f4f69";
-    mapCtx.beginPath();
-    mapCtx.moveTo(HALF_WORLD - 220, 0);
-    mapCtx.bezierCurveTo(HALF_WORLD + 70, 860, HALF_WORLD - 140, 1500, HALF_WORLD + 160, 2500);
-    mapCtx.bezierCurveTo(HALF_WORLD + 260, 2920, HALF_WORLD - 130, 3600, HALF_WORLD + 110, WORLD_SIZE);
-    mapCtx.lineTo(HALF_WORLD + 340, WORLD_SIZE);
-    mapCtx.bezierCurveTo(HALF_WORLD + 40, 3550, HALF_WORLD + 380, 2900, HALF_WORLD + 360, 2450);
-    mapCtx.bezierCurveTo(HALF_WORLD + 130, 1520, HALF_WORLD + 410, 930, HALF_WORLD + 70, 0);
-    mapCtx.closePath();
-    mapCtx.fill();
-    mapCtx.strokeStyle = "rgba(169,216,244,0.25)";
-    mapCtx.lineWidth = 8;
-    mapCtx.stroke();
-    mapCtx.globalAlpha = 0.08;
-    mapCtx.fillStyle = "#f5f9ff";
-    for (let i = 0; i < 18; i += 1) {
-      const px = HALF_WORLD + randomRange(i * 10, -120, 120);
-      const py = randomRange(i * 40 + 19, 120, WORLD_SIZE - 120);
-      mapCtx.fillRect(px - 44, py, 88, 2);
+      mapCtx.save();
+      mapCtx.globalAlpha = 0.24;
+      mapCtx.fillStyle = "#1f4f69";
+      mapCtx.beginPath();
+      mapCtx.moveTo(HALF_WORLD - 220, 0);
+      mapCtx.bezierCurveTo(HALF_WORLD + 70, 860, HALF_WORLD - 140, 1500, HALF_WORLD + 160, 2500);
+      mapCtx.bezierCurveTo(HALF_WORLD + 260, 2920, HALF_WORLD - 130, 3600, HALF_WORLD + 110, WORLD_SIZE);
+      mapCtx.lineTo(HALF_WORLD + 340, WORLD_SIZE);
+      mapCtx.bezierCurveTo(HALF_WORLD + 40, 3550, HALF_WORLD + 380, 2900, HALF_WORLD + 360, 2450);
+      mapCtx.bezierCurveTo(HALF_WORLD + 130, 1520, HALF_WORLD + 410, 930, HALF_WORLD + 70, 0);
+      mapCtx.closePath();
+      mapCtx.fill();
+      mapCtx.strokeStyle = "rgba(169,216,244,0.25)";
+      mapCtx.lineWidth = 8;
+      mapCtx.stroke();
+      mapCtx.globalAlpha = 0.08;
+      mapCtx.fillStyle = "#f5f9ff";
+      for (let i = 0; i < 18; i += 1) {
+        const px = HALF_WORLD + randomRange(i * 10, -120, 120);
+        const py = randomRange(i * 40 + 19, 120, WORLD_SIZE - 120);
+        mapCtx.fillRect(px - 44, py, 88, 2);
+      }
+      mapCtx.restore();
     }
-    mapCtx.restore();
 
     const light = mapCtx.createRadialGradient(HALF_WORLD * 0.35, HALF_WORLD * 0.28, 120, HALF_WORLD * 0.35, HALF_WORLD * 0.28, WORLD_SIZE * 0.8);
     light.addColorStop(0, "rgba(255,238,194,0.22)");
@@ -5804,6 +5820,33 @@
     coolShadow.addColorStop(1, "rgba(10,20,28,0.18)");
     mapCtx.fillStyle = coolShadow;
     mapCtx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+  }
+
+  function drawSelectedMapBackdrop() {
+    const preset = sanitizeMapPreset(state.world.preset || state.mapPreset);
+    const image = mapPresetBackgroundImages.get(preset);
+    if (!isImageReady(image)) return false;
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    if (!sourceWidth || !sourceHeight) return false;
+    const scale = Math.max(WORLD_SIZE / sourceWidth, WORLD_SIZE / sourceHeight);
+    const drawWidth = sourceWidth * scale;
+    const drawHeight = sourceHeight * scale;
+    const drawX = (WORLD_SIZE - drawWidth) * 0.5;
+    const drawY = (WORLD_SIZE - drawHeight) * 0.5;
+    mapCtx.save();
+    mapCtx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in mapCtx) mapCtx.imageSmoothingQuality = "high";
+    mapCtx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    mapCtx.fillStyle = "rgba(8, 15, 19, 0.14)";
+    mapCtx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+    const edgeVignette = mapCtx.createRadialGradient(HALF_WORLD, HALF_WORLD, WORLD_SIZE * 0.22, HALF_WORLD, HALF_WORLD, WORLD_SIZE * 0.74);
+    edgeVignette.addColorStop(0, "rgba(0,0,0,0)");
+    edgeVignette.addColorStop(1, "rgba(6,10,14,0.28)");
+    mapCtx.fillStyle = edgeVignette;
+    mapCtx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+    mapCtx.restore();
+    return true;
   }
 
   function worldToScreen(x, y) {
