@@ -103,6 +103,7 @@
   const WORLD_SIZE = 4600;
   const TILE_SIZE = 92;
   const AUTO_RESOURCE_SCAN_RADIUS = TILE_SIZE * 2;
+  const MIN_ENEMY_BASE_DISTANCE = TILE_SIZE * 40;
   const HALF_WORLD = WORLD_SIZE / 2;
   const GRID_COUNT = Math.ceil(WORLD_SIZE / TILE_SIZE);
   const CAMERA_LIMIT = WORLD_SIZE * 0.38;
@@ -677,6 +678,7 @@
   const ownedEconomyBuildingIds = new Set(["market", "granary", "farm", "command_hall", "dock", "refinery", "power_plant", "lumber_camp", "quarry", "village_house", "supply_depot", "imperial_mint", "storm_generator", "war_foundry"]);
   const reclaimableDefeatBuildingIds = new Set(["village_house", "army_house", "archer_house", "guard_barracks", "ranger_lodge"]);
   const aiEnemyOwners = ["enemy1", "enemy2"];
+  const SINGLEPLAYER_START_BASE = { x: -1180, y: 980 };
 
   const state = {
     mode: "menu",
@@ -5571,13 +5573,21 @@
     }
   }
 
-  function pickRandomEnemyAnchors(count = 2) {
-    const occupiedAnchors = Object.values(state.players)
-      .map((player) => player.startBase)
+  function getReservedHumanStartBases() {
+    const starts = Object.values(state.players)
+      .map((player) => player && player.startBase ? { x: player.startBase.x, y: player.startBase.y } : null)
       .filter(Boolean);
+    if (!starts.length || (!isCompetitiveMatch() && !isCoopMatch())) {
+      starts.push({ ...SINGLEPLAYER_START_BASE });
+    }
+    return starts;
+  }
+
+  function pickRandomEnemyAnchors(count = 2) {
+    const occupiedAnchors = getReservedHumanStartBases();
     const pool = homelandAnchorZones
       .map((anchor) => ({ x: anchor.x, y: anchor.y, radius: anchor.radius || 320 }))
-      .filter((anchor) => occupiedAnchors.every((base) => Math.hypot(base.x - anchor.x, base.y - anchor.y) > 220))
+      .filter((anchor) => occupiedAnchors.every((base) => Math.hypot(base.x - anchor.x, base.y - anchor.y) >= MIN_ENEMY_BASE_DISTANCE))
       .sort(() => Math.random() - 0.5);
     const picks = [];
     for (const anchor of pool) {

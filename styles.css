@@ -806,6 +806,10 @@ h1 {
   backdrop-filter: blur(8px);
 }
 
+#menu-overlay:not(.hidden) ~ .live-controls {
+  display: none !important;
+}
+
 .settings-overlay.hidden {
   display: none;
 }
