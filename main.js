@@ -12295,6 +12295,40 @@
     drawBarFrame(x + 16 * scale, y + 38 * scale, w - 32 * scale, 10 * scale, hpRatio, bossDef.tint || "#ffe29a", "rgba(255,255,255,0.08)");
   }
 
+  function getTechUnlockPreviewItems(techDef, limit = 4) {
+    if (!techDef || !Array.isArray(techDef.unlocks)) return [];
+    return techDef.unlocks
+      .map((itemId) => itemIndex.get(itemId))
+      .filter(Boolean)
+      .slice(0, limit);
+  }
+
+  function drawTechUnlockPreview(node, layout) {
+    const unlockCount = Array.isArray(node.tech.unlocks) ? node.tech.unlocks.length : 0;
+    const previewItems = getTechUnlockPreviewItems(node.tech, 4);
+    const iconSize = 18 * layout.scale;
+    const iconGap = 5 * layout.scale;
+    const iconY = node.y + node.h - 38 * layout.scale;
+    let cursorX = node.x + 18 * layout.scale;
+    const previewLocked = !node.status.available && !node.status.current && !node.status.researched;
+    for (const item of previewItems) {
+      roundRect(ctx, cursorX - 1.5 * layout.scale, iconY - 1.5 * layout.scale, iconSize + 3 * layout.scale, iconSize + 3 * layout.scale, 8 * layout.scale, "rgba(7,14,20,0.82)", "rgba(255,255,255,0.07)");
+      drawItemGlyph(item, cursorX, iconY, iconSize, {
+        locked: previewLocked,
+        dimmed: node.status.busy && !node.status.current && !node.status.researched,
+      });
+      cursorX += iconSize + iconGap;
+    }
+    ctx.fillStyle = "#8fa5b1";
+    ctx.font = `${Math.round(9.5 * layout.scale)}px Cambria`;
+    const extraUnlocks = Math.max(0, unlockCount - previewItems.length);
+    const summary = unlockCount
+      ? `${extraUnlocks ? `+${extraUnlocks} more | ` : ""}${Math.round(node.tech.time)}s`
+      : `Bonuses only | ${Math.round(node.tech.time)}s`;
+    const textX = previewItems.length ? cursorX + 3 * layout.scale : cursorX;
+    ctx.fillText(truncateTextToWidth(summary, node.w - (textX - node.x) - 24 * layout.scale), textX, iconY + 13 * layout.scale);
+  }
+
   function drawTechTreePanel() {
     const layout = getTechTreeLayout();
     const player = getActivePlayerState();
@@ -12363,10 +12397,9 @@
         });
         ctx.fillStyle = node.status.available ? "#8df2b7" : node.status.current ? "#9fe8ff" : node.status.researched ? "#ffe29a" : "#ffcf8d";
         ctx.fillText(truncateTextToWidth(node.status.note, node.w - 40 * layout.scale), node.x + 18 * layout.scale, node.y + (112) * layout.scale);
-        ctx.fillStyle = "#8fa5b1";
-        ctx.fillText(truncateTextToWidth(`Unlocks ${(node.tech.unlocks || []).length || 0} items | ${Math.round(node.tech.time)}s`, node.w - 40 * layout.scale), node.x + 18 * layout.scale, node.y + (126) * layout.scale);
+        drawTechUnlockPreview(node, layout);
         if (node.status.current) {
-          drawBarFrame(node.x + 18 * layout.scale, node.y + (132) * layout.scale, node.w - 36 * layout.scale, 6 * layout.scale, node.status.progress, node.accent, "rgba(255,255,255,0.08)");
+          drawBarFrame(node.x + 18 * layout.scale, node.y + node.h - 12 * layout.scale, node.w - 36 * layout.scale, 6 * layout.scale, node.status.progress, node.accent, "rgba(255,255,255,0.08)");
         }
       });
     });
@@ -13072,10 +13105,20 @@
     return { x, y, w, h, text: label };
   }
 
-  function drawItemGlyph(item, x, y, size, muted) {
+  function drawItemGlyph(item, x, y, size, options = {}) {
+    const glyphState = typeof options === "boolean" ? { dimmed: options } : (options || {});
+    const dimmed = Boolean(glyphState.dimmed);
+    const locked = Boolean(glyphState.locked);
+    const muted = dimmed || locked;
     ctx.save();
     ctx.translate(x, y);
-    if (muted) ctx.globalAlpha = 0.5;
+    if (locked) {
+      ctx.globalAlpha = 0.72;
+      ctx.filter = "saturate(0.08) brightness(0.4)";
+    } else if (dimmed) {
+      ctx.globalAlpha = 0.82;
+      ctx.filter = "saturate(0.68) brightness(0.74)";
+    }
     const theme = getItemVisualTheme(item);
     ctx.shadowColor = withAlpha(theme.shadow, muted ? 0.18 : 0.3);
     ctx.shadowBlur = size * 0.18;
@@ -13160,6 +13203,12 @@
       ctx.beginPath();
       ctx.arc(pipStartX + i * pipGap, pipY, size * 0.034, 0, TAU);
       ctx.fill();
+    }
+    if (locked) {
+      const veil = ctx.createLinearGradient(0, 0, 0, size);
+      veil.addColorStop(0, "rgba(5,9,13,0.18)");
+      veil.addColorStop(1, "rgba(0,0,0,0.44)");
+      roundRect(ctx, inner, inner, size - inner * 2, size - inner * 2, size * 0.14, veil, "rgba(255,255,255,0.04)");
     }
     ctx.restore();
   }
@@ -13292,7 +13341,10 @@
       iconWell.addColorStop(0, withAlpha(theme.accent, 0.18));
       iconWell.addColorStop(1, "rgba(9,14,18,0.92)");
       roundRect(ctx, iconBoxX, iconBoxY, iconBoxSize, iconBoxSize, 12 * layout.scale, iconWell, withAlpha(theme.edge, 0.22));
-      drawItemGlyph(item, iconBoxX + 4 * layout.scale, iconBoxY + 4 * layout.scale, iconBoxSize - 8 * layout.scale, !affordable || !unlocked);
+      drawItemGlyph(item, iconBoxX + 4 * layout.scale, iconBoxY + 4 * layout.scale, iconBoxSize - 8 * layout.scale, {
+        dimmed: unlocked && !affordable,
+        locked: !unlocked,
+      });
       const textX = iconBoxX + iconBoxSize + 12 * layout.scale;
       const textW = Math.max(48 * layout.scale, w - (textX - x) - 12 * layout.scale);
       drawLabelPill(getItemBadgeText(item), textX, y + 10 * layout.scale, theme.chipFill, withAlpha(theme.edge, 0.22), "#f6f0e3", layout.scale, textW - 52 * layout.scale);
@@ -13398,7 +13450,10 @@
       const iconX = slot.x + (slot.w - iconSize) * 0.5;
       const iconY = slot.y + 14 * scale;
       roundRect(ctx, iconX - 4 * scale, iconY - 3 * scale, iconSize + 8 * scale, iconSize + 8 * scale, 14 * scale, "rgba(0,0,0,0.14)", withAlpha(theme.edge, 0.16));
-      drawItemGlyph(item, iconX, iconY, iconSize, !affordable || !unlocked);
+      drawItemGlyph(item, iconX, iconY, iconSize, {
+        dimmed: unlocked && !affordable,
+        locked: !unlocked,
+      });
       ctx.fillStyle = "#f3ece0";
       ctx.font = `700 ${Math.round(10 * scale)}px Cambria`;
       const nameLines = getClampedTextLines(item.name, slot.w - 14 * scale, 2);
