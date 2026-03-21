@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
+const WebSocket = require("ws");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 4173);
@@ -10,6 +11,7 @@ const host = process.env.HOST || "0.0.0.0";
 const rooms = new Map();
 const ROOM_TTL_MS = 1000 * 60 * 60 * 6;
 const LAN_MATCH_TYPES = new Set(["lan", "lan-coop"]);
+const clientConnections = new Map(); // Map of clientId -> WebSocket connection
 
 const mime = {
   ".css": "text/css; charset=utf-8",
@@ -351,22 +353,186 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+// WebSocket message handler
+function handleWsMessage(ws, clientId, message) {
+  let data;
+  try {
+    data = JSON.parse(message);
+  } catch {
+    return;
+  }
+
+  const room = getRoomByClient(clientId);
+  const command = data.type || data.command;
+
+  if (command === "poll") {
+    const snapshotRevision = Number(data.snapshotRevision || 0);
+    const commandIndex = Number(data.commandIndex || 0);
+    const role = clientId === room.hostClientId ? "host" : "guest";
+
+    const payload = {
+      type: "poll",
+      role,
+      roomCode: room.code,
+      matchType: room.matchType,
+      started: Boolean(room.startedAt),
+      startedAt: room.startedAt,
+      guestJoined: Boolean(room.guestClientId),
+      hostReady: Boolean(room.snapshot),
+      snapshotRevision: room.snapshotRevision,
+      commandIndex: room.nextCommandIndex - 1,
+    };
+
+    if (role === "host") {
+      payload.commands = room.commands.filter((entry) => entry.index > commandIndex);
+    } else if (room.snapshotRevision > snapshotRevision) {
+      payload.snapshot = room.snapshot;
+    }
+
+    ws.send(JSON.stringify(payload));
+  } else if (command === "push" && clientId === room.hostClientId) {
+    room.snapshot = data.snapshot || null;
+    room.snapshotRevision += 1;
+    touchRoom(room);
+
+    // Broadcast to guest if connected
+    const guestWs = clientConnections.get(room.guestClientId);
+    if (guestWs && guestWs.readyState === WebSocket.OPEN) {
+      guestWs.send(JSON.stringify({
+        type: "snapshot",
+        snapshot: room.snapshot,
+        snapshotRevision: room.snapshotRevision,
+      }));
+    }
+
+    ws.send(JSON.stringify({
+      type: "push",
+      ok: true,
+      snapshotRevision: room.snapshotRevision,
+      guestJoined: Boolean(room.guestClientId),
+    }));
+  } else if (command === "input" && clientId === room.guestClientId) {
+    room.commands.push({
+      index: room.nextCommandIndex,
+      command: data.data || null,
+    });
+    room.nextCommandIndex += 1;
+
+    // Forward to host if connected
+    const hostWs = clientConnections.get(room.hostClientId);
+    if (hostWs && hostWs.readyState === WebSocket.OPEN) {
+      hostWs.send(JSON.stringify({
+        type: "input",
+        command: data.data || null,
+        index: room.nextCommandIndex - 1,
+      }));
+    }
+
+    ws.send(JSON.stringify({
+      type: "input",
+      ok: true,
+      commandIndex: room.nextCommandIndex - 1,
+    }));
+  }
+}
+
 const server = http.createServer(async (req, res) => {
+  try {
+    if (req.method === "OPTIONS") {
+      setCorsHeaders(res);
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url || "/", `http://${req.headers.host || `127.0.0.1:${port}`}`);
+    
+    // Add room discovery endpoint
+    if (req.method === "GET" && url.pathname === "/api/lan/discover") {
+      setCorsHeaders(res);
+      const activeRooms = Array.from(rooms.values())
+        .filter((room) => Date.now() - room.createdAt < ROOM_TTL_MS)
+        .map((room) => ({
+          code: room.code,
+          matchType: room.matchType,
+          started: Boolean(room.startedAt),
+          guestJoined: Boolean(room.guestClientId),
+        }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(activeRooms));
+      return;
+    }
+
+    const handled = await handleApi(req, res, url.pathname);
+    if (handled) return;
+    serveStatic(req, res, url.pathname);
+  } catch (error) {
+    sendJson(res, 500, { ok: false, error: error.message || "Server error." });
+  }
+});
+
+// WebSocket server
+const wss = new WebSocket.Server({ server });
+
+wss.on("connection", (ws, req) => {
+  const clientIp = req.socket?.remoteAddress || "unknown";
+  console.log(`[${new Date().toISOString()}] WebSocket client connected from ${clientIp}`);
+
+  ws.on("message", (message) => {
     try {
-      if (req.method === "OPTIONS") {
-        setCorsHeaders(res);
-        res.writeHead(204);
-        res.end();
+      const data = JSON.parse(message);
+      
+      // First message should include clientId and identify as host/guest
+      if (data.type === "connect") {
+        const clientId = String(data.clientId || "");
+        const role = String(data.role || "");
+        
+        if (!clientId) {
+          ws.send(JSON.stringify({ type: "error", error: "Missing clientId" }));
+          ws.close();
+          return;
+        }
+
+        const room = getRoomByClient(clientId);
+        if (!room) {
+          ws.send(JSON.stringify({ type: "error", error: "Room not found" }));
+          ws.close();
+          return;
+        }
+
+        clientConnections.set(clientId, ws);
+        console.log(`[${new Date().toISOString()}] WebSocket client registered: ${clientId} as ${role} in room ${room.code}`);
+
+        ws.send(JSON.stringify({
+          type: "connected",
+          role: clientId === room.hostClientId ? "host" : "guest",
+          roomCode: room.code,
+          matchType: room.matchType,
+        }));
+
+        // Clean up on disconnect
+        ws.on("close", () => {
+          clientConnections.delete(clientId);
+          console.log(`[${new Date().toISOString()}] WebSocket client disconnected: ${clientId}`);
+        });
+
+        // Handle all WebSocket messages for this client
+        ws.on("message", (msg) => {
+          handleWsMessage(ws, clientId, msg);
+        });
+
         return;
       }
-      const url = new URL(req.url || "/", `http://${req.headers.host || `127.0.0.1:${port}`}`);
-      const handled = await handleApi(req, res, url.pathname);
-      if (handled) return;
-      serveStatic(req, res, url.pathname);
-    } catch (error) {
-      sendJson(res, 500, { ok: false, error: error.message || "Server error." });
+    } catch {
+      // Invalid JSON, ignore
     }
   });
+
+  ws.on("error", (error) => {
+    console.error(`[${new Date().toISOString()}] WebSocket error:`, error.message);
+  });
+});
+
 
 server.on("error", (error) => {
   if (error && error.code === "EADDRINUSE") {
@@ -381,9 +547,13 @@ server.on("error", (error) => {
 server.listen(port, host, () => {
   const localUrl = `http://127.0.0.1:${port}`;
   console.log(`Top Knights server listening on ${localUrl}`);
+  console.log(`WebSocket available at ws://127.0.0.1:${port}`);
   const lanUrls = getLanAddresses();
   if (lanUrls.length) {
     console.log("LAN URLs:");
-    lanUrls.forEach((url) => console.log(`  ${url}`));
+    lanUrls.forEach((url) => {
+      console.log(`  ${url}`);
+      console.log(`  ws${url.slice(4)} (WebSocket)`);
+    });
   }
 });

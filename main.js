@@ -1225,6 +1225,10 @@
       linkMatchType: null,
       linkApiBase: "",
       statusText: getLanIdleStatusText(),
+      ws: null,
+      wsConnected: false,
+      availableRooms: [],
+      discoverTimer: 0,
     },
     admin: {
       slashOpen: false,
@@ -2959,6 +2963,7 @@
   }
 
   function resetLanSessionState() {
+    disconnectLanWebSocket();
     state.lan.role = "offline";
     state.lan.roomCode = "";
     state.lan.roomMatchType = null;
@@ -3267,6 +3272,7 @@
               weapons: [...player.quickSlots.weapons],
             },
             recentMessage: player.ui.recentMessage,
+            camera: { ...player.camera },
           },
         ]),
       ),
@@ -3710,6 +3716,12 @@
         player.quickSlots.weapons = [...(data.quickSlots.weapons || player.quickSlots.weapons)];
       }
       if (data.recentMessage && owner !== state.lan.localOwner) player.ui.recentMessage = data.recentMessage;
+      if (data.camera) {
+        player.camera.x = Number.isFinite(data.camera.x) ? data.camera.x : player.camera.x;
+        player.camera.y = Number.isFinite(data.camera.y) ? data.camera.y : player.camera.y;
+        player.camera.zoom = Number.isFinite(data.camera.zoom) ? data.camera.zoom : player.camera.zoom;
+        player.camera.rotation = Number.isFinite(data.camera.rotation) ? data.camera.rotation : player.camera.rotation;
+      }
     }
     restoreLanWorld(snapshot);
     const localPlayer = getPrimaryPlayer();
@@ -3798,6 +3810,17 @@
 
   function queueLanCommand(command) {
     if (!isLanClient() || !state.lan.clientId) return;
+    
+    // Try WebSocket first
+    if (state.lan.wsConnected && state.lan.ws) {
+      sendLanWsMessage({
+        type: "input",
+        data: command,
+      });
+      return;
+    }
+    
+    // Fall back to HTTP
     postJson("/api/lan/input", {
       clientId: state.lan.clientId,
       command,
@@ -3817,10 +3840,28 @@
     syncMenuButtons();
     if (state.mode === "playing" && state.matchType === state.lan.roomMatchType) return;
     
-    // For LAN guests, don't create a new match - wait for host snapshot to populate the world
+    // For LAN guests, initialize the player structure with proper camera positions
     if (isLanClient()) {
       state.matchType = normalizeLanMatchType(matchType);
       state.mode = "playing";
+      
+      // Initialize players the same way the host does, so snapshot data can be applied
+      state.players = {};
+      if (matchType === "lan" || matchType === "lan-coop") {
+        const configs = matchType === "lan" ? localVersusConfigs[2] : localCoopConfigs[2];
+        configs.forEach((config) => {
+          state.players[config.owner] = createPlayerState(
+            config.owner,
+            config.label,
+            config.viewportIndex,
+            config.camera,
+            config.controllerLabel,
+            { startBase: config.startBase, startFacing: config.startFacing },
+          );
+        });
+      }
+      if (!state.lan.localOwner) state.lan.localOwner = matchType === "lan-coop" ? "player1" : "player1";
+      
       state.lan.awaitingSnapshot = true;
       state.lan.pollTimer = 0; // Force immediate poll to get snapshot
       createWorld(); // Initialize empty world structure
@@ -3864,6 +3905,18 @@
     if (!isLanHost() || state.lan.awaitingPush || !state.lan.clientId || state.mode !== "playing") return;
     state.lan.awaitingPush = true;
     const shareOrigin = getLanShareOrigin();
+    
+    // Try WebSocket first
+    if (state.lan.wsConnected && state.lan.ws) {
+      sendLanWsMessage({
+        type: "push",
+        snapshot: serializeLanSnapshot(),
+      });
+      state.lan.awaitingPush = false;
+      return;
+    }
+    
+    // Fall back to HTTP
     try {
       const response = await postJson("/api/lan/state", {
         clientId: state.lan.clientId,
@@ -3883,46 +3936,148 @@
     }
   }
 
-  async function pollLanServer() {
-    if (state.lan.awaitingPoll || !hasLanSession()) return;
-    state.lan.awaitingPoll = true;
+  function connectLanWebSocket() {
+    if (state.lan.ws || !state.lan.clientId || !state.lan.apiBase) return;
+    
+    const wsUrl = state.lan.apiBase.replace(/^http/, "ws");
+    try {
+      state.lan.ws = new WebSocket(wsUrl);
+      
+      state.lan.ws.addEventListener("open", () => {
+        state.lan.wsConnected = true;
+        // Send connect message with clientId
+        state.lan.ws.send(JSON.stringify({
+          type: "connect",
+          clientId: state.lan.clientId,
+          role: state.lan.role,
+        }));
+      });
+      
+      state.lan.ws.addEventListener("message", (event) => {
+        handleLanWsMessage(JSON.parse(event.data));
+      });
+      
+      state.lan.ws.addEventListener("close", () => {
+        state.lan.wsConnected = false;
+        state.lan.ws = null;
+      });
+      
+      state.lan.ws.addEventListener("error", () => {
+        state.lan.wsConnected = false;
+        state.lan.ws = null;
+      });
+    } catch (error) {
+      state.lan.ws = null;
+    }
+  }
+
+  function disconnectLanWebSocket() {
+    if (state.lan.ws) {
+      state.lan.ws.close();
+      state.lan.ws = null;
+      state.lan.wsConnected = false;
+    }
+  }
+
+  function handleLanWsMessage(data) {
+    if (!data || !data.type) return;
+    
+    const { type } = data;
+    
+    if (type === "connected") {
+      state.lan.wsConnected = true;
+    } else if (type === "snapshot") {
+      state.lan.lastSnapshotRevision = data.snapshotRevision || state.lan.lastSnapshotRevision;
+      applyLanSnapshot(data.snapshot);
+      state.lan.awaitingSnapshot = false;
+    } else if (type === "input") {
+      if (data.command) applyLanCommand(data.command);
+    } else if (type === "poll") {
+      // Handle poll response (when HTTP fallback is triggered)
+      pollLanResponseHandler(data);
+    }
+  }
+
+  function sendLanWsMessage(message) {
+    if (!state.lan.wsConnected || !state.lan.ws) return false;
+    try {
+      state.lan.ws.send(JSON.stringify(message));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function pollLanResponseHandler(response) {
+    if (!response) return;
     const shareOrigin = getLanShareOrigin();
     const lanRole = state.lan.role;
+    
+    state.lan.roomMatchType = normalizeLanMatchType(response.matchType || state.lan.roomMatchType);
+    state.lan.guestJoined = Boolean(response.guestJoined);
+    state.lan.started = Boolean(response.started);
+    state.lan.startedAt = response.startedAt || state.lan.startedAt || 0;
+    if (response.started && state.mode !== "playing") beginLanRoomMatch(state.lan.roomMatchType, state.lan.startedAt);
+    if (lanRole === "host") {
+      const commands = response.commands || [];
+      for (const entry of commands) applyLanCommand(entry.command);
+      if (commands.length) state.lan.lastCommandIndex = commands[commands.length - 1].index;
+      if (!response.guestJoined) setLanStatus(`Hosting room ${state.lan.roomCode} on ${shareOrigin}. Share the generated room link and wait for player 2 to join.`);
+      else if (!response.started) setLanStatus(`Player 2 joined room ${state.lan.roomCode}. Either player can press Start to launch the shared LAN battle.`);
+      else setLanStatus(`Hosting room ${state.lan.roomCode} on ${shareOrigin}. The shared LAN battle is live.`);
+    } else {
+      if (response.snapshot) {
+        state.lan.lastSnapshotRevision = response.snapshotRevision || state.lan.lastSnapshotRevision;
+        applyLanSnapshot(response.snapshot);
+        state.lan.awaitingSnapshot = false;
+      }
+      setLanStatus(
+        !response.started
+          ? `Joined room ${state.lan.roomCode}. Press Start to launch the shared LAN battle for everyone in the room.`
+          : response.hostReady
+            ? `Joined room ${state.lan.roomCode} on ${shareOrigin}. Connected as Player 2 in the live battle.`
+            : state.lan.awaitingSnapshot
+              ? `Room ${state.lan.roomCode} started. Syncing game state...`
+              : `Room ${state.lan.roomCode} started. Connected and synchronized.`,
+      );
+    }
+    syncMenuButtons();
+  }
+
+  async function discoverLanRooms() {
+    if (state.mode !== "menu" || state.lan.discoverTimer > 0) return;
+    state.lan.discoverTimer = 1; // Throttle to once per frame
+    
+    try {
+      const response = await postJson("/api/lan/discover", {});
+      state.lan.availableRooms = Array.isArray(response) ? response : [];
+    } catch {
+      state.lan.availableRooms = [];
+    }
+  }
+
+  async function pollLanServer() {
+    if (state.lan.awaitingPoll || !hasLanSession()) return;
+    
+    // Try WebSocket first if connected
+    if (state.lan.wsConnected && state.lan.ws) {
+      sendLanWsMessage({
+        type: "poll",
+        snapshotRevision: state.lan.lastSnapshotRevision,
+        commandIndex: state.lan.lastCommandIndex,
+      });
+      return;
+    }
+    
+    state.lan.awaitingPoll = true;
+    const shareOrigin = getLanShareOrigin();
     try {
       const response = await postJson("/api/lan/poll", {
         clientId: state.lan.clientId,
         snapshotRevision: state.lan.lastSnapshotRevision,
         commandIndex: state.lan.lastCommandIndex,
       });
-      state.lan.roomMatchType = normalizeLanMatchType(response.matchType || state.lan.roomMatchType);
-      state.lan.guestJoined = Boolean(response.guestJoined);
-      state.lan.started = Boolean(response.started);
-      state.lan.startedAt = response.startedAt || state.lan.startedAt || 0;
-      if (response.started && state.mode !== "playing") beginLanRoomMatch(state.lan.roomMatchType, state.lan.startedAt);
-      if (lanRole === "host") {
-        const commands = response.commands || [];
-        for (const entry of commands) applyLanCommand(entry.command);
-        if (commands.length) state.lan.lastCommandIndex = commands[commands.length - 1].index;
-        if (!response.guestJoined) setLanStatus(`Hosting room ${state.lan.roomCode} on ${shareOrigin}. Share the generated room link and wait for player 2 to join.`);
-        else if (!response.started) setLanStatus(`Player 2 joined room ${state.lan.roomCode}. Either player can press Start to launch the shared LAN battle.`);
-        else setLanStatus(`Hosting room ${state.lan.roomCode} on ${shareOrigin}. The shared LAN battle is live.`);
-      } else {
-        if (response.snapshot) {
-          state.lan.lastSnapshotRevision = response.snapshotRevision || state.lan.lastSnapshotRevision;
-          applyLanSnapshot(response.snapshot);
-          state.lan.awaitingSnapshot = false;
-        }
-        setLanStatus(
-          !response.started
-            ? `Joined room ${state.lan.roomCode}. Press Start to launch the shared LAN battle for everyone in the room.`
-            : response.hostReady
-              ? `Joined room ${state.lan.roomCode} on ${shareOrigin}. Connected as Player 2 in the live battle.`
-              : state.lan.awaitingSnapshot
-                ? `Room ${state.lan.roomCode} started. Syncing game state...`
-                : `Room ${state.lan.roomCode} started. Connected and synchronized.`,
-        );
-      }
-      syncMenuButtons();
+      pollLanResponseHandler(response);
     } catch (error) {
       setLanStatus(`LAN poll failed: ${error.message}`);
     } finally {
@@ -3955,6 +4110,7 @@
       state.mode = "menu";
       setLanLink(response.joinUrl || "");
       if (lanCodeInput) lanCodeInput.value = response.roomCode;
+      connectLanWebSocket();
       overlay.classList.remove("hidden");
       setLanStatus(`Hosting ${getMatchLabel(state.lan.roomMatchType)} room ${response.roomCode}. Share the generated link below. When either joined player presses Start, the room launches for everyone.`);
       syncMenuButtons();
@@ -3999,6 +4155,7 @@
       if (state.lan.linkApiBase) state.lan.apiBase = state.lan.linkApiBase;
       state.mode = "menu";
       overlay.classList.remove("hidden");
+      connectLanWebSocket();
       setLanLink(response.joinUrl || "");
       setLanStatus(
         response.started
