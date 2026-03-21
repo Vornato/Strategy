@@ -505,15 +505,15 @@
   const assetCatalog = [
     { id: "royal_keep", name: "Royal Keep", cost: 320, tier: 1, footprint: 2.2, style: "keep", spawnRole: "knight", spawnRate: 22, hp: 1800, armor: "stone", desc: "Central command. Trains knights and anchors the empire." },
     { id: "village_house", name: "Village House", cost: 90, tier: 1, footprint: 1.4, style: "house", spawnRole: "villager", spawnRate: 20, hp: 320, armor: "wood", tax: 14, desc: "Raises peasants and taxes local citizens." },
-    { id: "army_house", name: "Army House", cost: 120, tier: 1, footprint: 1.6, style: "barracks", spawnRole: "warrior", spawnRate: 18, hp: 560, armor: "wood", desc: "Produces sword infantry." },
-    { id: "archer_house", name: "Archer House", cost: 135, tier: 1, footprint: 1.6, style: "archery", spawnRole: "archer", spawnRate: 19, hp: 500, armor: "wood", desc: "Produces ranged archers." },
-    { id: "stable", name: "Knight Stable", cost: 180, tier: 2, footprint: 1.8, style: "stable", spawnRole: "knight", spawnRate: 24, hp: 640, armor: "wood", desc: "Builds mounted knights." },
-    { id: "watch_tower", name: "Watch Tower", cost: 150, tier: 1, footprint: 1.3, style: "tower", attack: "arrow", attackRate: 1.6, range: 280, hp: 720, armor: "stone", desc: "Auto-fires on enemies in range." },
+    { id: "army_house", name: "Army House", cost: 120, tier: 1, footprint: 1.6, style: "barracks", spawnRole: "warrior", spawnRate: 18, hp: 560, armor: "wood", desc: "Produces sword infantry.", upgrades: [{ id: "guard_barracks", cost: 80 }] },
+    { id: "archer_house", name: "Archer House", cost: 135, tier: 1, footprint: 1.6, style: "archery", spawnRole: "archer", spawnRate: 19, hp: 500, armor: "wood", desc: "Produces ranged archers.", upgrades: [{ id: "ranger_lodge", cost: 85 }] },
+    { id: "stable", name: "Knight Stable", cost: 180, tier: 2, footprint: 1.8, style: "stable", spawnRole: "knight", spawnRate: 24, hp: 640, armor: "wood", desc: "Builds mounted knights.", upgrades: [{ id: "lancer_stable", cost: 120 }] },
+    { id: "watch_tower", name: "Watch Tower", cost: 150, tier: 1, footprint: 1.3, style: "tower", attack: "arrow", attackRate: 1.6, range: 280, hp: 720, armor: "stone", desc: "Auto-fires on enemies in range.", upgrades: [{ id: "stone_tower", cost: 100 }] },
     { id: "stone_tower", name: "Stone Tower", cost: 220, tier: 2, footprint: 1.5, style: "tower", attack: "bolt", attackRate: 1.1, range: 320, hp: 980, armor: "stone", desc: "Heavy tower with armor-piercing fire." },
     { id: "wall", name: "Wall Segment", cost: 70, tier: 1, footprint: 1.1, style: "wall", hp: 680, armor: "stone", desc: "Blocks movement and protects your frontier." },
     { id: "gatehouse", name: "Gatehouse", cost: 180, tier: 2, footprint: 1.6, style: "gate", hp: 980, armor: "stone", desc: "Fortified passage for walled lines." },
     { id: "outpost", name: "Scout Outpost", cost: 110, tier: 1, footprint: 1.3, style: "outpost", spawnRole: "scout", spawnRate: 25, hp: 420, armor: "wood", desc: "Produces scouts with long vision." },
-    { id: "market", name: "Market Hall", cost: 180, tier: 2, footprint: 1.7, style: "market", hp: 520, armor: "wood", taxBoost: 1.35, desc: "Boosts nearby taxes and coin flow." },
+    { id: "market", name: "Market Hall", cost: 180, tier: 2, footprint: 1.7, style: "market", hp: 520, armor: "wood", taxBoost: 1.35, desc: "Boosts nearby taxes and coin flow.", upgrades: [{ id: "imperial_mint", cost: 200 }] },
     { id: "farm", name: "Farmstead", cost: 120, tier: 1, footprint: 1.7, style: "farm", hp: 420, armor: "wood", tax: 10, desc: "Feeds the empire and grows taxes." },
     { id: "lumber_camp", name: "Lumber Camp", cost: 125, tier: 1, footprint: 1.7, style: "lumber", hp: 430, armor: "wood", gather: "wood", desc: "Harvests nearby forests for coin and wood." },
     { id: "quarry", name: "Stone Quarry", cost: 145, tier: 1, footprint: 1.7, style: "quarry", hp: 480, armor: "stone", gather: "stone", desc: "Extracts stone from the hills." },
@@ -566,6 +566,9 @@
     { id: "emp_burst", name: "EMP Burst", cost: 520, role: "emp", type: "ability", era: "Future", damage: 35, range: 0, blast: 180, slow: 0.3, desc: "Disables enemy engines and towers." },
     { id: "nuke", name: "Tactical Nuke", cost: 1400, role: "nuke", type: "ability", era: "Future", damage: 850, range: 0, blast: 260, fallout: 18, desc: "Devastating manual deployment." },
     { id: "repair_drone", name: "Repair Drone", cost: 260, role: "repair", type: "unit", era: "Future", hp: 120, armor: "steel", damage: 0, range: 0, speed: 126, cooldown: 0, desc: "Repairs allied armor and structures." },
+    { id: "medic", name: "Medic Squad", cost: 140, role: "medic", type: "unit", era: "Modern", hp: 100, armor: "flesh", damage: 0, range: 0, speed: 70, cooldown: 0, desc: "Heals nearby allies over time." },
+    { id: "sniper", name: "Sniper Team", cost: 180, role: "sniper", type: "unit", era: "Modern", hp: 90, armor: "flesh", damage: 25, range: 350, speed: 60, cooldown: 2.0, projectile: "bullet", desc: "Long-range precision fire." },
+    { id: "trebuchet", name: "Trebuchet", cost: 250, role: "trebuchet", type: "vehicle", era: "Old", hp: 280, armor: "wood", damage: 80, range: 400, speed: 40, cooldown: 4.0, projectile: "boulder", splash: 100, desc: "Massive siege engine with area damage." },
   ];
 
   assetCatalog.push(
@@ -957,6 +960,24 @@
       radius: 28,
       ability: { interval: 8.5, radius: 190, damage: 170, burrowDuration: 2.4 },
     },
+    super_boss: {
+      id: "super_boss",
+      name: "Ancient Overlord",
+      type: "unit",
+      role: "superBoss",
+      tint: "#ff4444",
+      reward: { coins: 500, heroXp: 350, researchBoost: 0.5 },
+      desc: "The ultimate enemy that roams the battlefield, builds bases, and unleashes devastating attacks.",
+      hp: 5000,
+      damage: 200,
+      splash: 150,
+      range: 400,
+      speed: 60,
+      cooldown: 0.8,
+      armor: "legendary",
+      radius: 40,
+      ability: { interval: 6, radius: 250, damage: 300, buildBases: true },
+    },
   };
   allItems.forEach((item) => {
     const techRequirement = ITEM_TECH_REQUIREMENTS[item.id];
@@ -994,12 +1015,14 @@
     canyon: { id: "canyon", label: "Canyon", shortLabel: "Canyon", desc: "Ravines, cliffs, canyon choke routes, and harsher central pressure." },
     desert: { id: "desert", label: "Desert", shortLabel: "Desert", desc: "Expansive desert pressure, oasis rivers, and more attrition-heavy routes." },
     ocean: { id: "ocean", label: "Ocean", shortLabel: "Ocean", desc: "Coastal mainland with ocean edges, marsh coves, and shipping lanes." },
+    random: { id: "random", label: "Random Map", shortLabel: "Random", desc: "Procedurally generated map with random resources and obstacles." },
   };
   const mapPresetBackgroundPaths = {
     green: "assets/environment/maps/green map.png",
     canyon: "assets/environment/maps/Canyon.png",
     desert: "assets/environment/maps/Desert.png",
     ocean: "assets/environment/maps/ocean.png",
+    random: "assets/environment/maps/green map.png", // Use green as base for random
   };
   const mapPresetBackgroundImages = new Map(Object.entries(mapPresetBackgroundPaths).map(([preset, src]) => {
     const image = loadImage(src);
@@ -1038,6 +1061,15 @@
     { id: "rifle", name: "Rare Rifle", bonus: 10, rangeBonus: 90, projectile: "bullet", tint: "#7ef2d0" },
   ];
   const rareDropIndex = new Map(rareDropCatalog.map((drop) => [drop.id, drop]));
+
+  const achievementsCatalog = [
+    { id: "first_victory", name: "First Victory", desc: "Win your first match.", reward: "New unit: Medic Squad" },
+    { id: "building_master", name: "Building Master", desc: "Upgrade 5 buildings.", reward: "Increased resource production" },
+    { id: "unit_slayer", name: "Unit Slayer", desc: "Destroy 100 enemy units.", reward: "New unit: Sniper Team" },
+    { id: "story_complete", name: "Story Complete", desc: "Complete the story mode.", reward: "New map: Random Procedural" },
+  ];
+  const achievementsIndex = new Map(achievementsCatalog.map((ach) => [ach.id, ach]));
+
   const neutralEconomyBuildingIds = new Set(["village_house", "market", "granary", "farm", "dock"]);
   const ownedEconomyBuildingIds = new Set(["market", "granary", "farm", "command_hall", "dock", "refinery", "power_plant", "lumber_camp", "quarry", "village_house", "supply_depot", "imperial_mint", "storm_generator", "war_foundry"]);
   const reclaimableDefeatBuildingIds = new Set(["village_house", "army_house", "archer_house", "guard_barracks", "ranger_lodge"]);
@@ -1058,7 +1090,9 @@
     wood: 260,
     stone: 220,
     score: 0,
-    camera: { x: 0, y: 0, zoom: 0.82, rotation: -0.28 },
+    achievements: new Set(),
+    hoveredEntity: null,
+    camera: { x: 0, y: 0, zoom: 0.82, rotation: -0.28, shake: 0, shakeAngle: 0 },
     input: {
       mouseScreenX: 0,
       mouseScreenY: 0,
@@ -1072,6 +1106,16 @@
       panAnchorY: 0,
       dragStartScreenX: 0,
       dragStartScreenY: 0,
+      touchActive: false,
+      touchIdentifier: null,
+    },
+    mobile: {
+      isMobileDevice: /Android|iPhone|iPad|iPod|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768,
+      isPortrait: window.innerHeight > window.innerWidth,
+      lastTouchDistance: 0,
+      touchStartDistance: 0,
+      showTouchButtons: true,
+      tapTimer: 0,
     },
     world: {
       preset: "green",
@@ -1125,6 +1169,11 @@
       selectedMapPreset: "green",
       lanArmed: false,
     },
+    story: {
+      level: 1,
+      maxLevel: 4,
+      completedLevels: new Set(),
+    },
     save: {
       autosaveTimer: 0,
       lastStatus: "",
@@ -1166,6 +1215,7 @@
       lastCommandIndex: 0,
       awaitingPoll: false,
       awaitingPush: false,
+      awaitingSnapshot: false,
       apiBase: "",
       guestJoined: false,
       joinUrl: "",
@@ -2745,7 +2795,7 @@
     state.menu.screen = screen;
     if (overlay) {
       overlay.dataset.menuScreen = screen;
-      if (state.mode !== "victory" && state.mode !== "defeat") overlay.dataset.menuResult = "off";
+      if (state.mode !== "victory" && state.mode !== "defeat" && state.mode !== "level-complete") overlay.dataset.menuResult = "off";
     }
     if (menuRootScreen) menuRootScreen.classList.toggle("hidden", screen !== "root");
     if (menuMultiplayerScreen) menuMultiplayerScreen.classList.toggle("hidden", screen !== "multiplayer");
@@ -3191,6 +3241,7 @@
       ids: state.ids,
       waves: { ...state.waves },
       difficulty: { ...state.difficulty },
+      story: { ...state.story },
       factions: Object.fromEntries(
         Object.entries(state.factions || {}).map(([owner, faction]) => [
           owner,
@@ -3421,6 +3472,7 @@
     state.ids = Number.isFinite(snapshot.ids) ? snapshot.ids : 0;
     state.waves = { ...state.waves, ...(snapshot.waves || {}) };
     state.difficulty = { ...state.difficulty, ...(snapshot.difficulty || {}) };
+    state.story = { ...state.story, ...(snapshot.story || {}) };
     state.speed = { ...state.speed, ...(snapshot.speed || {}) };
     state.taxPulseLock = false;
     state.save.autosaveTimer = 0;
@@ -3490,6 +3542,14 @@
     syncSettingsUi();
   }
 
+  function checkAchievements() {
+    if (state.mode === "victory" && !state.achievements.has("first_victory")) {
+      state.achievements.add("first_victory");
+      addNotification("Achievement Unlocked: First Victory - New unit: Medic Squad");
+    }
+    // Add more checks here
+  }
+
   function showMatchResultOverlay() {
     exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
     overlay.classList.remove("hidden");
@@ -3549,6 +3609,80 @@
     syncLiveControls();
   }
 
+  function showLevelCompleteOverlay() {
+    exitFirstPerson(getFirstPersonActivePlayer(), { silent: true });
+    overlay.classList.remove("hidden");
+    const title = overlay.querySelector("h1");
+    const intro = overlay.querySelector(".intro");
+    title.textContent = `Level ${state.story.level} Complete!`;
+    intro.textContent = `You've conquered the ${getMapPresetDef(state.mapPreset).label} battlefield. Continue to the next challenge with all your assets.`;
+    
+    // Change the start button to "Continue"
+    startBtn.textContent = "Continue";
+    startBtn.onclick = () => {
+      playUiSound("uiClick", { volume: 0.54, cooldown: 0.04 });
+      continueToNextLevel();
+    };
+    
+    showMenuScreen("root");
+    if (overlay) overlay.dataset.menuResult = "on";
+    
+    if (audioState.lastResultCue !== "level-complete") {
+      audioState.lastResultCue = "level-complete";
+      playUiSound("victory", { volume: 0.92, cooldown: 0.2 });
+    }
+    syncMenuButtons();
+    syncLiveControls();
+  }
+
+  function continueToNextLevel() {
+    // Mark current level as completed
+    state.story.completedLevels.add(state.story.level);
+    
+    // Advance to next level
+    state.story.level++;
+    
+    // Increase difficulty based on level - gradually ramp up
+    if (state.story.level === 1) {
+      state.difficulty.mode = "easy";
+    } else if (state.story.level === 2) {
+      state.difficulty.mode = "normal";
+    } else if (state.story.level === 3) {
+      state.difficulty.mode = "hard";
+    } else if (state.story.level === 4) {
+      state.difficulty.mode = "hard";
+    }
+    
+    // Save player assets before recreating world
+    const playerAssets = {
+      buildings: state.world.buildings.filter(b => b.owner === "player"),
+      units: state.world.units.filter(u => u.owner === "player"),
+      resources: { ...getPrimaryPlayer().resources },
+      tech: cloneTechState(getPrimaryPlayer().tech),
+      hero: cloneHeroState(getPrimaryPlayer().hero),
+      quickSlots: {
+        assets: [...getPrimaryPlayer().quickSlots.assets],
+        weapons: [...getPrimaryPlayer().quickSlots.weapons]
+      }
+    };
+    
+    // Start new match
+    startMatch("single", 1);
+    
+    // Restore carried-over assets
+    const player = getPrimaryPlayer();
+    if (player) {
+      player.resources = playerAssets.resources;
+      player.tech = playerAssets.tech;
+      player.hero = playerAssets.hero;
+      player.quickSlots = playerAssets.quickSlots;
+      
+      // Add carried-over buildings and units to the new world
+      state.world.buildings.push(...playerAssets.buildings);
+      state.world.units.push(...playerAssets.units);
+    }
+  }
+
   function applyLanSnapshot(snapshot) {
     if (!snapshot) return;
     state.matchType = snapshot.matchType || state.matchType;
@@ -3561,6 +3695,7 @@
     state.ids = snapshot.ids || state.ids;
     state.waves = { ...state.waves, ...(snapshot.waves || {}) };
     state.difficulty = { ...state.difficulty, ...(snapshot.difficulty || {}) };
+    state.story = { ...state.story, ...(snapshot.story || {}) };
     state.boss = { ...createBossState(), ...(snapshot.boss || {}) };
     for (const [owner, data] of Object.entries(snapshot.players || {})) {
       const player = state.players[owner];
@@ -3681,6 +3816,19 @@
     state.lan.startedAt = startedAt || Date.now();
     syncMenuButtons();
     if (state.mode === "playing" && state.matchType === state.lan.roomMatchType) return;
+    
+    // For LAN guests, don't create a new match - wait for host snapshot to populate the world
+    if (isLanClient()) {
+      state.matchType = normalizeLanMatchType(matchType);
+      state.mode = "playing";
+      state.lan.awaitingSnapshot = true;
+      state.lan.pollTimer = 0; // Force immediate poll to get snapshot
+      createWorld(); // Initialize empty world structure
+      overlay.classList.add("hidden");
+      setLanStatus("Syncing game state from host...");
+      return;
+    }
+    
     startMatchWithLoading(state.lan.roomMatchType).catch((error) => {
       setLanStatus(`Unable to start the LAN match: ${error.message}`);
     });
@@ -3762,13 +3910,16 @@
         if (response.snapshot) {
           state.lan.lastSnapshotRevision = response.snapshotRevision || state.lan.lastSnapshotRevision;
           applyLanSnapshot(response.snapshot);
+          state.lan.awaitingSnapshot = false;
         }
         setLanStatus(
           !response.started
             ? `Joined room ${state.lan.roomCode}. Press Start to launch the shared LAN battle for everyone in the room.`
             : response.hostReady
               ? `Joined room ${state.lan.roomCode} on ${shareOrigin}. Connected as Player 2 in the live battle.`
-              : `Room ${state.lan.roomCode} started. Waiting for the host battlefield snapshot.`,
+              : state.lan.awaitingSnapshot
+                ? `Room ${state.lan.roomCode} started. Syncing game state...`
+                : `Room ${state.lan.roomCode} started. Connected and synchronized.`,
         );
       }
       syncMenuButtons();
@@ -4479,6 +4630,15 @@
     applyStrategicEffects(bonuses, getOwnerTechBonuses(entity.owner));
     applyStrategicEffects(bonuses, getOwnerTerritoryBonuses(entity.owner));
     applyStrategicEffects(bonuses, getHeroAuraModifiers(entity));
+    
+    // Royal Rally rally buff
+    if (entity.ralliedTimer && entity.ralliedTimer > 0) {
+      const rallyStrength = Math.min(1, entity.ralliedTimer / 10);
+      bonuses.attackMult *= (1 + rallyStrength * 0.35);
+      bonuses.defenseMult *= (1 + rallyStrength * 0.28);
+      bonuses.speedMult *= (1 + rallyStrength * 0.22);
+    }
+    
     return bonuses;
   }
 
@@ -4649,7 +4809,34 @@
     if (active.id === "royal_rally") {
       const healed = healCircle(heroUnit.x, heroUnit.y, active.radius || 180, 72 * power, owner);
       spawnEffect("repair", heroUnit.x, heroUnit.y, (active.radius || 180) * 0.65, "#8affd9", 0.95);
-      notify(healed ? `${archetype.name} triggered Royal Rally.` : `${archetype.name} rallied the line.`, "#8affd9", { owner });
+      
+      // Heavy impact effects
+      spawnEffect("blast", heroUnit.x, heroUnit.y, (active.radius || 180) * 0.8, "#4fffcc", 1.2);
+      
+      // Screen shake for impact
+      for (const player of getHumanPlayers()) {
+        if (areOwnersAllied(player.owner, owner)) {
+          player.camera.shake = (player.camera.shake || 0) + 18;
+        }
+      }
+      
+      // Buff nearby allied units temporarily
+      for (const unit of state.world.units) {
+        if (!unit.owner || !areOwnersAllied(unit.owner, owner)) continue;
+        if (Math.hypot(unit.x - heroUnit.x, unit.y - heroUnit.y) > (active.radius || 180)) continue;
+        unit.ralliedTimer = Math.max(unit.ralliedTimer || 0, active.duration || 10);
+        unit.lastBuffTimer = 0.3;
+      }
+      
+      // Enhanced visual effect with rings
+      for (let ring = 0; ring < 3; ring++) {
+        setTimeout(() => {
+          spawnEffect("blast", heroUnit.x, heroUnit.y, (active.radius || 180) * (0.5 + ring * 0.3), "#2fffcc", 0.5);
+        }, ring * 150);
+      }
+      
+      notify(healed ? `${archetype.name} triggered Royal Rally! Allies rallied!` : `${archetype.name} rallied the line with mighty force!`, "#00ffee", { owner });
+      playWorldSound("impactBlast", heroUnit.x, heroUnit.y, { cooldown: 0.1, volume: 1.2 });
     } else if (active.id === "blood_onslaught") {
       damageCircle(heroUnit.x, heroUnit.y, active.radius || 180, 82 * power, owner, "melee", 1.08);
       spawnEffect("blast", heroUnit.x, heroUnit.y, (active.radius || 180) * 0.52, "#ffb469", 0.8);
@@ -5082,6 +5269,24 @@
         entity.speed = def.speed * 1.55;
         entity.moveTarget = { x: target.x, y: target.y };
         spawnEffect("smoke", entity.x, entity.y, def.ability.radius * 0.5, "rgba(108,88,54,0.7)", 0.9);
+      }
+    } else if (def.id === "super_boss") {
+      // Super boss: roam around and attack aggressively
+      const rand = Math.random();
+      if (rand < 0.4) {
+        // Move to a random location
+        const angle = Math.random() * TAU;
+        const distance = 300 + Math.random() * 400;
+        entity.moveTarget = {
+          x: clamp(entity.x + Math.cos(angle) * distance, -HALF_WORLD + 200, HALF_WORLD - 200),
+          y: clamp(entity.y + Math.sin(angle) * distance, -HALF_WORLD + 200, HALF_WORLD - 200)
+        };
+        entity.order = "move";
+      } else {
+        // Attack with devastating ability
+        damageCircle(entity.x, entity.y, def.ability.radius, def.ability.damage, entity.owner, "super", 1.2);
+        spawnEffect("blast", entity.x, entity.y, def.ability.radius * 0.6, def.tint, 1.2);
+        spawnEffect("emp", entity.x, entity.y, def.ability.radius * 0.8, "#ff6666", 1.0);
       }
     }
   }
@@ -6905,8 +7110,12 @@
     }
     const pendingBoss = BOSS_WAVE_SEQUENCE[state.boss.waveCursor];
     if (pendingBoss && state.waves.index >= pendingBoss.wave && state.time >= (pendingBoss.minTime || 0) && !getActiveBossEntity()) {
-      spawnBossEncounter(pendingBoss.bossId, enemyKeeps[0] ? enemyKeeps[0].owner : "enemy1");
-      state.boss.waveCursor += 1;
+      // For story mode level 4, spawn super boss early
+      const bossId = (state.matchType === "single" && state.story.level === 4 && state.waves.index >= 3 && !getActiveBossEntity()) ? "super_boss" : pendingBoss.bossId;
+      spawnBossEncounter(bossId, enemyKeeps[0] ? enemyKeeps[0].owner : "enemy1");
+      if (bossId !== "super_boss") { // Don't advance cursor for super boss
+        state.boss.waveCursor += 1;
+      }
     }
     const baseCooldown = clamp(28 - state.waves.index * 1.25, 15, 28);
     state.waves.cooldown = (isEasyModeActive() ? baseCooldown * 1.45 : isHardModeActive() ? baseCooldown * 0.78 : baseCooldown) * cooldownMult;
@@ -7149,18 +7358,20 @@
     });
     assignFactionDoctrines(preset);
 
+    const randomSeed = preset === "random" ? Math.random() * 1000 : 0;
+
     for (let gy = 0; gy < GRID_COUNT; gy += 1) {
       for (let gx = 0; gx < GRID_COUNT; gx += 1) {
         const x = gx * TILE_SIZE - HALF_WORLD + TILE_SIZE / 2;
         const y = gy * TILE_SIZE - HALF_WORLD + TILE_SIZE / 2;
         const nx = gx / GRID_COUNT;
         const ny = gy / GRID_COUNT;
-        const ridge = Math.sin(nx * 8.2) * Math.cos(ny * 6.7);
-        const swirl = Math.sin((nx + ny) * 11.5) * 0.24;
-        const noise = ridge + swirl + (rand(gx * 993 + gy * 117) - 0.5) * 0.5;
-        const heat = Math.sin(nx * 5.1 - ny * 3.4) * 0.45 + rand(gx * 83 + gy * 41) * 0.45;
-        const fracture = Math.abs(Math.sin(nx * 14.5 + ny * 7.3) + Math.cos(nx * 4.7 - ny * 9.5)) * 0.5;
-        const blight = Math.sin((nx - ny) * 9.3) * 0.4 + rand(gx * 211 + gy * 59) * 0.3;
+        const ridge = Math.sin(nx * (8.2 + randomSeed * 0.01)) * Math.cos(ny * (6.7 + randomSeed * 0.01));
+        const swirl = Math.sin((nx + ny) * (11.5 + randomSeed * 0.01)) * 0.24;
+        const noise = ridge + swirl + (rand(gx * 993 + gy * 117 + randomSeed) - 0.5) * 0.5;
+        const heat = Math.sin(nx * (5.1 + randomSeed * 0.01) - ny * (3.4 + randomSeed * 0.01)) * 0.45 + rand(gx * 83 + gy * 41 + randomSeed) * 0.45;
+        const fracture = Math.abs(Math.sin(nx * (14.5 + randomSeed * 0.01) + ny * (7.3 + randomSeed * 0.01)) + Math.cos(nx * (4.7 + randomSeed * 0.01) - ny * (9.5 + randomSeed * 0.01))) * 0.5;
+        const blight = Math.sin((nx - ny) * (9.3 + randomSeed * 0.01)) * 0.4 + rand(gx * 211 + gy * 59 + randomSeed) * 0.3;
         let biome = getMapBiomeForPreset(preset, { x, y, nx, ny, noise, heat, fracture, blight });
         biome = applySafeZoneBiomeOverride(biome, x, y, noise, safeZones);
 
@@ -8499,7 +8710,16 @@
       if ((item.id === "village_house" || item.id === "market" || item.id === "chapel") && terrainSamples.some((terrain) => terrain.label === "Canyon")) return "Settlements cannot be placed inside canyon terrain.";
     }
     const constraint = getPlacementConstraint(item, owner, { excludeBuildingId: options.ignoreBuildingId || null });
-    if (constraint && Math.hypot(x - constraint.anchor.x, y - constraint.anchor.y) > constraint.radius) return constraint.reason;
+    if (constraint) {
+      // Check if placement is within range of ANY owned building, not just the anchor
+      const placementRadius = constraint.radius;
+      const isWithinAnyBuilding = state.world.buildings.some(building => 
+        building.owner === owner && 
+        building.id !== options.ignoreBuildingId &&
+        Math.hypot(x - building.x, y - building.y) <= placementRadius
+      );
+      if (!isWithinAnyBuilding) return constraint.reason;
+    }
     return null;
   }
 
@@ -9519,6 +9739,8 @@
     unit.lastHitTimer = Math.max(0, unit.lastHitTimer - dt);
     unit.lastCombatTimer = Math.max(0, (unit.lastCombatTimer || 0) - dt);
     unit.empTimer = Math.max(0, unit.empTimer - dt);
+    unit.ralliedTimer = Math.max(0, (unit.ralliedTimer || 0) - dt);
+    unit.lastBuffTimer = Math.max(0, (unit.lastBuffTimer || 0) - dt);
     const strategic = getEntityStrategicModifiers(unit);
     unit.attackCooldown -= dt * (strategic.attackRateMult || 1);
     unit.interactCooldown = Math.max(0, (unit.interactCooldown || 0) - dt);
@@ -9686,6 +9908,28 @@
       const blockingResource = getBlockingResourceForMove(unit);
       if (blockingResource) {
         setUnitInteractionOrder(unit, blockingResource, "resource", { preserveMove: true });
+      }
+    }
+
+    // Auto-mining for idle player units - look for nearby resources when standing still
+    if (isHumanOwner(unit.owner) && unit.order === "idle" && !unit.moveTarget && !unit.targetId && !unit.interactTargetId) {
+      // Look for nearby resources (trees and rocks) within a reasonable range
+      const autoMineRange = 280;
+      const nearbyResources = state.world.trees
+        .concat(state.world.rocks)
+        .filter(resource => {
+          const dist = Math.hypot(resource.x - unit.x, resource.y - unit.y);
+          return dist <= autoMineRange && resource.health > 0;
+        })
+        .sort((a, b) => {
+          const distA = Math.hypot(a.x - unit.x, a.y - unit.y);
+          const distB = Math.hypot(b.x - unit.x, b.y - unit.y);
+          return distA - distB;
+        });
+      
+      if (nearbyResources.length > 0) {
+        const target = nearbyResources[0];
+        setUnitInteractionOrder(unit, target, "resource");
       }
     }
 
@@ -9915,7 +10159,7 @@
       if (isLanHost()) {
         state.lan.syncTimer -= dt;
         if (state.lan.syncTimer <= 0) {
-          state.lan.syncTimer = state.lan.guestJoined ? 0.12 : 0.35;
+          state.lan.syncTimer = state.lan.guestJoined ? 0.03 : 0.2;
           pushLanSnapshot();
         }
       }
@@ -9923,7 +10167,7 @@
     updateAudio(dt);
     if (state.mode !== "playing") return;
     updateFogOfWar();
-    if (isLanClient()) return;
+    if (isLanClient() && !state.lan.awaitingSnapshot) return;
     const simDt = dt * state.speed.multiplier;
     state.time += simDt;
     if (state.runtime.lastPlacementUndo && state.runtime.lastPlacementUndo.expiresAt <= state.time) state.runtime.lastPlacementUndo = null;
@@ -9948,6 +10192,18 @@
     updateHeroSystems(simDt);
     updateResourceNodes(simDt);
     rebuildFormationProgressCache();
+    
+    // Update camera shake
+    if (state.camera.shake > 0) {
+      state.camera.shake = Math.max(0, state.camera.shake - simDt * 22);
+      state.camera.shakeAngle = Math.random() * TAU;
+      const shakeIntensity = state.camera.shake * 0.8;
+      const shakeX = Math.cos(state.camera.shakeAngle) * shakeIntensity;
+      const shakeY = Math.sin(state.camera.shakeAngle) * shakeIntensity;
+      state.camera.x += shakeX;
+      state.camera.y += shakeY;
+    }
+    
     for (const civilian of state.world.civilians) updateCivilian(civilian, simDt);
     for (const animal of state.world.animals) updateAnimal(animal, simDt);
     for (const building of [...state.world.buildings]) updateBuilding(building, simDt);
@@ -9977,6 +10233,7 @@
       } else if (aliveCombatOwners.length === 1) {
         state.winnerOwner = aliveCombatOwners[0] || null;
         state.mode = isHumanOwner(state.winnerOwner) ? "victory" : "defeat";
+        checkAchievements();
         if (getHumanPlayers().length === 2 && state.winnerOwner && isHumanOwner(state.winnerOwner)) {
           state.loserOwner = getHumanOwners().find((owner) => owner !== state.winnerOwner) || null;
         } else {
@@ -9989,6 +10246,7 @@
       const enemyAlive = countHostileBuildings() > 0 || countHostileUnits() > 0;
       if (!enemyAlive) {
         state.mode = "victory";
+        checkAchievements();
         state.winnerOwner = null;
         state.loserOwner = null;
         showMatchResultOverlay();
@@ -10003,8 +10261,14 @@
         state.world.units.some((unit) => unit.owner !== "player" && unit.owner !== "neutral");
       const playerAlive = ownerHasForces("player");
       if (!enemyAlive) {
-        state.mode = "victory";
-        showMatchResultOverlay();
+        // Story mode: check if there are more levels
+        if (state.matchType === "single" && state.story.level < state.story.maxLevel) {
+          state.mode = "level-complete";
+          showLevelCompleteOverlay();
+        } else {
+          state.mode = "victory";
+          showMatchResultOverlay();
+        }
       } else if (!playerAlive) {
         state.mode = "defeat";
         showMatchResultOverlay();
@@ -11168,7 +11432,13 @@
     ctx.rotate(state.camera.rotation);
     ctx.translate(-state.camera.x, -state.camera.y);
 
-    ctx.drawImage(mapCanvas, -HALF_WORLD, -HALF_WORLD, WORLD_SIZE, WORLD_SIZE);
+    // Draw tiled map to eliminate void
+    for (let dx = -WORLD_SIZE; dx <= WORLD_SIZE; dx += WORLD_SIZE) {
+      for (let dy = -WORLD_SIZE; dy <= WORLD_SIZE; dy += WORLD_SIZE) {
+        ctx.drawImage(mapCanvas, -HALF_WORLD + dx, -HALF_WORLD + dy, WORLD_SIZE, WORLD_SIZE);
+      }
+    }
+
     drawEnvironmentShaders();
     drawGrid();
     drawResources();
@@ -11185,6 +11455,37 @@
     drawFogOfWar();
     drawAdminPoints();
     ctx.restore();
+
+    // Draw red restriction zones in screen space when camera reaches edges
+    const restrictionThreshold = CAMERA_LIMIT - 200; // Start showing red 200 units before limit
+    if (Math.abs(state.camera.x) > restrictionThreshold || Math.abs(state.camera.y) > restrictionThreshold) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255, 0, 0, 0.3)"; // Semi-transparent red
+      const zoneWidth = 50; // Width of red zone on screen edges
+
+      if (Math.abs(state.camera.x) > restrictionThreshold) {
+        // Draw vertical red zones on left/right edges
+        if (state.camera.x > 0) {
+          // Right edge
+          ctx.fillRect(viewport.x + viewport.w - zoneWidth, viewport.y, zoneWidth, viewport.h);
+        } else {
+          // Left edge
+          ctx.fillRect(viewport.x, viewport.y, zoneWidth, viewport.h);
+        }
+      }
+
+      if (Math.abs(state.camera.y) > restrictionThreshold) {
+        // Draw horizontal red zones on top/bottom edges
+        if (state.camera.y > 0) {
+          // Bottom edge
+          ctx.fillRect(viewport.x, viewport.y + viewport.h - zoneWidth, viewport.w, zoneWidth);
+        } else {
+          // Top edge
+          ctx.fillRect(viewport.x, viewport.y, viewport.w, zoneWidth);
+        }
+      }
+      ctx.restore();
+    }
   }
 
   function drawFogOfWar() {
@@ -11192,7 +11493,12 @@
     if (!player || !player.fog) return;
     ctx.save();
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(player.fog.maskCanvas, -HALF_WORLD, -HALF_WORLD, WORLD_SIZE, WORLD_SIZE);
+    // Draw tiled fog to match the tiled map
+    for (let dx = -WORLD_SIZE; dx <= WORLD_SIZE; dx += WORLD_SIZE) {
+      for (let dy = -WORLD_SIZE; dy <= WORLD_SIZE; dy += WORLD_SIZE) {
+        ctx.drawImage(player.fog.maskCanvas, -HALF_WORLD + dx, -HALF_WORLD + dy, WORLD_SIZE, WORLD_SIZE);
+      }
+    }
     ctx.restore();
   }
 
@@ -11686,6 +11992,7 @@
     const quality = getGraphicsPreset();
     const color = ownerColors[unit.owner] || "#ffffff";
     const hitTint = unit.lastHitTimer > 0 ? "#fff1d5" : null;
+    const ralliedIntensity = unit.ralliedTimer > 0 ? (unit.ralliedTimer / 10) * 0.8 : 0;
     if (quality.simplifyModels) {
       if (unit.type === "vehicle" || unit.airborne) {
         ctx.fillStyle = hitTint || "#60707a";
@@ -11804,6 +12111,23 @@
       }
     }
     drawBanner(color, -unit.radius * 0.8, -unit.radius * 1.1, unit.radius * 0.5);
+    
+    // Draw rally effect glow
+    if (ralliedIntensity > 0) {
+      ctx.save();
+      ctx.globalAlpha = ralliedIntensity;
+      ctx.fillStyle = "#00ffcc";
+      ctx.beginPath();
+      ctx.arc(0, 0, unit.radius * (0.9 + Math.sin(state.time * 8) * 0.2), 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = ralliedIntensity * 0.6;
+      ctx.strokeStyle = "#00ffcc";
+      ctx.lineWidth = 3 / state.camera.zoom;
+      ctx.beginPath();
+      ctx.arc(0, 0, unit.radius * (1.2 + Math.sin(state.time * 6) * 0.3), 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function drawSelectionHalo(unit) {
@@ -11933,9 +12257,14 @@
       ctx.setLineDash([18 / state.camera.zoom, 12 / state.camera.zoom]);
       ctx.lineWidth = 3 / state.camera.zoom;
       ctx.strokeStyle = blocked ? "rgba(255,138,128,0.48)" : "rgba(125,242,171,0.38)";
-      ctx.beginPath();
-      ctx.arc(constraint.anchor.x, constraint.anchor.y, constraint.radius, 0, TAU);
-      ctx.stroke();
+      // Draw placement ranges around all player's buildings
+      for (const building of state.world.buildings) {
+        if (building.owner === owner && building.id !== (action.building && action.building.id)) {
+          ctx.beginPath();
+          ctx.arc(building.x, building.y, constraint.radius, 0, TAU);
+          ctx.stroke();
+        }
+      }
       ctx.setLineDash([]);
       ctx.fillStyle = blocked ? "rgba(255,138,128,0.16)" : "rgba(125,242,171,0.12)";
       ctx.beginPath();
@@ -14874,6 +15203,21 @@
     closeSettingsOverlay();
     if (matchType !== "lan" && matchType !== "lan-coop") resetLanSessionState();
     initializePlayers(matchType, playerCount);
+    
+    // Set map based on story level for single player story mode
+    if (matchType === "single") {
+      const storyMaps = ["green", "canyon", "desert", "ocean"];
+      state.mapPreset = storyMaps[(state.story.level - 1) % storyMaps.length] || "green";
+      // Set difficulty based on story level for new matches
+      if (state.story.level === 1) {
+        state.difficulty.mode = "easy";
+      } else if (state.story.level === 2) {
+        state.difficulty.mode = "normal";
+      } else if (state.story.level >= 3) {
+        state.difficulty.mode = "hard";
+      }
+    }
+    
     state.world.preset = sanitizeMapPreset(state.mapPreset);
     state.keys.forward = false;
     state.keys.back = false;
@@ -14893,7 +15237,7 @@
     state.ids = 0;
     state.taxPulseLock = false;
     state.save.autosaveTimer = 0;
-    state.difficulty.ceasefireTimer = 0;
+    state.difficulty.ceasefireTimer = state.difficulty.ceasefireDuration;
     state.difficulty.hardPressureApplied = false;
     state.runtime.lastPlacementUndo = null;
     audioState.lastResultCue = null;
@@ -15166,6 +15510,115 @@
     requestAnimationFrame(loop);
   }
 
+  function getTouchDistance(touches) {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function getTouchCenter(touches) {
+    let x = 0;
+    let y = 0;
+    for (const touch of touches) {
+      x += touch.clientX;
+      y += touch.clientY;
+    }
+    return { x: x / touches.length, y: y / touches.length };
+  }
+
+  function handleTouchStart(event) {
+    if (state.mode !== "playing") return;
+    const touches = event.touches;
+    if (touches.length === 1) {
+      // Single touch - movement/interaction
+      const touch = touches[0];
+      const pointer = clientToCanvasPoint(touch.clientX, touch.clientY);
+      const player = getPlayerForScreenPoint(pointer.x, pointer.y);
+      markMouseInput(player);
+      setActivePlayerContext(player, getViewportForPlayer(player));
+      state.input.touchActive = true;
+      state.input.touchIdentifier = touch.identifier;
+      handleLeftDown(player, pointer.x, pointer.y, "touch");
+    } else if (touches.length === 2) {
+      // Two-finger touch - pan and zoom
+      state.input.touchActive = true;
+      const distance = getTouchDistance(touches);
+      state.mobile.touchStartDistance = distance;
+      state.mobile.lastTouchDistance = distance;
+      const center = getTouchCenter(touches);
+      state.input.panAnchorX = center.x;
+      state.input.panAnchorY = center.y;
+    }
+    event.preventDefault();
+  }
+
+  function handleTouchMove(event) {
+    if (!state.input.touchActive || state.mode !== "playing") return;
+    const touches = event.touches;
+    
+    if (touches.length === 1) {
+      // Single touch move
+      const touch = touches[0];
+      if (touch.identifier !== state.input.touchIdentifier) return;
+      const pointer = clientToCanvasPoint(touch.clientX, touch.clientY);
+      const player = getPlayerForScreenPoint(pointer.x, pointer.y);
+      setActivePlayerContext(player, getViewportForPlayer(player));
+      updatePlayerPointer(player, pointer.x, pointer.y);
+    } else if (touches.length === 2) {
+      // Two-finger touch - pinch zoom and pan
+      const distance = getTouchDistance(touches);
+      if (distance > 0 && state.mobile.touchStartDistance > 0) {
+        const zoomFactor = 1 + (distance - state.mobile.touchStartDistance) / 500;
+        state.camera.zoom = clamp(state.camera.zoom / zoomFactor, 0.36, 1.9);
+      }
+      
+      // Pan with two fingers
+      const center = getTouchCenter(touches);
+      const dx = (center.x - state.input.panAnchorX) / state.camera.zoom;
+      const dy = (center.y - state.input.panAnchorY) / state.camera.zoom;
+      const cos = Math.cos(-state.camera.rotation);
+      const sin = Math.sin(-state.camera.rotation);
+      state.camera.x -= dx * cos - dy * sin;
+      state.camera.y -= dx * sin + dy * cos;
+      state.camera.x = clamp(state.camera.x, -CAMERA_LIMIT, CAMERA_LIMIT);
+      state.camera.y = clamp(state.camera.y, -CAMERA_LIMIT, CAMERA_LIMIT);
+      
+      state.input.panAnchorX = center.x;
+      state.input.panAnchorY = center.y;
+      state.mobile.lastTouchDistance = distance;
+    }
+    event.preventDefault();
+  }
+
+  function handleTouchEnd(event) {
+    if (state.mode !== "playing") {
+      state.input.touchActive = false;
+      return;
+    }
+    
+    const touches = event.touches;
+    if (touches.length === 0) {
+      // All touches ended
+      if (state.input.leftDown && state.input.actionSource === "touch") {
+        const pointer = clientToCanvasPoint(state.input.cursorX, state.input.cursorY);
+        const player = getPlayerForScreenPoint(pointer.x, pointer.y);
+        setActivePlayerContext(player, getViewportForPlayer(player));
+        handleLeftUp(player, pointer.x, pointer.y, "touch");
+      }
+      state.input.touchActive = false;
+      state.input.touchIdentifier = null;
+    }
+    event.preventDefault();
+  }
+
+  function handleOrientationChange() {
+    state.mobile.isPortrait = window.innerHeight > window.innerWidth;
+    resize();
+    for (const player of getHumanPlayers()) clampCursorToViewport(player);
+    draw();
+  }
+
   window.addEventListener("pointerdown", ensureAudioUnlocked, { once: true });
   window.addEventListener("keydown", ensureAudioUnlocked, { once: true });
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -15227,6 +15680,10 @@
   window.addEventListener("wheel", handleWheel, { passive: false });
   window.addEventListener("keydown", handleKey);
   window.addEventListener("keyup", handleKeyUp);
+  canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+  canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+  canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
+  window.addEventListener("orientationchange", handleOrientationChange);
   window.addEventListener("resize", () => {
     resize();
     for (const player of getHumanPlayers()) clampCursorToViewport(player);
