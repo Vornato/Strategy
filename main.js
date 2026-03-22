@@ -1132,6 +1132,7 @@
       notifications: [],
       quests: [],
       controlPoints: [],
+      fallingPayloads: [],
     },
     ui: {
       openPanel: null,
@@ -3289,6 +3290,7 @@
         effects: state.world.effects.map((effect) => ({ ...effect })),
         drops: state.world.drops.map(({ def, ...drop }) => ({ ...drop, defId: def.id })),
         notifications: state.world.notifications.slice(-8).map((note) => ({ ...note })),
+        fallingPayloads: state.world.fallingPayloads.map((p) => ({ ...p, item: undefined })),
         quests: state.world.quests.map((quest) => ({ ...quest })),
         controlPoints: (state.world.controlPoints || []).map((point) => ({ ...point })),
       },
@@ -3317,6 +3319,10 @@
     state.world.notifications = (world.notifications || []).map((note) => ({ ...note }));
     state.world.quests = (world.quests || []).map((quest) => ({ ...quest }));
     state.world.controlPoints = (world.controlPoints || []).map((point) => ({ ...point }));
+    state.world.fallingPayloads = (world.fallingPayloads || []).map((p) => ({
+      ...p,
+      item: itemIndex.get(p.itemId),
+    }));
     state.factions = Object.fromEntries(
       Object.entries(snapshot.factions || {}).map(([owner, faction]) => [
         owner,
@@ -3995,6 +4001,9 @@
     } else if (type === "poll") {
       // Handle poll response (when HTTP fallback is triggered)
       pollLanResponseHandler(data);
+    } else if (type === "push") {
+      state.lan.lastSnapshotRevision = data.snapshotRevision || state.lan.lastSnapshotRevision;
+      state.lan.guestJoined = Boolean(data.guestJoined);
     }
   }
 
@@ -7502,6 +7511,7 @@
     state.world.notifications.length = 0;
     state.world.quests.length = 0;
     state.world.controlPoints.length = 0;
+    state.world.fallingPayloads.length = 0;
     state.factions = {};
     state.boss = createBossState();
     state.waves.index = 0;
@@ -9304,69 +9314,128 @@
     }
   }
 
-  function resolveAbility(item, x, y, owner) {
-    if (item.id === "carpet_bomb") {
-      const angle = randomRange(x + y + state.time, -Math.PI, Math.PI);
-      for (let i = -3; i <= 3; i += 1) {
-        const ox = x + Math.cos(angle) * i * 44 + randomRange(i * 31 + x, -18, 18);
-        const oy = y + Math.sin(angle) * i * 44 + randomRange(i * 27 + y, -18, 18);
-        damageCircle(ox, oy, item.blast * 0.46, item.damage, owner, "rocket");
-        spawnEffect("blast", ox, oy, 58, "#ffb469", 0.84);
-        spawnEffect("smoke", ox, oy, 44, "rgba(68,58,48,0.58)", 1.08);
-        playWorldSound("impactBlast", ox, oy, { cooldown: 0.1, volume: 0.92 });
+  function spawnFallingPayload(item, x, y, owner, options = {}) {
+    const startZ = options.startZ || 900;
+    const speed = options.speed || 600;
+    const delay = options.delay || 0;
+    state.world.fallingPayloads.push({
+      id: createId("payload"),
+      itemId: item.id,
+      item,
+      x,
+      y,
+      z: startZ,
+      vz: -speed,
+      owner,
+      delay,
+      overrides: options.overrides || {},
+    });
+  }
+
+  function updateFallingPayloads(dt) {
+    for (let i = state.world.fallingPayloads.length - 1; i >= 0; i -= 1) {
+      const p = state.world.fallingPayloads[i];
+      if (p.delay > 0) {
+        p.delay -= dt;
+        continue;
       }
+      p.z += p.vz * dt;
+      p.vz -= 900 * dt; // Gravity acceleration
+      if (p.z <= 0) {
+        triggerAbilityImpact(p.item, p.x, p.y, p.owner, p.overrides);
+        state.world.fallingPayloads.splice(i, 1);
+      }
+    }
+  }
+
+  function drawFallingPayloads() {
+    const quality = getGraphicsPreset();
+    for (const p of state.world.fallingPayloads) {
+      if (p.delay > 0) continue;
+      const visualY = p.y - p.z;
+      if (!isWorldCircleVisibleInActiveViewport(p.x, visualY, 80)) continue;
+
+      // Scale starts large (high Z) and drops to 1.0 (ground)
+      const scale = 1 + (p.z / 1000) * 1.5;
+      const size = 32 * scale;
+
+      // Shadow
+      if (quality.drawShadows && p.z > 10) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.translate(p.x, p.y);
+        const shadowScale = 1 - Math.min(1, p.z / 1500);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 16 * shadowScale, 10 * shadowScale, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const rotation = Math.PI * 0.75 + p.z * 0.003;
+      drawSpriteFromGroup("units", p.item.role, p.x, visualY, size, size, rotation, 1);
+    }
+  }
+
+  function triggerAbilityImpact(item, x, y, owner, overrides = {}) {
+    const damage = overrides.damage || item.damage;
+    const blast = overrides.blast || item.blast;
+    const projectileType = overrides.projectile || (item.id === "bunker_buster" ? "shell" : "rocket");
+    
+    if (item.id === "carpet_bomb") {
+      // Carpet bomb impact logic (single explosion of the carpet)
+      damageCircle(x, y, blast, damage, owner, "rocket");
+      spawnEffect("blast", x, y, 58, "#ffb469", 0.84);
+      spawnEffect("smoke", x, y, 44, "rgba(68,58,48,0.58)", 1.08);
+      playWorldSound("impactBlast", x, y, { cooldown: 0.1, volume: 0.92 });
       return;
     }
     if (item.id === "orbital_laser") {
-      damageCircle(x, y, item.blast * 0.7, item.damage, owner, "pulse", 1.35);
-      damageCircle(x, y, item.blast * 0.38, item.damage * 0.55, owner, "pulse", 1.6);
-      spawnEffect("emp", x, y, item.blast, "#7ef7ff", 1.15);
-      spawnEffect("impact", x, y, item.blast * 0.55, "#f1fcff", 0.5);
+      damageCircle(x, y, blast * 0.7, damage, owner, "pulse", 1.35);
+      damageCircle(x, y, blast * 0.38, damage * 0.55, owner, "pulse", 1.6);
+      spawnEffect("emp", x, y, blast, "#7ef7ff", 1.15);
+      spawnEffect("impact", x, y, blast * 0.55, "#f1fcff", 0.5);
       notify("Orbital beam locked on target.", "#9fe8ff");
       playWorldSound("impactPulse", x, y, { cooldown: 0.16, volume: 1.02 });
       return;
     }
     if (item.id === "nano_swarm") {
-      const healed = healCircle(x, y, item.blast, 120, owner);
-      damageCircle(x, y, item.blast * 0.7, item.damage, owner, "pulse");
-      spawnEffect("repair", x, y, item.blast * 0.54, "#8affd9", 0.9);
-      spawnEffect("emp", x, y, item.blast * 0.7, "#7ef7ff", 0.75);
+      const healed = healCircle(x, y, blast, 120, owner);
+      damageCircle(x, y, blast * 0.7, damage, owner, "pulse");
+      spawnEffect("repair", x, y, blast * 0.54, "#8affd9", 0.9);
+      spawnEffect("emp", x, y, blast * 0.7, "#7ef7ff", 0.75);
       notify(healed ? `Nano swarm repaired ${healed} allied targets.` : "Nano swarm released over the combat zone.", "#8affd9");
       playWorldSound("repair", x, y, { cooldown: 0.16, volume: 0.9 });
       return;
     }
     if (item.id === "gravity_bomb") {
-      damageCircle(x, y, item.blast, item.damage, owner, "pulse", 1.12);
+      damageCircle(x, y, blast, damage, owner, "pulse", 1.12);
       for (const unit of state.world.units) {
         if (!unit.owner || areOwnersAllied(unit.owner, owner)) continue;
-        if (Math.hypot(unit.x - x, unit.y - y) <= item.blast) {
+        if (Math.hypot(unit.x - x, unit.y - y) <= blast) {
           unit.empTimer = Math.max(unit.empTimer || 0, 5);
           const pull = normalize(x - unit.x, y - unit.y);
           unit.vx += pull.x * 90;
           unit.vy += pull.y * 90;
         }
       }
-      spawnEffect("emp", x, y, item.blast, "#b0c6ff", 1.15);
-      spawnEffect("blast", x, y, item.blast * 0.42, "#c8d4ff", 0.92);
+      spawnEffect("emp", x, y, blast, "#b0c6ff", 1.15);
+      spawnEffect("blast", x, y, blast * 0.42, "#c8d4ff", 0.92);
       playWorldSound("impactPulse", x, y, { cooldown: 0.14, volume: 1 });
       return;
     }
     if (item.id === "cluster_bomb") {
-      for (let i = 0; i < item.shards; i += 1) {
-        const ox = x + randomRange(i * 20 + x, -92, 92);
-        const oy = y + randomRange(i * 17 + y, -92, 92);
-        damageCircle(ox, oy, item.blast * 0.4, item.damage, owner, "rocket");
-        spawnEffect("blast", ox, oy, 54, "#ffbf69", 0.9);
-        spawnEffect("smoke", ox, oy, 42, "rgba(61,53,48,0.58)", 1.15);
-        playWorldSound("impactBlast", ox, oy, { cooldown: 0.1, volume: 0.88 });
-      }
+      // Cluster sub-munition impact
+      damageCircle(x, y, blast * 0.4, damage, owner, "rocket");
+      spawnEffect("blast", x, y, 54, "#ffbf69", 0.9);
+      spawnEffect("smoke", x, y, 42, "rgba(61,53,48,0.58)", 1.15);
+      playWorldSound("impactBlast", x, y, { cooldown: 0.1, volume: 0.88 });
       return;
     }
     if (item.id === "emp_burst") {
-      damageCircle(x, y, item.blast, item.damage, owner, "pulse");
+      damageCircle(x, y, blast, damage, owner, "pulse");
       for (const unit of state.world.units) {
         if (unit.owner === owner) continue;
-        if (Math.hypot(unit.x - x, unit.y - y) <= item.blast) {
+        if (Math.hypot(unit.x - x, unit.y - y) <= blast) {
           unit.speed *= item.slow;
           unit.empTimer = 7;
         }
@@ -9376,18 +9445,48 @@
       return;
     }
     if (item.id === "nuke") {
-      damageCircle(x, y, item.blast, item.damage, owner, "rocket", item.armorPierce || 1.8);
-      spawnEffect("nuke", x, y, item.blast, "#fff4b2", 2.6);
-      spawnEffect("smoke", x, y, item.blast * 0.62, "rgba(72,64,60,0.78)", 2.9);
-      spawnEffect("blast", x, y, item.blast * 0.52, "#ffcf8f", 1.4);
+      damageCircle(x, y, blast, damage, owner, "rocket", item.armorPierce || 1.8);
+      spawnEffect("nuke", x, y, blast, "#fff4b2", 2.6);
+      spawnEffect("smoke", x, y, blast * 0.62, "rgba(72,64,60,0.78)", 2.9);
+      spawnEffect("blast", x, y, blast * 0.52, "#ffcf8f", 1.4);
       notify("Tactical nuke detonated.", "#ffdd85");
       playWorldSound("impactBlast", x, y, { cooldown: 0.24, volume: 1.2 });
       return;
     }
-    damageCircle(x, y, item.blast, item.damage, owner, item.id === "bunker_buster" ? "shell" : "rocket", item.armorPierce || 1);
-    spawnEffect("blast", x, y, item.blast * 0.48, item.id === "bomb_strike" ? "#f6b36d" : "#ff8d6d", 1.0);
-    spawnEffect("smoke", x, y, item.blast * 0.38, "rgba(63,58,54,0.55)", 1.2);
+    
+    // Default bomb impact
+    damageCircle(x, y, blast, damage, owner, projectileType, item.armorPierce || 1);
+    spawnEffect("blast", x, y, blast * 0.48, item.id === "bomb_strike" ? "#f6b36d" : "#ff8d6d", 1.0);
+    spawnEffect("smoke", x, y, blast * 0.38, "rgba(63,58,54,0.55)", 1.2);
     playWorldSound("impactBlast", x, y, { cooldown: 0.14, volume: item.id === "bunker_buster" ? 1.02 : 0.92 });
+  }
+
+  function resolveAbility(item, x, y, owner) {
+    if (item.id === "orbital_laser") {
+      triggerAbilityImpact(item, x, y, owner);
+      return;
+    }
+    if (item.id === "carpet_bomb") {
+      const angle = randomRange(x + y + state.time, -Math.PI, Math.PI);
+      for (let i = -3; i <= 3; i += 1) {
+        const ox = x + Math.cos(angle) * i * 44 + randomRange(i * 31 + x, -18, 18);
+        const oy = y + Math.sin(angle) * i * 44 + randomRange(i * 27 + y, -18, 18);
+        spawnFallingPayload(item, ox, oy, owner, { 
+          delay: i * 0.1, 
+          overrides: { blast: item.blast * 0.46, damage: item.damage } 
+        });
+      }
+      return;
+    }
+    if (item.id === "cluster_bomb") {
+      for (let i = 0; i < item.shards; i += 1) {
+        const ox = x + randomRange(i * 20 + x, -92, 92);
+        const oy = y + randomRange(i * 17 + y, -92, 92);
+        spawnFallingPayload(item, ox, oy, owner, { delay: randomRange(i, 0, 0.3) });
+      }
+      return;
+    }
+    spawnFallingPayload(item, x, y, owner);
   }
 
   function deployPlacement(item, x, y, owner = "player", options = {}) {
@@ -10317,6 +10416,7 @@
         state.lan.syncTimer -= dt;
         if (state.lan.syncTimer <= 0) {
           state.lan.syncTimer = state.lan.guestJoined ? 0.03 : 0.2;
+          state.lan.syncTimer = state.lan.guestJoined ? 0.05 : 0.2;
           pushLanSnapshot();
         }
       }
@@ -10350,6 +10450,7 @@
     updateResourceNodes(simDt);
     rebuildFormationProgressCache();
     
+    updateFallingPayloads(simDt);
     // Update camera shake
     if (state.camera.shake > 0) {
       state.camera.shake = Math.max(0, state.camera.shake - simDt * 22);
@@ -10434,15 +10535,50 @@
   }
 
   function draw() {
+    if (!window.frameCount) window.frameCount = 0;
+    window.frameCount++;
     const w = window.innerWidth;
     const h = window.innerHeight;
     ctx.clearRect(0, 0, w, h);
-    if (isSplitScreenMatch() && state.mode !== "menu") {
-      for (const player of getHumanPlayers()) drawViewport(player);
-      drawSplitDivider();
+    const fpPlayer = getFirstPersonActivePlayer();
+    if (fpPlayer) {
+      // First-person mode is active
+      if (isSplitScreenMatch() && state.mode !== "menu") {
+        for (const player of getHumanPlayers()) {
+          const viewport = getViewportForPlayer(player);
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(viewport.x, viewport.y, viewport.w, viewport.h);
+          ctx.clip();
+          drawFirstPersonView(player, viewport);
+          ctx.restore();
+          drawViewportLabel(player, viewport);
+        }
+        drawSplitDivider();
+      } else {
+        drawFirstPersonView(fpPlayer, getViewportForPlayer(fpPlayer));
+      }
     } else {
-      const player = getPrimaryPlayer();
-      drawFirstPersonView(player, getViewportForPlayer(player));
+      // Normal 3D isometric mode
+      if (isSplitScreenMatch() && state.mode !== "menu") {
+        for (const player of getHumanPlayers()) drawViewport(player);
+        drawSplitDivider();
+      } else {
+        const player = getPrimaryPlayer();
+        if (player) {
+          const viewport = getViewportForPlayer(player);
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(viewport.x, viewport.y, viewport.w, viewport.h);
+          ctx.clip();
+          setActivePlayerContext(player, viewport);
+          drawBackdrop(viewport.w, viewport.h, viewport.x, viewport.y);
+          drawWorld();
+          drawUi(viewport.w, viewport.h);
+          drawControllerCursor(player);
+          ctx.restore();
+        }
+      }
     }
   }
 
@@ -10552,29 +10688,33 @@
     const bobX = Math.sin(bobPhase) * (1.2 + speedNorm * 4.8) * aimFactor + strafeSpeed * 4.2;
     const bobY = Math.abs(Math.cos(bobPhase * 1.82)) * (0.5 + speedNorm * 4.4) * aimFactor + Math.max(0, forwardSpeed) * 0.7;
     const cameraOffsetX = bobX * 0.34 + strafeSpeed * 1.5;
-    const cameraOffsetY = bobY * 0.28 + breath - fp.kick * 2.4 - (fp.aiming ? 0.8 : 0);
+    const cameraOffsetY = bobY * 0.28 + breath - (fp.kick || 0) * 2.4 - (fp.aiming ? 0.8 : 0);
     const sprint = state.keys.sprint && !fp.aiming ? clamp(speedNorm, 0, 1) : 0;
     const lean = clamp(-strafeSpeed * 10 + ((state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0)) * 2.8, -8, 8) * (fp.aiming ? 0.5 : 1);
     return {
-      speedNorm,
-      forwardSpeed,
-      strafeSpeed,
-      breath,
-      bobX,
-      bobY,
-      cameraOffsetX,
-      cameraOffsetY,
-      weaponOffsetX: bobX * (fp.aiming ? 0.58 : 1.38) + fp.kick * 8.2,
-      weaponOffsetY: bobY * (fp.aiming ? 0.52 : 1.14) + breath * 0.7 + fp.kick * 12.5,
-      lean,
-      sprint,
-      reticleSpread: clamp((fp.aiming ? 2.2 : 5.4) + speedNorm * 8.4 + fp.kick * 18, fp.aiming ? 1.8 : 4.6, fp.aiming ? 8 : 18),
+      speedNorm: Number.isFinite(speedNorm) ? speedNorm : 0,
+      forwardSpeed: Number.isFinite(forwardSpeed) ? forwardSpeed : 0,
+      strafeSpeed: Number.isFinite(strafeSpeed) ? strafeSpeed : 0,
+      breath: Number.isFinite(breath) ? breath : 0,
+      bobX: Number.isFinite(bobX) ? bobX : 0,
+      bobY: Number.isFinite(bobY) ? bobY : 0,
+      cameraOffsetX: Number.isFinite(cameraOffsetX) ? cameraOffsetX : 0,
+      cameraOffsetY: Number.isFinite(cameraOffsetY) ? cameraOffsetY : 0,
+      weaponOffsetX: Number.isFinite(bobX * (fp.aiming ? 0.58 : 1.38) + (fp.kick || 0) * 8.2) ? bobX * (fp.aiming ? 0.58 : 1.38) + (fp.kick || 0) * 8.2 : 0,
+      weaponOffsetY: Number.isFinite(bobY * (fp.aiming ? 0.52 : 1.14) + breath * 0.7 + (fp.kick || 0) * 12.5) ? bobY * (fp.aiming ? 0.52 : 1.14) + breath * 0.7 + (fp.kick || 0) * 12.5 : 0,
+      lean: Number.isFinite(lean) ? lean : 0,
+      sprint: Number.isFinite(sprint) ? sprint : 0,
+      reticleSpread: clamp((fp.aiming ? 2.2 : 5.4) + speedNorm * 8.4 + (fp.kick || 0) * 18, fp.aiming ? 1.8 : 4.6, fp.aiming ? 8 : 18),
     };
   }
 
   function getFirstPersonHorizon(viewport, fp, motion = null) {
-    const motionOffset = motion ? motion.cameraOffsetY / Math.max(1, viewport.h) : 0;
-    return viewport.y + viewport.h * clamp(0.46 + fp.pitch * 0.7 + motionOffset * 0.22, 0.18, 0.78);
+    const cameraOffsetY = motion && Number.isFinite(motion.cameraOffsetY) ? motion.cameraOffsetY : 0;
+    const motionOffset = cameraOffsetY / Math.max(1, viewport.h);
+    const pitch = Number.isFinite(fp.pitch) ? fp.pitch : -0.08;
+    const horizonValue = clamp(0.46 + pitch * 0.7 + motionOffset * 0.22, 0.18, 0.78);
+    const result = viewport.y + viewport.h * horizonValue;
+    return Number.isFinite(result) ? result : viewport.y + viewport.h * 0.46;
   }
 
   function getBiomeFloorColor(biome, worldX, worldY, distance = 0) {
@@ -10598,23 +10738,26 @@
   function drawFirstPersonSkylineLayers(viewport, unit, fp, horizon, biome, motion = null) {
     const palettes = biome === "desert" || biome === "canyon"
       ? [
-        { color: "#443124", height: viewport.h * 0.19, variance: viewport.h * 0.028, alpha: 0.34, parallax: 0.14 },
-        { color: "#664634", height: viewport.h * 0.13, variance: viewport.h * 0.022, alpha: 0.26, parallax: 0.24 },
-        { color: "#8e6144", height: viewport.h * 0.08, variance: viewport.h * 0.014, alpha: 0.2, parallax: 0.38 },
+        { color: "#443124", height: viewport.h * 0.19, variance: viewport.h * 0.028, alpha: 0.38, parallax: 0.14 },
+        { color: "#664634", height: viewport.h * 0.13, variance: viewport.h * 0.022, alpha: 0.28, parallax: 0.24 },
+        { color: "#8e6144", height: viewport.h * 0.08, variance: viewport.h * 0.014, alpha: 0.22, parallax: 0.38 },
+        { color: "#a5795a", height: viewport.h * 0.04, variance: viewport.h * 0.008, alpha: 0.14, parallax: 0.52 },
       ]
       : biome === "ocean" || biome === "river"
         ? [
-          { color: "#193848", height: viewport.h * 0.14, variance: viewport.h * 0.02, alpha: 0.3, parallax: 0.12 },
-          { color: "#245165", height: viewport.h * 0.09, variance: viewport.h * 0.014, alpha: 0.2, parallax: 0.22 },
+          { color: "#193848", height: viewport.h * 0.14, variance: viewport.h * 0.02, alpha: 0.32, parallax: 0.12 },
+          { color: "#245165", height: viewport.h * 0.09, variance: viewport.h * 0.014, alpha: 0.22, parallax: 0.22 },
+          { color: "#2f5f7a", height: viewport.h * 0.05, variance: viewport.h * 0.008, alpha: 0.16, parallax: 0.36 },
         ]
         : [
-          { color: "#24362c", height: viewport.h * 0.16, variance: viewport.h * 0.024, alpha: 0.3, parallax: 0.12 },
-          { color: "#35523d", height: viewport.h * 0.11, variance: viewport.h * 0.018, alpha: 0.22, parallax: 0.24 },
-          { color: "#4f6b56", height: viewport.h * 0.07, variance: viewport.h * 0.012, alpha: 0.16, parallax: 0.36 },
+          { color: "#24362c", height: viewport.h * 0.16, variance: viewport.h * 0.024, alpha: 0.32, parallax: 0.12 },
+          { color: "#35523d", height: viewport.h * 0.11, variance: viewport.h * 0.018, alpha: 0.24, parallax: 0.24 },
+          { color: "#4f6b56", height: viewport.h * 0.07, variance: viewport.h * 0.012, alpha: 0.18, parallax: 0.36 },
+          { color: "#5a7560", height: viewport.h * 0.03, variance: viewport.h * 0.006, alpha: 0.12, parallax: 0.52 },
         ];
     for (let layerIndex = 0; layerIndex < palettes.length; layerIndex += 1) {
       const layer = palettes[layerIndex];
-      const segments = 18;
+      const segments = 20;
       const baseOffset = (motion ? motion.cameraOffsetX : 0) * layer.parallax * 0.35;
       ctx.fillStyle = withAlpha(layer.color, layer.alpha);
       ctx.beginPath();
@@ -10706,54 +10849,122 @@
     const forwardY = Math.sin(fp.yaw);
     const rightX = -forwardY;
     const rightY = forwardX;
-    const stepX = Math.max(8, Math.round(viewport.w / 140));
-    const stepY = Math.max(4, Math.round(viewport.h / 110));
-    for (let y = Math.floor(horizon); y < viewport.y + viewport.h; y += stepY) {
-      const rowDistance = clamp((eyeHeight * focal * 0.13) / Math.max(10, y - horizon + 1), 16, 1280);
-      for (let x = viewport.x; x < viewport.x + viewport.w; x += stepX) {
+    const stepX = Math.max(6, Math.round(viewport.w / 160));
+    const stepY = Math.max(3, Math.round(viewport.h / 130));
+    
+    // DEBUG: Log ground rendering info
+    if (!window.groundDebugShown) {
+      console.log(`[GROUND] horizon=${horizon.toFixed(1)}, viewport=${viewport.y}-${viewport.y + viewport.h}, eyeHeight=${eyeHeight}, focal=${focal.toFixed(0)}`);
+      window.groundDebugShown = true;
+    }
+    
+    // Draw textured ground layer by layer with proper depth
+    let groundPixelsDrawn = 0;
+    for (let y = Math.floor(horizon) + stepY; y < viewport.y + viewport.h; y += stepY) {
+      const screenDepth = y - horizon;
+      if (screenDepth < 1) continue;
+      
+      const rowDistance = clamp((eyeHeight * focal * 0.14) / Math.max(8, screenDepth), 12, 2800);
+      const depthFade = clamp(1 - (rowDistance - 100) / 2000, 0, 1);
+      const fogAlpha = 1 - depthFade;
+      
+      // More detailed near, less detailed far
+      const detailLevel = depthFade > 0.6 ? 1 : depthFade > 0.3 ? 2 : 3;
+      const skipStep = Math.max(1, detailLevel);
+      
+      for (let x = viewport.x; x < viewport.x + viewport.w; x += stepX * skipStep) {
         const cameraX = ((x + stepX * 0.5) - centerX) / Math.max(120, focal);
         const worldX = unit.x + forwardX * rowDistance + rightX * rowDistance * cameraX * 1.6;
         const worldY = unit.y + forwardY * rowDistance + rightY * rowDistance * cameraX * 1.6;
+        
+        // Sample actual map tile at this position
         const tile = getTileAtWorld(worldX, worldY);
-        ctx.fillStyle = getBiomeFloorColor(tile ? tile.biome : "meadow", worldX, worldY, rowDistance);
-        ctx.fillRect(x, y, stepX + 1, stepY + 1);
-        if (tile && (tile.biome === "river" || tile.biome === "ocean" || tile.biome === "marsh")) {
+        const biome = (tile && tile.biome) || "meadow";
+        const baseColor = getBiomeFloorColor(biome, worldX, worldY, rowDistance);
+        
+        // Add texture variation using world coordinates
+        const texU = Math.floor(worldX / 32) % 4;
+        const texV = Math.floor(worldY / 32) % 4;
+        const textureVariation = (texU + texV * 4) * 0.02;
+        
+        // Parse hex color and add depth shading
+        let r = parseInt(baseColor.substring(1, 3), 16);
+        let g = parseInt(baseColor.substring(3, 5), 16);
+        let b = parseInt(baseColor.substring(5, 7), 16);
+        
+        // Apply depth-based shading
+        const depthShade = 0.92 + textureVariation + depthFade * 0.12;
+        r = Math.round(clamp(r * depthShade, 0, 255));
+        g = Math.round(clamp(g * depthShade, 0, 255));
+        b = Math.round(clamp(b * depthShade, 0, 255));
+        
+        const shadedColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        
+        ctx.fillStyle = shadedColor;
+        const tileW = stepX * skipStep + 1;
+        const tileH = stepY + 1;
+        ctx.fillRect(x, y, tileW, tileH);
+        groundPixelsDrawn++;
+        
+        // Add water shimmer
+        if (tile && (tile.biome === "river" || tile.biome === "ocean")) {
           const shimmer = 0.5 + 0.5 * Math.sin(state.time * 2.4 + worldX * 0.02 + worldY * 0.017);
-          if (shimmer > 0.74) {
-            ctx.fillStyle = tile.biome === "marsh" ? `rgba(182,206,166,${(shimmer - 0.74) * 0.12})` : `rgba(228,244,255,${(shimmer - 0.74) * 0.2})`;
-            ctx.fillRect(x, y, stepX + 1, Math.max(1, stepY * 0.45));
+          if (shimmer > 0.76) {
+            ctx.fillStyle = `rgba(${250 - texU * 8},${255 - texV * 6},${255},${(shimmer - 0.76) * 0.18 * depthFade})`;
+            ctx.fillRect(x, y, tileW, Math.max(1, tileH * 0.5));
+          }
+        } else if (tile && tile.biome === "marsh") {
+          const shimmer = 0.5 + 0.5 * Math.sin(state.time * 1.8 + worldX * 0.015);
+          if (shimmer > 0.72) {
+            ctx.fillStyle = `rgba(160,200,140,${(shimmer - 0.72) * 0.14 * depthFade})`;
+            ctx.fillRect(x, y, tileW, Math.max(1, tileH * 0.6));
           }
         } else if (tile && tile.biome === "road") {
-          const lane = Math.abs(Math.sin(worldX * 0.035 + worldY * 0.02));
-          if (lane > 0.86) {
-            ctx.fillStyle = "rgba(70,54,38,0.1)";
-            ctx.fillRect(x, y, stepX + 1, stepY + 1);
+          const lanePattern = Math.abs(Math.sin(worldX * 0.04 + worldY * 0.025));
+          if (lanePattern > 0.84) {
+            ctx.fillStyle = `rgba(50,40,30,${0.08 * depthFade})`;
+            ctx.fillRect(x, y, tileW, tileH);
           }
         }
       }
+      
+      // Add fog layer only for far distances (reduce obscuration of near ground)
+      if (fogAlpha > 0.06 && rowDistance > 300) {
+        ctx.fillStyle = `rgba(194,214,224,${fogAlpha * 0.08})`;
+        ctx.fillRect(viewport.x, y, viewport.w, stepY);
+      }
     }
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    
+    if (window.frameCount % 60 === 0) console.log(`[GROUND] Drew ${groundPixelsDrawn} ground tiles this frame`);
+    
+    // Draw perspective guide lines for realistic depth
+    ctx.strokeStyle = "rgba(255,255,255,0.04)";
     ctx.lineWidth = 1;
-    for (let i = 1; i <= 10; i += 1) {
-      const t = i / 10;
-      const lineY = horizon + Math.pow(t, 2.15) * (viewport.h - (horizon - viewport.y));
+    for (let i = 1; i <= 8; i += 1) {
+      const t = i / 8;
+      const lineY = horizon + Math.pow(t, 2.1) * (viewport.y + viewport.h - horizon);
       ctx.beginPath();
       ctx.moveTo(viewport.x, lineY);
       ctx.lineTo(viewport.x + viewport.w, lineY);
       ctx.stroke();
     }
+    
+    // Add subtle vanishing point lines for depth
     if (!fp.aiming) {
-      ctx.strokeStyle = "rgba(255,255,255,0.035)";
-      for (const lane of [-0.34, -0.12, 0.12, 0.34]) {
+      ctx.strokeStyle = "rgba(255,255,255,0.025)";
+      for (const lane of [-0.38, -0.14, 0.14, 0.38]) {
         ctx.beginPath();
-        ctx.moveTo(centerX + lane * viewport.w * 0.44, viewport.y + viewport.h);
-        ctx.lineTo(centerX + lane * viewport.w * 0.07, horizon + viewport.h * 0.02);
+        ctx.moveTo(centerX + lane * viewport.w * 0.48, viewport.y + viewport.h);
+        ctx.lineTo(centerX + lane * viewport.w * 0.06, horizon + viewport.h * 0.015);
         ctx.stroke();
       }
     }
+    
+    // Final depth vignette
     const vignette = ctx.createLinearGradient(viewport.x, horizon, viewport.x, viewport.y + viewport.h);
     vignette.addColorStop(0, "rgba(255,255,255,0)");
-    vignette.addColorStop(1, "rgba(0,0,0,0.26)");
+    vignette.addColorStop(0.5, "rgba(0,0,0,0.08)");
+    vignette.addColorStop(1, "rgba(0,0,0,0.32)");
     ctx.fillStyle = vignette;
     ctx.fillRect(viewport.x, horizon, viewport.w, viewport.h - (horizon - viewport.y));
   }
@@ -10777,10 +10988,22 @@
   }
 
   function getFirstPersonDepthFade(depth, maxDistance = 1080) {
-    const fog = clamp((depth - 120) / Math.max(1, maxDistance - 120), 0, 1);
+    // Non-linear fog curve for more realistic atmospheric perspective
+    // Objects fade gradually starting at 150 units away
+    const fogStartDistance = 150;
+    const midFogDistance = (fogStartDistance + maxDistance) / 2;
+    
+    if (depth <= fogStartDistance) {
+      return { fog: 0, alpha: 1 };
+    }
+    
+    // Smooth fog curve: starts slow, accelerates in middle, flattens at far distance
+    const normalizedDepth = (depth - fogStartDistance) / (maxDistance - fogStartDistance);
+    const fog = Math.min(1, Math.pow(Math.max(0, normalizedDepth), 1.2));
+    
     return {
-      fog,
-      alpha: lerp(1, 0.34, fog),
+      fog: fog,
+      alpha: lerp(1, 0.3, fog),
     };
   }
 
@@ -10822,28 +11045,53 @@
   function drawFirstPersonTreeModel(tree, proj) {
     const width = tree.radius * 4.2 * proj.scale;
     const height = tree.radius * 7.2 * proj.scale;
-    drawFirstPersonScreenShadow(proj.x, proj.y + 5 * proj.scale, width, 0.22);
-    ctx.fillStyle = "#4b2f20";
-    ctx.fillRect(proj.x - width * 0.08, proj.y - height * 0.34, width * 0.16, height * 0.46);
-    const lowerLeaf = ctx.createRadialGradient(proj.x, proj.y - height * 0.58, width * 0.08, proj.x, proj.y - height * 0.52, width * 0.58);
-    lowerLeaf.addColorStop(0, "#89c97e");
-    lowerLeaf.addColorStop(0.6, "#4f874d");
-    lowerLeaf.addColorStop(1, "#203f26");
-    ctx.fillStyle = lowerLeaf;
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y - height * 0.52, width * 0.42, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.beginPath();
-    ctx.arc(proj.x - width * 0.12, proj.y - height * 0.62, width * 0.18, 0, TAU);
-    ctx.fill();
+    drawFirstPersonScreenShadow(proj.x, proj.y + 5 * proj.scale, width, 0.24);
+    
+    // Try to draw actual tree sprite at appropriate scale (reduced for ground visibility)
+    const spriteWidth = Math.max(18, width * 0.6);
+    const spriteHeight = Math.max(24, height * 0.8);
+    const spriteDrawn = drawSpriteFromGroup(
+      "resources",
+      tree.spriteKey || "tree_1",
+      proj.x,
+      proj.y - height * 0.26,
+      spriteWidth,
+      spriteHeight,
+      0,
+      0.82
+    );
+    
+    if (!spriteDrawn) {
+      // Fallback to procedural tree with enhanced detail
+      ctx.fillStyle = "#5a3f2e";
+      ctx.fillRect(proj.x - width * 0.08, proj.y - height * 0.34, width * 0.16, height * 0.46);
+      
+      const lowerLeaf = ctx.createRadialGradient(proj.x, proj.y - height * 0.58, width * 0.1, proj.x, proj.y - height * 0.52, width * 0.62);
+      lowerLeaf.addColorStop(0, "#92d885");
+      lowerLeaf.addColorStop(0.5, "#5a954d");
+      lowerLeaf.addColorStop(1, "#1f3f1f");
+      ctx.fillStyle = lowerLeaf;
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y - height * 0.52, width * 0.46, 0, TAU);
+      ctx.fill();
+      
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.beginPath();
+      ctx.arc(proj.x - width * 0.18, proj.y - height * 0.66, width * 0.2, 0, TAU);
+      ctx.fill();
+    }
   }
 
   function drawFirstPersonRockModel(rock, proj) {
     const width = rock.radius * 3.9 * proj.scale;
     const height = rock.radius * 2.8 * proj.scale;
-    drawFirstPersonScreenShadow(proj.x, proj.y + 4 * proj.scale, width, 0.16);
-    ctx.fillStyle = "#626871";
+    drawFirstPersonScreenShadow(proj.x, proj.y + 4 * proj.scale, width, 0.18);
+    
+    // Main rock body with gradient for depth
+    const rockGrad = ctx.createLinearGradient(proj.x - width * 0.48, proj.y - height, proj.x + width * 0.48, proj.y + height * 0.08);
+    rockGrad.addColorStop(0, "#706b78");
+    rockGrad.addColorStop(1, "#4a4555");
+    ctx.fillStyle = rockGrad;
     ctx.beginPath();
     ctx.moveTo(proj.x - width * 0.48, proj.y);
     ctx.lineTo(proj.x - width * 0.22, proj.y - height);
@@ -10852,11 +11100,21 @@
     ctx.lineTo(proj.x + width * 0.22, proj.y + height * 0.08);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    
+    // Cracks and texture detail
+    ctx.strokeStyle = "rgba(0,0,0,0.22)";
+    ctx.lineWidth = Math.max(0.5, proj.scale);
+    ctx.beginPath();
+    ctx.moveTo(proj.x - width * 0.16, proj.y - height * 0.64);
+    ctx.lineTo(proj.x + width * 0.12, proj.y - height * 0.24);
+    ctx.stroke();
+    
+    // Highlight for realism
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
     ctx.beginPath();
     ctx.moveTo(proj.x - width * 0.22, proj.y - height);
-    ctx.lineTo(proj.x + width * 0.08, proj.y - height * 0.78);
-    ctx.lineTo(proj.x + width * 0.18, proj.y - height * 0.2);
+    ctx.lineTo(proj.x + width * 0.08, proj.y - height * 0.72);
+    ctx.lineTo(proj.x + width * 0.16, proj.y - height * 0.88);
     ctx.closePath();
     ctx.fill();
   }
@@ -10870,76 +11128,123 @@
     const x = proj.x;
     const y = proj.y;
     drawFirstPersonScreenShadow(x, y + 6 * proj.scale, width * 1.1, 0.18);
-    if (style === "wall" || style === "capital-wall" || style === "gate") {
-      ctx.fillStyle = style === "capital-wall" ? "#77828c" : "#aca69c";
-      ctx.fillRect(x - width * 0.5, y - height * 0.5, width, height * 0.5);
-      ctx.fillStyle = style === "capital-wall" ? "#59636c" : "#7b746b";
-      for (let i = -2; i <= 2; i += 1) ctx.fillRect(x + i * width * 0.18 - width * 0.05, y - height * 0.64, width * 0.1, height * 0.18);
-    } else if (style === "tower" || style === "radar") {
-      ctx.fillStyle = style === "radar" ? "#6c7a84" : "#92847b";
-      ctx.fillRect(x - width * 0.2, y - height, width * 0.4, height);
-      ctx.fillStyle = "#c9d2d9";
-      ctx.fillRect(x - width * 0.34, y - height * 1.04, width * 0.68, height * 0.12);
-      if (style === "radar") {
-        ctx.strokeStyle = "#b9f0ff";
-        ctx.lineWidth = Math.max(1, proj.scale * 2.4);
+    
+    // Try to draw building sprite first at appropriate scale (reduced for ground visibility)
+    // Map building styles to sprite keys from assets group
+    const styleToSpriteKey = {
+      house: "village_house",
+      keep: "royal_keep",
+      tower: "stone_tower",
+      academy: "academy",
+      wall: "wall",
+      "capital-wall": "capital_wall",
+      gate: "wall",
+      cannon: "cannon_nest",
+      mortar: "mortar_pit",
+      bunker: "bunker",
+      radar: "radar_hub",
+      command: "command_hall",
+      market: "market",
+      granary: "granary",
+      outpost: "outpost",
+      barracks: "guard_barracks",
+      archery: "archer_house",
+      stable: "stable",
+      dock: "dock",
+      bridge: "bridge",
+    };
+    const spriteKey = styleToSpriteKey[style] || "village_house";
+    const spriteDrawn = drawSpriteFromGroup(
+      "assets",
+      spriteKey,
+      x,
+      y - height * 0.5,
+      Math.max(20, width * 0.55),
+      Math.max(20, height * 0.7),
+      0,
+      0.8
+    );
+    
+    // DEBUG: Log building sprite results
+    if (!window.buildingSpriteDebug) {
+      console.log(`[BUILDING] Attempted to draw sprite key="${spriteKey}" with dimensions ${Math.max(20, width * 0.55).toFixed(0)}x${Math.max(20, height * 0.7).toFixed(0)}, result=${spriteDrawn}`);
+      window.buildingSpriteDebug = true;
+    }
+    
+    if (!spriteDrawn) {
+      // Fallback to procedural rendering
+      if (style === "wall" || style === "capital-wall" || style === "gate") {
+        ctx.fillStyle = style === "capital-wall" ? "#77828c" : "#aca69c";
+        ctx.fillRect(x - width * 0.5, y - height * 0.5, width, height * 0.5);
+        ctx.fillStyle = style === "capital-wall" ? "#59636c" : "#7b746b";
+        for (let i = -2; i <= 2; i += 1) ctx.fillRect(x + i * width * 0.18 - width * 0.05, y - height * 0.64, width * 0.1, height * 0.18);
+      } else if (style === "tower" || style === "radar") {
+        ctx.fillStyle = style === "radar" ? "#6c7a84" : "#92847b";
+        ctx.fillRect(x - width * 0.2, y - height, width * 0.4, height);
+        ctx.fillStyle = "#c9d2d9";
+        ctx.fillRect(x - width * 0.34, y - height * 1.04, width * 0.68, height * 0.12);
+        if (style === "radar") {
+          ctx.strokeStyle = "#b9f0ff";
+          ctx.lineWidth = Math.max(1, proj.scale * 2.4);
+          ctx.beginPath();
+          ctx.arc(x, y - height * 1.02, width * 0.14, Math.PI * 1.1, Math.PI * 1.9);
+          ctx.stroke();
+        }
+      } else if (style === "bunker" || style === "cannon" || style === "mortar") {
+        ctx.fillStyle = "#5d6770";
+        ctx.fillRect(x - width * 0.44, y - height * 0.54, width * 0.88, height * 0.54);
+        ctx.fillStyle = "#76838e";
+        ctx.fillRect(x - width * 0.26, y - height * 0.78, width * 0.52, height * 0.24);
+        ctx.fillStyle = "#303b40";
+        ctx.fillRect(x + width * 0.08, y - height * 0.56, width * (style === "cannon" ? 0.46 : 0.22), height * 0.08);
+      } else if (style === "bridge" || style === "dock") {
+        ctx.fillStyle = "#977754";
+        ctx.fillRect(x - width * 0.54, y - height * 0.28, width * 1.08, height * 0.28);
+        ctx.fillStyle = "#caa879";
+        ctx.fillRect(x - width * 0.54, y - height * 0.34, width * 1.08, height * 0.06);
+        ctx.fillStyle = "#6d5138";
+        ctx.fillRect(x - width * 0.42, y - height * 0.08, width * 0.08, height * 0.16);
+        ctx.fillRect(x + width * 0.34, y - height * 0.08, width * 0.08, height * 0.16);
+      } else if (style === "keep" || style === "academy" || style === "command") {
+        ctx.fillStyle = "#beb8af";
+        ctx.fillRect(x - width * 0.42, y - height * 0.66, width * 0.84, height * 0.66);
+        ctx.fillStyle = "#8d8378";
+        ctx.fillRect(x - width * 0.52, y - height * 0.88, width * 0.18, height * 0.88);
+        ctx.fillRect(x + width * 0.34, y - height * 0.88, width * 0.18, height * 0.88);
+        ctx.fillStyle = "#6f665d";
         ctx.beginPath();
-        ctx.arc(x, y - height * 1.02, width * 0.14, Math.PI * 1.1, Math.PI * 1.9);
-        ctx.stroke();
-      }
-    } else if (style === "bunker" || style === "cannon" || style === "mortar") {
-      ctx.fillStyle = "#5d6770";
-      ctx.fillRect(x - width * 0.44, y - height * 0.54, width * 0.88, height * 0.54);
-      ctx.fillStyle = "#76838e";
-      ctx.fillRect(x - width * 0.26, y - height * 0.78, width * 0.52, height * 0.24);
-      ctx.fillStyle = "#303b40";
-      ctx.fillRect(x + width * 0.08, y - height * 0.56, width * (style === "cannon" ? 0.46 : 0.22), height * 0.08);
-    } else if (style === "bridge" || style === "dock") {
-      ctx.fillStyle = "#977754";
-      ctx.fillRect(x - width * 0.54, y - height * 0.28, width * 1.08, height * 0.28);
-      ctx.fillStyle = "#caa879";
-      ctx.fillRect(x - width * 0.54, y - height * 0.34, width * 1.08, height * 0.06);
-      ctx.fillStyle = "#6d5138";
-      ctx.fillRect(x - width * 0.42, y - height * 0.08, width * 0.08, height * 0.16);
-      ctx.fillRect(x + width * 0.34, y - height * 0.08, width * 0.08, height * 0.16);
-    } else if (style === "keep" || style === "academy" || style === "command") {
-      ctx.fillStyle = "#beb8af";
-      ctx.fillRect(x - width * 0.42, y - height * 0.66, width * 0.84, height * 0.66);
-      ctx.fillStyle = "#8d8378";
-      ctx.fillRect(x - width * 0.52, y - height * 0.88, width * 0.18, height * 0.88);
-      ctx.fillRect(x + width * 0.34, y - height * 0.88, width * 0.18, height * 0.88);
-      ctx.fillStyle = "#6f665d";
-      ctx.beginPath();
-      ctx.moveTo(x - width * 0.48, y - height * 0.66);
-      ctx.lineTo(x, y - height);
-      ctx.lineTo(x + width * 0.48, y - height * 0.66);
-      ctx.lineTo(x, y - height * 0.42);
-      ctx.closePath();
-      ctx.fill();
-      if (style === "command") {
-        ctx.fillStyle = ownerColor;
-        ctx.fillRect(x + width * 0.1, y - height * 1.08, width * 0.04, height * 0.26);
-        ctx.beginPath();
-        ctx.moveTo(x + width * 0.14, y - height * 1.08);
-        ctx.lineTo(x + width * 0.32, y - height * 1.02);
-        ctx.lineTo(x + width * 0.14, y - height * 0.96);
+        ctx.moveTo(x - width * 0.48, y - height * 0.66);
+        ctx.lineTo(x, y - height);
+        ctx.lineTo(x + width * 0.48, y - height * 0.66);
+        ctx.lineTo(x, y - height * 0.42);
         ctx.closePath();
         ctx.fill();
+        if (style === "command") {
+          ctx.fillStyle = ownerColor;
+          ctx.fillRect(x + width * 0.1, y - height * 1.08, width * 0.04, height * 0.26);
+          ctx.beginPath();
+          ctx.moveTo(x + width * 0.14, y - height * 1.08);
+          ctx.lineTo(x + width * 0.32, y - height * 1.02);
+          ctx.lineTo(x + width * 0.14, y - height * 0.96);
+          ctx.closePath();
+          ctx.fill();
+        }
+      } else {
+        ctx.fillStyle = "#d8d1c2";
+        ctx.fillRect(x - width * 0.38, y - height * 0.46, width * 0.76, height * 0.46);
+        ctx.fillStyle = style === "market" ? "#c7764f" : style === "plant" || style === "refinery" ? "#5d6774" : style === "hospital" ? "#556c7c" : style === "stable" ? "#6f5337" : "#8d6c5c";
+        ctx.beginPath();
+        ctx.moveTo(x - width * 0.46, y - height * 0.46);
+        ctx.lineTo(x, y - height * 0.9);
+        ctx.lineTo(x + width * 0.46, y - height * 0.46);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#e8f4fb";
+        ctx.fillRect(x - width * 0.22, y - height * 0.34, width * 0.12, height * 0.1);
+        ctx.fillRect(x + width * 0.1, y - height * 0.34, width * 0.12, height * 0.1);
       }
-    } else {
-      ctx.fillStyle = "#d8d1c2";
-      ctx.fillRect(x - width * 0.38, y - height * 0.46, width * 0.76, height * 0.46);
-      ctx.fillStyle = style === "market" ? "#c7764f" : style === "plant" || style === "refinery" ? "#5d6774" : style === "hospital" ? "#556c7c" : style === "stable" ? "#6f5337" : "#8d6c5c";
-      ctx.beginPath();
-      ctx.moveTo(x - width * 0.46, y - height * 0.46);
-      ctx.lineTo(x, y - height * 0.9);
-      ctx.lineTo(x + width * 0.46, y - height * 0.46);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#e8f4fb";
-      ctx.fillRect(x - width * 0.22, y - height * 0.34, width * 0.12, height * 0.1);
-      ctx.fillRect(x + width * 0.1, y - height * 0.34, width * 0.12, height * 0.1);
     }
+    
     if (building.lastHitTimer > 0 || fp.targetId === building.id) {
       drawFirstPersonHealthBar(x, y - height - 8, Math.max(26, width * 0.7), building.hp / Math.max(1, building.maxHp || building.hp || 1), "#ff9b89");
     }
@@ -11439,6 +11744,13 @@
       return;
     }
     const fp = getFirstPersonState(player);
+    if (!fp) {
+      drawBackdrop(viewport.w, viewport.h, viewport.x, viewport.y);
+      drawWorld();
+      drawUi(viewport.w, viewport.h);
+      drawControllerCursor(player);
+      return;
+    }
     syncFirstPersonCamera(player, unit);
     const motion = getFirstPersonMotionProfile(unit, fp);
     try {
@@ -11605,6 +11917,7 @@
     drawCommandLinks();
     drawUnits();
     drawProjectiles();
+    drawFallingPayloads();
     drawEffects();
     drawHoveredEnemyHighlights();
     drawPlacementGhost();
